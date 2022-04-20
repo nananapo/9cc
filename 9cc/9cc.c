@@ -305,7 +305,8 @@ void	gen(Node *node)
 		case ND_EQUAL:
 			printf("    cmp rdi, rax\n");
 			printf("    sete al\n");
-			printf("    movzb rax, al\n");
+			//printf("    movzb rax, al\n");
+			printf("    movzx rax, al\n");
 			break;
 		default:
 			error("不明なノード");
