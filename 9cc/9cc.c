@@ -34,8 +34,6 @@ typedef enum {
 	ND_NEQUAL,
 	ND_LESS,
 	ND_LESSEQ,
-	ND_GREATER,
-	ND_GREATEREQ,
 } NodeKind;
 
 struct Node {
@@ -246,9 +244,9 @@ Node *relational()
 		else if (consume("<="))
 			node = new_node(ND_LESSEQ, node, add());
 		else if (consume(">"))
-			node = new_node(ND_GREATER, node, add());
+			node = new_node(ND_LESS, add(), node);
 		else if (consume(">="))
-			node = new_node(ND_GREATEREQ, node, add());
+			node = new_node(ND_LESSEQ, add(), node);
 		else
 			return node;
 	}
@@ -310,6 +308,16 @@ void	gen(Node *node)
 		case ND_NEQUAL:
 			printf("    cmp rdi, rax\n");
 			printf("    setne al\n");
+			printf("    movzx rax, al\n");
+			break;
+		case ND_LESS:
+			printf("    cmp rax, rdi\n");
+			printf("    setl al\n");
+			printf("    movzx rax, al\n");
+			break;
+		case ND_LESSEQ:
+			printf("    cmp rax, rdi\n");
+			printf("    setle al\n");
 			printf("    movzx rax, al\n");
 			break;
 		default:

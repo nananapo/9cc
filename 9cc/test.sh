@@ -33,4 +33,8 @@ assert 1 "3 + 5 == 8"
 assert 0 "3 + 4 == 8"
 assert 0 "3 + 5 != 8"
 assert 1 "3 + 4 != 8"
+assert 1 "-3 + 2 < 0"
+assert 0 "-3 + 2 > 0"
+assert 1 "-3 + 3 <= 0"
+assert 1 "-3 + 3 >= 0"
 echo OK
