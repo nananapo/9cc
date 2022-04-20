@@ -10,9 +10,9 @@ int main(int argc, char **argv)
     }
 
     printf(".intel_syntax noprefix\n");
-    printf(".global main\n");
-    printf("main:\n");
-    printf("    moc rax. %d\n", atoi(argv[1]));
+    printf(".global _main\n");
+    printf("_main:\n");
+    printf("    mov rax, %d\n", atoi(argv[1]));
     printf("    ret\n");
     return (0);
 }
