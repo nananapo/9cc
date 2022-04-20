@@ -303,19 +303,14 @@ void	gen(Node *node)
 			printf("    idiv rdi\n");
 			break;
 		case ND_EQUAL:
-		case ND_NEQUAL:
 			printf("    cmp rdi, rax\n");
 			printf("    sete al\n");
-			//printf("    movzb rax, al\n");
 			printf("    movzx rax, al\n");
-			if (node->kind == ND_NEQUAL)
-			{
-				printf("    push 0\n");
-				printf("    pop rdi\n");
-				printf("    cmp rax, rdi\n");
-				printf("    sete al\n");
-				printf("    movzx rax, al\n");
-			}
+			break;
+		case ND_NEQUAL:
+			printf("    cmp rdi, rax\n");
+			printf("    setne al\n");
+			printf("    movzx rax, al\n");
 			break;
 		default:
 			error("不明なノード");
