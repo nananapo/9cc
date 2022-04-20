@@ -117,7 +117,7 @@ Token	*tokenize(char *p)
 			p++;
 			continue;
 		}
-		if (*p == '+' || *p == '-')
+		if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')')
 		{
 			cur = new_token(TK_RESERVED, cur, p++);
 			continue;
@@ -152,15 +152,24 @@ Node *new_node_num(int val)
 	return node;
 }
 
+Node *unary()
+{
+	if (consume('+'))
+		return primary();
+	if (consume('-'))
+		return  new_node(ND_SUB, new_node_num(0), primary());
+	return primary();
+}
+
 Node *mul()
 {
-	Node *node = primary();
+	Node *node = unary();
 	for (;;)
 	{
 		if (consume('*'))
-			node = new_node(ND_MUL, node, primary());
+			node = new_node(ND_MUL, node, unary());
 		else if (consume('/'))
-			node = new_node(ND_DIV, node, primary());
+			node = new_node(ND_DIV, node, unary());
 		else
 			return node;
 	}
@@ -191,11 +200,47 @@ Node *primary()
 	return new_node_num(expect_number());
 }
 
+void	gen(Node *node)
+{
+	if (node->kind == ND_NUM)
+	{
+		printf("    push %d\n", node->val);
+		return;
+	}
+
+	gen(node->lhs);
+	gen(node->rhs);
+
+	printf("    pop rdi\n");
+	printf("    pop rax\n");
+
+	switch (node->kind)
+	{
+		case ND_ADD:
+			printf("    add rax, rdi\n");
+			break;
+		case ND_SUB:
+			printf("    sub rax, rdi\n");
+			break;
+		case ND_MUL:
+			printf("    imul rax, rdi\n");
+			break;
+		case ND_DIV:
+			printf("    cqo\n");
+			printf("    idiv rdi\n");
+			break;
+		default:
+			error("不明なノード");
+			break;
+	}
+	printf("    push rax\n");
+}
 
 int main(int argc, char **argv)
 {
 	char	*str;
 	int		sign;
+	Node	*node;
 
 	if (argc != 2)
 	{
@@ -205,22 +250,15 @@ int main(int argc, char **argv)
 
 	user_input = argv[1];
 	token = tokenize(argv[1]);
+	node = expr();
 
 	printf(".intel_syntax noprefix\n");
 	printf(".global _main\n");
 	printf("_main:\n");
-	printf("    mov rax, %d\n", expect_number());
-	while (!at_eof())
-	{
-		if (consume('+'))
-		{
-			printf("    add rax, %d\n", expect_number());
-			continue;
-		}
+	
+	gen(node);
 
-		expect('-');
-		printf("    sub rax, %d\n", expect_number());
-	}
+	printf("    pop rax\n");
 	printf("    ret\n");
 	return (0);
 }
