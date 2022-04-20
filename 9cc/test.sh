@@ -31,4 +31,6 @@ assert 10 "5 - -5"
 assert 48 "12 * -2 * -2"
 assert 1 "3 + 5 == 8"
 assert 0 "3 + 4 == 8"
+assert 0 "3 + 5 != 8"
+assert 1 "3 + 4 != 8"
 echo OK
