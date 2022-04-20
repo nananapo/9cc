@@ -29,4 +29,5 @@ assert 3 "(15 + 3) / 6"
 assert 5 "+5"
 assert 10 "5 - -5"
 assert 48 "12 * -2 * -2"
+assert 1 "3 + 5 == 8"
 echo OK

@@ -153,8 +153,9 @@ Token	*tokenize(char *p)
 		res_result = match_reserved_word(p);
 		if (res_result != NULL)
 		{
-			cur = new_token(TK_RESERVED, cur, p++);
+			cur = new_token(TK_RESERVED, cur, p);
 			cur->len = strlen(res_result);
+			p += cur->len;
 			continue;
 		}
 		if (isdigit(*p))
@@ -300,6 +301,11 @@ void	gen(Node *node)
 		case ND_DIV:
 			printf("    cqo\n");
 			printf("    idiv rdi\n");
+			break;
+		case ND_EQUAL:
+			printf("    cmp rdi, rax\n");
+			printf("    sete al\n");
+			printf("    movzb rax, al\n");
 			break;
 		default:
 			error("不明なノード");
