@@ -3,7 +3,8 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-extern Token	*token;
+extern	Node	*code[];
+extern	Token	*token;
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 {
@@ -24,10 +25,20 @@ Node *new_node_num(int val)
 
 Node *primary()
 {
+	Token	*tok;
+
 	if (consume("("))
 	{
-		Node *node = expr();
+		Node	*node = expr();
 		expect(")");
+		return node;
+	}
+	tok = consume_ident();
+	if (tok)
+	{
+		Node	*node = calloc(1, sizeof(Node));
+		node->kind = ND_LVAR;
+		node->offset = (tok->str[0] - 'a' + 1) * 8;
 		return node;
 	}
 	return new_node_num(expect_number());
@@ -102,8 +113,32 @@ Node *equality()
 	}
 }
 
-Node *expr()
+Node	*assign()
 {
-	return equality();
+	Node	*node = equality();
+	if (consume("="))
+		node = new_node(ND_ASSIGN, node, assign());
+	return node;
 }
 
+Node	*expr()
+{
+	return assign();
+}
+
+Node	*stmt()
+{
+	Node	*node = expr();
+	expect(";");
+	return node;
+}
+
+void	program()
+{
+	int	i;
+
+	i = 0;
+	while (!at_eof())
+		code[i++] = stmt();
+	code[i] = NULL;
+}

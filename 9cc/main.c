@@ -1,14 +1,17 @@
 #include "9cc.h"
 #include <stdio.h>
 
-Token		*token;
 char	*user_input;
+
+Token		*token;
+
+Node	*code[100];
 
 int main(int argc, char **argv)
 {
 	char	*str;
 	int		sign;
-	Node	*node;
+	int		i;
 
 	if (argc != 2)
 	{
@@ -18,15 +21,25 @@ int main(int argc, char **argv)
 
 	user_input = argv[1];
 	token = tokenize(argv[1]);
-	node = expr();
+	program();
 
 	printf(".intel_syntax noprefix\n");
 	printf(".global _main\n");
 	printf("_main:\n");
 	
-	gen(node);
+	printf("    push rbp\n");
+	printf("    mov rbp, rsp\n");
+	printf("    sub rsp, 208\n");
 
-	printf("    pop rax\n");
+	i = 0;
+	while (code[i])
+	{
+		gen(code[i++]);
+		printf("    pop rax\n");
+	}
+
+	printf("    mov rsp, rbp\n");
+	printf("    pop rbp\n");
 	printf("    ret\n");
 	return (0);
 }

@@ -14,8 +14,11 @@ static char *reserved_words[] = {
 	">=", "<=", "==", "!=",
 	">", "<", "=",
 	"+", "-", "*", "/",
-	"(", ")"
+	"(", ")",
+	";"
 };
+
+#define RESERVED_WORD_COUNT 14
 
 void	error_at(char *loc, char *fmt, ...)
 {
@@ -46,7 +49,7 @@ char	*match_reserved_word(char *str)
 	int	i;
 
 	i = -1;
-	while (++i < 13)
+	while (++i < RESERVED_WORD_COUNT)
 		if (strncmp(reserved_words[i], str, strlen(reserved_words[i])) == 0)
 			return reserved_words[i];
 	return NULL;
@@ -62,12 +65,22 @@ bool	consume(char *op)
 	return true;
 }
 
+Token	*consume_ident()
+{
+	Token	*ret;
+	if (token->kind != TK_IDENT)
+		return NULL;
+	ret = token;
+	token = token->next;
+	return ret;
+}
+
 void	expect(char *op)
 {
 	if (token->kind != TK_RESERVED ||
 		strlen(op) != token->len ||
 		memcmp(token->str, op, token->len) != 0)
-		error_at(token->str, "'%c'ではありません", op);
+		error_at(token->str, "'%s'ではありません", op);
 	token = token->next;
 }
 
@@ -107,6 +120,13 @@ Token	*tokenize(char *p)
 			cur = new_token(TK_RESERVED, cur, p);
 			cur->len = strlen(res_result);
 			p += cur->len;
+			continue;
+		}
+		if ('a' <= *p && *p <= 'z')
+		{
+			cur = new_token(TK_IDENT, cur, p);
+			cur->len = 1;
+			p += 1;
 			continue;
 		}
 		if (isdigit(*p))
