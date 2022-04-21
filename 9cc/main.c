@@ -3,9 +3,11 @@
 
 char	*user_input;
 
-Token		*token;
+Token	*token;
 
 Node	*code[100];
+
+LVar	*locals = NULL;
 
 int main(int argc, char **argv)
 {

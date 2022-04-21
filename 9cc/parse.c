@@ -6,9 +6,11 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-extern Token		*token;
+extern Token	*token;
 
-extern char	*user_input;
+extern char		*user_input;
+
+extern LVar		*locals;
 
 static char *reserved_words[] = {
 	">=", "<=", "==", "!=",
@@ -55,6 +57,7 @@ char	*match_reserved_word(char *str)
 	return NULL;
 }
 
+
 bool	consume(char *op)
 {
 	if (token->kind != TK_RESERVED ||
@@ -100,6 +103,24 @@ bool	at_eof()
 	return token->kind == TK_EOF;
 }
 
+// read var name
+// return length
+int	read_var_name(char *p)
+{
+	int	l = 0;
+
+	while (*p)
+	{
+		if (isspace(*p))
+			return l;
+		if (match_reserved_word(p))
+			return l;
+		l++;
+		p++;
+	}
+	return l;
+}
+
 Token	*tokenize(char *p)
 {
 	Token head;
@@ -125,8 +146,8 @@ Token	*tokenize(char *p)
 		if ('a' <= *p && *p <= 'z')
 		{
 			cur = new_token(TK_IDENT, cur, p);
-			cur->len = 1;
-			p += 1;
+			cur->len = read_var_name(p);
+			p += cur->len;
 			continue;
 		}
 		if (isdigit(*p))

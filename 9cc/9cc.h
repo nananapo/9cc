@@ -5,15 +5,18 @@
 
 typedef struct Token Token;
 typedef struct Node Node;
+typedef struct LVar LVar;
 
-typedef enum {
+typedef enum
+{
 	TK_RESERVED,
 	TK_IDENT,
 	TK_NUM,
 	TK_EOF,
 } TokenKind;
 
-struct Token {
+struct Token
+{
 	TokenKind	kind;
 	Token		*next;
 	int			val;
@@ -21,7 +24,8 @@ struct Token {
 	int			len;
 };
 
-typedef enum {
+typedef enum
+{
 	ND_NUM,
 	ND_ADD,
 	ND_SUB,
@@ -35,12 +39,21 @@ typedef enum {
 	ND_LVAR
 } NodeKind;
 
-struct Node {
+struct Node
+{
 	NodeKind	kind;
 	Node		*lhs;
 	Node		*rhs;
 	int			val;
 	int			offset;
+};
+
+struct	LVar
+{
+	LVar	*next;
+	char	*name;
+	int		len;
+	int		offset;
 };
 
 Node	*expr();
