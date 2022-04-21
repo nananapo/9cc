@@ -31,6 +31,7 @@ struct Token
 
 typedef enum
 {
+	ND_DUMMY,
 	ND_NUM,
 	ND_ADD,
 	ND_SUB,

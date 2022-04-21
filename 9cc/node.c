@@ -184,6 +184,34 @@ Node	*stmt()
 		node->rhs = stmt();
 		return node;
 	}
+	else if(consume_with_type(TK_FOR))
+	{
+		if (!consume("("))
+			error_at(token->str, ")ではないトークンです");
+		node = new_node(ND_FOR, NULL, NULL);
+		if (!consume(";"))
+		{
+			node->lhs = expr();
+			if (!consume(";"))
+				error_at(token->str, ";が必要です");
+		}
+		node->rhs = new_node(ND_DUMMY, NULL, NULL);
+		if (!consume(";"))
+		{
+			node->rhs->lhs = expr();
+			if (!consume(";"))
+				error_at(token->str, ";が必要です");
+		}
+		node->rhs->rhs = new_node(ND_DUMMY, NULL, NULL);
+		if (!consume(")"))
+		{
+			node->rhs->rhs->lhs = expr();
+			if(!consume(")"))
+				error_at(token->str, ")ではないトークンです");
+		}
+		node->rhs->rhs->rhs = stmt();
+		return node;
+	}
 	else
 	{
 		node = expr();

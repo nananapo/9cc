@@ -69,5 +69,9 @@ assert 2 "a = 1; if (a) return 2;"
 assert 2 "a = 1; b = 3; if (a < b) return 2; else return 3;"
 assert 3 "a = 3; b = 1; if (a < b) return 2; else return 3;"
 
+assert 10 "i=0;s=0;while(i<10) s = s + (i = i + 1);return 10;"
 assert 55 "i=0;s=0;while(i<10) s = s + (i = i + 1);return s;"
+
+assert 10 "s = 0;for(a=0;a<=10;a=a+1) s = s + a; return 10;"
+assert 55 "s = 0;for(a=0;a<=10;a=a+1) s = s + a; return s;"
 echo OK

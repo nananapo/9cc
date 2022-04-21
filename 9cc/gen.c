@@ -81,6 +81,32 @@ void	gen(Node *node)
 			printf("    jmp .Lbegin%d\n", lbegin);
 			printf(".Lend%d:\n", lend);
 			return;
+		case ND_FOR:
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			if (node->lhs != NULL)
+			{
+				gen(node->lhs);
+				printf("    pop rax\n");
+			}
+			printf(".Lbegin%d:\n", lbegin);
+			if(node->rhs->lhs != NULL)
+			{
+				gen(node->rhs->lhs);
+				printf("    pop rax\n");
+				printf("    cmp rax, 0\n");
+				printf("    je .Lend%d\n", lend);
+			}
+			gen(node->rhs->rhs->rhs);
+			printf("    pop rax\n");
+			if(node->rhs->rhs->lhs != NULL)
+			{
+				gen(node->rhs->rhs->lhs);
+				printf("    pop rax\n");
+			}
+			printf("    jmp .Lbegin%d\n", lbegin);
+			printf(".Lend%d:\n", lend);
+			return;
 		default:
 			break;
 	}
