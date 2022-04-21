@@ -15,6 +15,9 @@ void	gen_lval(Node *node)
 
 void	gen(Node *node)
 {
+	int	lend;
+	int	lbegin;
+
 	switch (node->kind)
 	{
 		case ND_NUM:
@@ -47,7 +50,7 @@ void	gen(Node *node)
 			printf("    pop rax\n");
 			printf("    cmp rax, 0\n");
 
-			int lend = jumpLabelCount++;
+			lend = jumpLabelCount++;
 
 			if (node->rhs->kind == ND_ELSE)
 			{
@@ -64,6 +67,18 @@ void	gen(Node *node)
 				printf("    je .Lend%d\n", lend);
 				gen(node->rhs);
 			}
+			printf(".Lend%d:\n", lend);
+			return;
+		case ND_WHILE:
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			printf(".Lbegin%d:\n", lbegin);
+			gen(node->lhs);
+			printf("    pop rax\n");
+			printf("    cmp rax, 0\n");
+			printf("    je .Lend%d\n", lend);
+			gen(node->rhs);
+			printf("    jmp .Lbegin%d\n", lbegin);
 			printf(".Lend%d:\n", lend);
 			return;
 		default:
@@ -112,7 +127,7 @@ void	gen(Node *node)
 			printf("    movzx rax, al\n");
 			break;
 		default:
-			fprintf(stderr, "不明なノード\n");
+			fprintf(stderr, "不明なノード %d\n", node->kind);
 			break;
 	}
 	printf("    push rax\n");

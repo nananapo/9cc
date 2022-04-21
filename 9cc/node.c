@@ -174,6 +174,16 @@ Node	*stmt()
 		node->rhs = rhs;
 		return node;
 	}
+	else if(consume_with_type(TK_WHILE))
+	{
+		if (!consume("("))
+			error_at(token->str, "(ではないトークンです");
+		node = new_node(ND_WHILE, expr(), NULL);
+		if (!consume(")"))
+			error_at(token->str, ")ではないトークンです");
+		node->rhs = stmt();
+		return node;
+	}
 	else
 	{
 		node = expr();

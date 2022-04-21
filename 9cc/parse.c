@@ -185,14 +185,14 @@ Token	*tokenize(char *p)
 		}
 		if (match_word(p, "while"))
 		{
-			cur = new_token(TK_ELSE, cur, p);
+			cur = new_token(TK_WHILE, cur, p);
 			cur->len = 5;
 			p += 5;
 			continue;
 		}
 		if (match_word(p, "for"))
 		{
-			cur = new_token(TK_ELSE, cur, p);
+			cur = new_token(TK_FOR, cur, p);
 			cur->len = 3;
 			p += 3;
 			continue;
