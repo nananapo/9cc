@@ -68,6 +68,14 @@ bool	consume(char *op)
 	return true;
 }
 
+bool	consume_with_type(TokenKind kind)
+{
+	if (token->kind != kind)
+		return false;
+	token = token->next;
+	return true;
+}
+
 Token	*consume_ident()
 {
 	Token	*ret;
@@ -139,6 +147,13 @@ Token	*tokenize(char *p)
 			cur = new_token(TK_RESERVED, cur, p);
 			cur->len = strlen(res_result);
 			p += cur->len;
+			continue;
+		}
+		if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6]))
+		{
+			cur = new_token(TK_RETURN, cur, p);
+			cur->len = 6;
+			p += 6;
 			continue;
 		}
 		if (can_use_beginning_of_var(*p))

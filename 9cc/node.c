@@ -157,8 +157,18 @@ Node	*expr()
 
 Node	*stmt()
 {
-	Node	*node = expr();
-	expect(";");
+	Node	*node;
+
+	if (consume_with_type(TK_RETURN))
+	{
+		node = calloc(1, sizeof(Node));
+		node->kind = ND_RETURN;
+		node->lhs = expr();
+	}
+	else
+		node = expr();
+	if(!consume(";"))
+		error_at(token->str, ";ではないトークンです");
 	return node;
 }
 

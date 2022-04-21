@@ -12,6 +12,7 @@ typedef enum
 	TK_RESERVED,
 	TK_IDENT,
 	TK_NUM,
+	TK_RETURN,
 	TK_EOF,
 } TokenKind;
 
@@ -36,7 +37,8 @@ typedef enum
 	ND_LESS,
 	ND_LESSEQ,
 	ND_ASSIGN,
-	ND_LVAR
+	ND_LVAR,
+	ND_RETURN
 } NodeKind;
 
 struct Node
@@ -65,6 +67,7 @@ void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
 
 bool	consume(char *op);
+bool	consume_with_type(TokenKind kind);
 Token	*consume_ident();
 void	expect(char *op);
 int		expect_number();

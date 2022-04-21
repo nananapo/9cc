@@ -58,4 +58,9 @@ assert 10 "abc=def=10;abc;"
 assert 10 "abc=def=10;def;"
 assert 0 "abc=1;def=2;abc>def;"
 assert 1 "abc=1;def=2;abc<def;"
+
+assert 10 "return 10;"
+assert 15 "a = 15;return a;"
+assert 20 "a = 3; b = 5; c = 12; return a + b + c;"
+
 echo OK
