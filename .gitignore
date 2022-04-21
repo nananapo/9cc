@@ -4,3 +4,4 @@ tmp*
 a.out
 9cc/9cc
 *.dSYM
+a.s
