@@ -56,6 +56,10 @@ struct	LVar
 	int		offset;
 };
 
+
+int	is_alnum(char c);
+int	can_use_beginning_of_var(char c);
+
 Node	*expr();
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
