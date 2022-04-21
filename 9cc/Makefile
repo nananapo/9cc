@@ -14,6 +14,11 @@ test: $(NAME)
 	./$(TEST_SCRIPT)
 
 clean:
-	rm -rf $(NAME) $(OBJS) *~ tmp* *dSYM
+	rm -rf $(OBJS) *~ tmp* *dSYM
 
-.PHONEY: test clean
+fclean: clean
+	rm -rf $(NAME)
+
+re: fclean $(NAME)
+
+.PHONEY: test clean fclean re
