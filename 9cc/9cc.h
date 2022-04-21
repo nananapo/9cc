@@ -1,6 +1,8 @@
 #ifndef NINECC_H
 # define NINECC_H
 
+#include <stdbool.h>
+
 typedef struct Token Token;
 typedef struct Node Node;
 
@@ -38,5 +40,15 @@ struct Node {
 };
 
 Node	*expr();
+void	error_at(char *loc, char *fmt, ...);
+
+bool	consume(char *op);
+void	expect(char *op);
+int		expect_number();
+bool	at_eof();
+
+Token	*tokenize(char *p);
+
+void	gen(Node *node);
 
 #endif
