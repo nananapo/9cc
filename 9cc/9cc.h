@@ -13,6 +13,10 @@ typedef enum
 	TK_IDENT,
 	TK_NUM,
 	TK_RETURN,
+	TK_IF,
+	TK_ELSE,
+	TK_WHILE,
+	TK_FOR,
 	TK_EOF,
 } TokenKind;
 
@@ -38,7 +42,11 @@ typedef enum
 	ND_LESSEQ,
 	ND_ASSIGN,
 	ND_LVAR,
-	ND_RETURN
+	ND_RETURN,
+	ND_IF,
+	ND_ELSE,
+	ND_WHILE,
+	ND_FOR
 } NodeKind;
 
 struct Node

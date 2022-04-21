@@ -127,6 +127,19 @@ int	read_var_name(char *p)
 	return l;
 }
 
+// check str is start with needle
+// if so, returns length of needle.
+// otherwise returns 0.
+int	match_word(char *str, char *needle)
+{
+	int	len = strlen(needle);
+	if (strncmp(str, needle, len) != 0)
+		return 0;
+	if (is_alnum(str[len]))
+		return 0;
+	return len;
+}
+
 Token	*tokenize(char *p)
 {
 	Token head;
@@ -149,11 +162,39 @@ Token	*tokenize(char *p)
 			p += cur->len;
 			continue;
 		}
-		if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6]))
+		if (match_word(p, "return"))
 		{
 			cur = new_token(TK_RETURN, cur, p);
 			cur->len = 6;
 			p += 6;
+			continue;
+		}
+		if (match_word(p, "if"))
+		{
+			cur = new_token(TK_IF, cur, p);
+			cur->len = 2;
+			p += 2;
+			continue;
+		}
+		if (match_word(p, "else"))
+		{
+			cur = new_token(TK_ELSE, cur, p);
+			cur->len = 4;
+			p += 4;
+			continue;
+		}
+		if (match_word(p, "while"))
+		{
+			cur = new_token(TK_ELSE, cur, p);
+			cur->len = 5;
+			p += 5;
+			continue;
+		}
+		if (match_word(p, "for"))
+		{
+			cur = new_token(TK_ELSE, cur, p);
+			cur->len = 3;
+			p += 3;
 			continue;
 		}
 		if (can_use_beginning_of_var(*p))

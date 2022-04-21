@@ -47,9 +47,7 @@ Node *primary()
 	tok = consume_ident();
 	if (tok)
 	{
-		Node	*node = calloc(1, sizeof(Node));
-		node->kind = ND_LVAR;
-
+		Node	*node = new_node(ND_LVAR, NULL, NULL);
 		LVar	*lvar = find_lvar(tok);
 		if (lvar)
 		{
@@ -160,13 +158,26 @@ Node	*stmt()
 	Node	*node;
 
 	if (consume_with_type(TK_RETURN))
+		node = new_node(ND_RETURN, expr(), NULL);
+	else if (consume_with_type(TK_IF))
 	{
-		node = calloc(1, sizeof(Node));
-		node->kind = ND_RETURN;
-		node->lhs = expr();
+		if (!consume("("))
+			error_at(token->str, "(ではないトークンです");
+		node = new_node(ND_IF, expr(), NULL);
+		if (!consume(")"))
+			error_at(token->str, ")ではないトークンです");
+		Node *rhs = stmt();
+		if (consume_with_type(TK_ELSE))
+		{
+			rhs = new_node(ND_ELSE, rhs, stmt());
+		}
+		node->rhs = rhs;
+		return node;
 	}
 	else
+	{
 		node = expr();
+	}
 	if(!consume(";"))
 		error_at(token->str, ";ではないトークンです");
 	return node;

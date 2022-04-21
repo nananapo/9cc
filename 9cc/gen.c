@@ -1,6 +1,8 @@
 #include "9cc.h"
 #include <stdio.h>
 
+int	jumpLabelCount = 0;
+
 // 変数のアドレスをpushする
 void	gen_lval(Node *node)
 {
@@ -39,6 +41,30 @@ void	gen(Node *node)
 			printf("    mov rsp, rbp\n");
 			printf("    pop rbp\n");
 			printf("    ret\n");
+			return;
+		case ND_IF:
+			gen(node->lhs);
+			printf("    pop rax\n");
+			printf("    cmp rax, 0\n");
+
+			int lend = jumpLabelCount++;
+
+			if (node->rhs->kind == ND_ELSE)
+			{
+				node = node->rhs;
+				int lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				gen(node->lhs);
+				printf("    jmp .Lend%d\n", lend);
+				printf(".Lelse%d:\n", lelse);
+				gen(node->rhs);
+			}
+			else
+			{
+				printf("    je .Lend%d\n", lend);
+				gen(node->rhs);
+			}
+			printf(".Lend%d:\n", lend);
 			return;
 		default:
 			break;
