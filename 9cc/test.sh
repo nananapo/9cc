@@ -64,7 +64,7 @@ assert 15 "a = 15;return a;"
 assert 20 "a = 3; b = 5; c = 12; return a + b + c;"
 
 assert 2 "if (1) return 2;"
-assert 2 "if (0) return 3; else 2;"
+assert 2 "if (0) return 3; else return 2;"
 assert 2 "a = 1; if (a) return 2;"
 assert 2 "a = 1; b = 3; if (a < b) return 2; else return 3;"
 assert 3 "a = 3; b = 1; if (a < b) return 2; else return 3;"
