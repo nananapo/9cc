@@ -1,47 +1,10 @@
+#include "9cc.h"
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct Token Token;
-typedef struct Node Node;
-
-Node	*expr();
-
-typedef enum {
-	TK_RESERVED,
-	TK_NUM,
-	TK_EOF,
-} TokenKind;
-
-struct Token {
-	TokenKind	kind;
-	Token		*next;
-	int			val;
-	char		*str;
-	int			len;
-};
-
-typedef enum {
-	ND_NUM,
-	ND_ADD,
-	ND_SUB,
-	ND_MUL,
-	ND_DIV,
-	ND_EQUAL,
-	ND_NEQUAL,
-	ND_LESS,
-	ND_LESSEQ,
-} NodeKind;
-
-struct Node {
-	NodeKind kind;
-	Node *lhs;
-	Node *rhs;
-	int val;
-};
 
 Token	*token;
 

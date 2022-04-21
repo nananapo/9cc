@@ -1,12 +1,19 @@
+NAME=9cc
+TEST_SCRIPT=test.sh
+
 CC=gcc
-CFLAGS=-std=c11 -g
+CFLAGS=-std=c11 -g -static
 
-9cc: 9cc.c
+SRCS=$(wildcard *.c)
+OBJS=$(SRCS:.c=.o)
 
-test: 9cc
-	./test.sh
+$(NAME): $(OBJS)
+	$(CC) -o $(NAME) $(OBJS) $(LDFLAGS)
+
+test: $(NAME)
+	./$(TEST_SCRIPT)
 
 clean:
-	rm -rf 9cc *.dSYM *.o *~ tmp*
+	rm -rf $(NAME) $(OBJS) *~ tmp* *dSYM
 
 .PHONEY: test clean
