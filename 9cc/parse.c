@@ -111,9 +111,7 @@ int	read_var_name(char *p)
 
 	while (*p)
 	{
-		if (isspace(*p))
-			return l;
-		if (match_reserved_word(p))
+		if (!is_alnum(*p))
 			return l;
 		l++;
 		p++;
@@ -143,7 +141,7 @@ Token	*tokenize(char *p)
 			p += cur->len;
 			continue;
 		}
-		if ('a' <= *p && *p <= 'z')
+		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);
 			cur->len = read_var_name(p);
