@@ -23,6 +23,8 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->kind = kind;
 	node->lhs = lhs;
 	node->rhs = rhs;
+	node->fname = NULL;
+	node->args = NULL;
 	return node;
 }
 
@@ -47,6 +49,28 @@ Node *primary()
 	tok = consume_ident();
 	if (tok)
 	{
+		if (consume("("))
+		{
+			Node	*node = new_node(ND_CALL, NULL, NULL);
+			node->fname = tok->str;
+			node->flen = tok->len;
+			node->args = NULL;
+			if (!consume(")"))
+			{
+				Node *arg = new_node(ND_DUMMY, expr(), NULL);
+				node->args = arg;
+				for (;;)
+				{	
+					if (consume(")"))
+						break;
+					if (!consume(","))
+						error_at(token->str, "トークンが,ではありません");
+					arg->rhs = new_node(ND_DUMMY, expr(), NULL);
+					arg = arg->rhs;
+				}
+			}
+			return node;
+		}
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
 		LVar	*lvar = find_lvar(tok);
 		if (lvar)

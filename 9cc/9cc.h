@@ -48,7 +48,8 @@ typedef enum
 	ND_IF,
 	ND_ELSE,
 	ND_WHILE,
-	ND_FOR
+	ND_FOR,
+	ND_CALL,
 } NodeKind;
 
 struct Node
@@ -58,6 +59,10 @@ struct Node
 	Node		*rhs;
 	int			val;
 	int			offset;
+
+	char		*fname;
+	int			flen;
+	Node		*args;
 };
 
 struct	LVar
@@ -84,6 +89,7 @@ int		expect_number();
 bool	at_eof();
 
 Token	*tokenize(char *p);
+Token *new_token(TokenKind kind, Token *cur, char *str);
 
 void	gen(Node *node);
 

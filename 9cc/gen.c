@@ -3,6 +3,9 @@
 
 int	jumpLabelCount = 0;
 
+#define ARG_REG_COUNT 6
+char *arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+
 // 変数のアドレスをpushする
 void	gen_lval(Node *node)
 {
@@ -15,8 +18,10 @@ void	gen_lval(Node *node)
 
 void	gen(Node *node)
 {
-	int	lend;
-	int	lbegin;
+	int		lend;
+	int		lbegin;
+	Node	*tmp = node;
+	int		i = 0;
 
 	switch (node->kind)
 	{
@@ -119,6 +124,26 @@ void	gen(Node *node)
 			}
 			printf("    jmp .Lbegin%d\n", lbegin);
 			printf(".Lend%d:\n", lend);
+			return;
+		case ND_CALL:
+			tmp = node->args;
+			i = 0;
+			while (tmp != NULL && i < ARG_REG_COUNT)
+			{
+				if (tmp->lhs != NULL)
+				{
+					gen(tmp->lhs);
+					printf("    pop rax\n");
+					printf("    mov %s, rax\n", arg_regs[i]);
+				}
+				tmp = tmp->rhs;
+				i++;
+			}
+			printf("    call ");
+			i = 0;
+			while (i < node->flen)
+				printf("%c", node->fname[i++]);
+			printf("\n");
 			return;
 		default:
 			break;

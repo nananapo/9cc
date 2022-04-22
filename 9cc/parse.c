@@ -17,10 +17,10 @@ static char *reserved_words[] = {
 	">", "<", "=",
 	"+", "-", "*", "/",
 	"(", ")", "{", "}",
-	";"
+	",", ";"
 };
 
-#define RESERVED_WORD_COUNT 16
+#define RESERVED_WORD_COUNT 17
 
 void	error_at(char *loc, char *fmt, ...)
 {
