@@ -74,4 +74,8 @@ assert 55 "i=0;s=0;while(i<10) s = s + (i = i + 1);return s;"
 
 assert 10 "s = 0;for(a=0;a<=10;a=a+1) s = s + a; return 10;"
 assert 55 "s = 0;for(a=0;a<=10;a=a+1) s = s + a; return s;"
+
+assert 10 "{return 10;}"
+assert 10 "{a = 3; b = 7;return a+b;}"
+assert 55 "a = 1; s = 0;for (;;) { s = s + a; a = a + 1; if (a == 11) { return s; }}"
 echo OK

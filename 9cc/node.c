@@ -212,6 +212,18 @@ Node	*stmt()
 		node->rhs->rhs->rhs = stmt();
 		return node;
 	}
+	else if(consume("{"))
+	{
+		node = new_node(ND_BLOCK, NULL, NULL);
+		Node *start = node;
+		while (!consume("}"))
+		{
+			node->lhs = stmt();
+			node->rhs = new_node(ND_BLOCK, NULL, NULL);
+			node = node->rhs;
+		}
+		return start;
+	}
 	else
 	{
 		node = expr();
