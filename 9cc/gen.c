@@ -67,6 +67,7 @@ void	gen(Node *node)
 			{
 				printf("    je .Lend%d\n", lend);
 				gen(node->rhs);
+				printf("    pop rax\n");
 			}
 			printf(".Lend%d:\n", lend);
 			return;
