@@ -29,8 +29,7 @@ void	gen(Node *node)
 				if (node->lhs == NULL)
 					return;
 				gen(node->lhs);
-				if (node->rhs != NULL)
-					printf("    pop rax\n");
+				printf("    pop rax\n");
 				node = node->rhs;
 			}
 			return;
