@@ -63,6 +63,11 @@ struct Node
 	// else of if
 	Node		*els;
 
+	// for
+	Node		*for_init;
+	Node		*for_if;
+	Node		*for_next;
+
 	// call & func
 	char		*fname;
 	int			flen;

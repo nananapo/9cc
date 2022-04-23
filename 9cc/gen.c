@@ -147,31 +147,31 @@ void	gen(Node *node)
 			lend = jumpLabelCount++;
 			
 			// init
-			if (node->lhs != NULL)
+			if (node->for_init != NULL)
 			{
-				gen(node->lhs);
+				gen(node->for_init);
 				printf("    pop rax\n");
 			}
 			printf(".Lbegin%d:\n", lbegin);
 			
 			// if
-			if(node->rhs->lhs != NULL)
+			if(node->for_if != NULL)
 			{
-				gen(node->rhs->lhs);
+				gen(node->for_if);
 				printf("    pop rax\n");
 				printf("    cmp rax, 0\n");
 				printf("    je .Lend%d\n", lend);
 			}
 
 			// for-block
-			gen(node->rhs->rhs->rhs);
-			if (!is_block_node(node->rhs->rhs->rhs))
+			gen(node->lhs);
+			if (!is_block_node(node->lhs))
 				printf("    pop rax\n");
 
 			// next
-			if(node->rhs->rhs->lhs != NULL)
+			if(node->for_next != NULL)
 			{
-				gen(node->rhs->rhs->lhs);
+				gen(node->for_next);
 				printf("    pop rax\n");
 			}
 			printf("    jmp .Lbegin%d\n", lbegin);

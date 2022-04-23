@@ -64,9 +64,16 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->kind = kind;
 	node->lhs = lhs;
 	node->rhs = rhs;
-	
+
+	// for
+	node->for_init = NULL;
+	node->for_if = NULL;
+	node->for_next = NULL;
+
+	// else
 	node->els = NULL;
 	
+	// call & deffunc
 	node->fname = NULL;
 	node->args = NULL;
 	return node;
@@ -241,27 +248,29 @@ Node	*stmt()
 		if (!consume("("))
 			error_at(token->str, ")ではないトークンです");
 		node = new_node(ND_FOR, NULL, NULL);
+		// for init
 		if (!consume(";"))
 		{
-			node->lhs = expr();
+			node->for_init = expr();
 			if (!consume(";"))
 				error_at(token->str, ";が必要です");
 		}
-		node->rhs = new_node(ND_DUMMY, NULL, NULL);
+		// for if
 		if (!consume(";"))
 		{
-			node->rhs->lhs = expr();
+			node->for_if = expr();
 			if (!consume(";"))
 				error_at(token->str, ";が必要です");
 		}
-		node->rhs->rhs = new_node(ND_DUMMY, NULL, NULL);
+		// for next
 		if (!consume(")"))
 		{
-			node->rhs->rhs->lhs = expr();
+			node->for_next = expr();
 			if(!consume(")"))
 				error_at(token->str, ")ではないトークンです");
 		}
-		node->rhs->rhs->rhs = stmt();
+		// stmt
+		node->lhs = stmt();
 		return node;
 	}
 	else if(consume("{"))
