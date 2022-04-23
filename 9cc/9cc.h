@@ -6,6 +6,7 @@
 typedef struct Token Token;
 typedef struct Node Node;
 typedef struct LVar LVar;
+typedef struct Type	Type;
 
 typedef enum
 {
@@ -55,13 +56,22 @@ typedef enum
 	ND_DEFVAR
 } NodeKind;
 
+struct Type
+{
+	enum {INT, PTR}	ty;
+	Type		*ptr_to;
+};
+
 struct Node
 {
 	NodeKind	kind;
 	Node		*lhs;
 	Node		*rhs;
 	int			val;
+
+	// ident
 	int			offset;
+	Type		*type;
 
 	// else of if
 	Node		*els;
@@ -79,6 +89,7 @@ struct Node
 	// func
 	int			argdef_count;
 	int			locals_len;
+	Type		*ret_type;
 };
 
 struct	LVar
@@ -87,6 +98,7 @@ struct	LVar
 	char	*name;
 	int		len;
 	int		offset;
+	Type	*type;
 };
 
 int	is_block_node(Node *node);

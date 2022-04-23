@@ -144,4 +144,6 @@ int main()
 	return add(4,6);
 }"
 
+assert 0 "int main(){int a; int *aa;int **aaa;return 0;}"
+assert 0 "int main(){return 0;}int *sub(){}int *sub2(int *a,int **b){}"
 echo OK
