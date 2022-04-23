@@ -48,7 +48,6 @@ typedef enum
 	ND_LVAR,
 	ND_RETURN,
 	ND_IF,
-	ND_ELSE,
 	ND_WHILE,
 	ND_FOR,
 } NodeKind;
@@ -60,6 +59,9 @@ struct Node
 	Node		*rhs;
 	int			val;
 	int			offset;
+
+	// else of if
+	Node		*els;
 
 	// call & func
 	char		*fname;

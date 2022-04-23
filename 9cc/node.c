@@ -7,6 +7,7 @@
 extern Node		*code[];
 extern Token	*token;
 extern char		*func_defs[];
+
 LVar		*locals;
 
 LVar	*find_lvar(Token *tok)
@@ -49,7 +50,6 @@ int	is_block_node(Node *node)
 	{
 		case ND_BLOCK:
 		case ND_IF:
-		case ND_ELSE:
 		case ND_WHILE:
 		case ND_FOR:
 			return true;
@@ -64,6 +64,9 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->kind = kind;
 	node->lhs = lhs;
 	node->rhs = rhs;
+	
+	node->els = NULL;
+	
 	node->fname = NULL;
 	node->args = NULL;
 	return node;
@@ -218,12 +221,9 @@ Node	*stmt()
 		node = new_node(ND_IF, expr(), NULL);
 		if (!consume(")"))
 			error_at(token->str, ")ではないトークンです");
-		Node *rhs = stmt();
+		node->rhs = stmt();
 		if (consume_with_type(TK_ELSE))
-		{
-			rhs = new_node(ND_ELSE, rhs, stmt());
-		}
-		node->rhs = rhs;
+			node->els = stmt();
 		return node;
 	}
 	else if(consume_with_type(TK_WHILE))

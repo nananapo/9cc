@@ -93,28 +93,28 @@ void	gen(Node *node)
 
 			lend = jumpLabelCount++;
 
-			if (node->rhs->kind == ND_ELSE)
+			if (node->els == NULL)
 			{
-				node = node->rhs;
-				int lelse = jumpLabelCount++;
-				printf("    je .Lelse%d\n", lelse);
-				
-				gen(node->lhs);
-				if (!is_block_node(node->lhs))
-					printf("    pop rax\n");
-
-				printf("    jmp .Lend%d\n", lend);
-
-				printf(".Lelse%d:\n", lelse);
+				printf("    je .Lend%d\n", lend);
 				gen(node->rhs);
 				if (!is_block_node(node->rhs))
 					printf("    pop rax\n");
 			}
 			else
 			{
-				printf("    je .Lend%d\n", lend);
+				int lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				
+				// if stmt
 				gen(node->rhs);
 				if (!is_block_node(node->rhs))
+					printf("    pop rax\n");
+				printf("    jmp .Lend%d\n", lend);
+
+				// else
+				printf(".Lelse%d:\n", lelse);
+				gen(node->els);
+				if (!is_block_node(node->els))
 					printf("    pop rax\n");
 			}
 			printf(".Lend%d:\n", lend);
