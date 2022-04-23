@@ -269,7 +269,6 @@ bool	gen_formula(Node *node)
 		case ND_ASSIGN:
 			gen_lval(node->lhs);
 			gen(node->rhs);
-			
 			printf("    pop rdi\n");
 			printf("    pop rax\n");
 			printf("    mov [rax], rdi\n");
@@ -285,6 +284,15 @@ bool	gen_formula(Node *node)
 		case ND_CALL:
 			gen_call(node);
 			return true;
+		case ND_ADDR:
+			gen_lval(node->lhs);
+			return true;
+		case ND_DEREF:
+			gen(node->lhs);
+			printf("    pop rax\n");
+			printf("    mov rax,[rax]\n");
+			printf("    push rax\n");
+			return true;
 		default:
 			break;
 	}
@@ -293,7 +301,6 @@ bool	gen_formula(Node *node)
 
 void	gen(Node *node)
 {
-
 	if (gen_filescope(node)) return;
 	if (gen_block(node)) return;
 	if (gen_formula(node)) return;

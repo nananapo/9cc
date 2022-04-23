@@ -96,8 +96,7 @@ assert 10 "main(){{a = 3; b = 7;return a+b;}}"
 assert 55 "main(){a = 1; s = 0;for (;;) { s = s + a; a = a + 1; if (a == 11) { return s; }}}"
 
 assert_out "1" "main(){pint(1);}"
-assert_out "1 1 2 3 5 8 13 21 34 55 " "
-fib(x)
+assert_out "1 1 2 3 5 8 13 21 34 55 " "fib(x)
 {
 	if (x == 0)
 		return 1;
@@ -112,5 +111,12 @@ main(){
 		pint(x);
 		pspace(1);
 	}
+}"
+
+assert 10 "main()
+{
+	test = 10;
+	addr = &test;
+	return *addr;
 }"
 echo OK

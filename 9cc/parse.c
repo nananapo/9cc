@@ -15,12 +15,12 @@ extern LVar		*locals;
 static char *reserved_words[] = {
 	">=", "<=", "==", "!=",
 	">", "<", "=",
-	"+", "-", "*", "/",
+	"+", "-", "*", "/", "&",
 	"(", ")", "{", "}",
 	",", ";"
 };
 
-#define RESERVED_WORD_COUNT 17
+#define RESERVED_WORD_COUNT 18
 
 void	error_at(char *loc, char *fmt, ...)
 {
