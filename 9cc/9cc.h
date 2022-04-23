@@ -51,7 +51,8 @@ typedef enum
 	ND_WHILE,
 	ND_FOR,
 	ND_ADDR,
-	ND_DEREF
+	ND_DEREF,
+	ND_DEFVAR
 } NodeKind;
 
 struct Node
@@ -100,6 +101,7 @@ void	error_at(char *loc, char *fmt, ...);
 bool	consume(char *op);
 bool	consume_with_type(TokenKind kind);
 Token	*consume_ident();
+Token	*consume_ident_str(char *p);
 void	expect(char *op);
 int		expect_number();
 bool	at_eof();

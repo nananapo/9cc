@@ -181,6 +181,8 @@ bool	gen_block(Node *node)
 			//end
 			printf(".Lend%d:\n", lend);
 			return true;
+		case ND_DEFVAR:
+			return true;
 		default:
 			break;
 	}

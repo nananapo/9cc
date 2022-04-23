@@ -86,6 +86,18 @@ Token	*consume_ident()
 	return ret;
 }
 
+Token	*consume_ident_str(char *p)
+{
+	Token	*ret;
+	if (token->kind != TK_IDENT)
+		return NULL;
+	if (strncmp(p, token->str, strlen(p)) != 0)
+		return NULL;
+	ret = token;
+	token = token->next;
+	return ret;
+}
+
 void	expect(char *op)
 {
 	if (token->kind != TK_RESERVED ||

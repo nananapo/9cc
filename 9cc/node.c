@@ -20,6 +20,7 @@ LVar	*find_lvar(Token *tok)
 
 int	create_local_var(char *name, int len)
 {
+	// TODO check same
 	LVar *lvar = calloc(1, sizeof(LVar));
 	lvar->next = locals;
 	lvar->name = name;
@@ -53,6 +54,7 @@ int	is_block_node(Node *node)
 		case ND_WHILE:
 		case ND_FOR:
 		case ND_RETURN:
+		case ND_DEFVAR:
 			return true;
 		default:
 			return false;
@@ -128,7 +130,7 @@ Node *primary()
 		if (lvar)
 			node->offset = lvar->offset;
 		else
-			node->offset = create_local_var(tok->str, tok->len);
+			error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
 		return node;
 	}
 	return new_node_num(expect_number());
@@ -290,6 +292,14 @@ Node	*stmt()
 		}
 		return start;
 	}
+	else if (consume_ident_str("int"))
+	{
+		Token *tok = consume_ident();
+		if (tok == NULL)
+			error_at(token->str, "識別子が必要です");
+		node = new_node(ND_DEFVAR, NULL, NULL);
+		node->offset = create_local_var(tok->str, tok->len);
+	}
 	else
 	{
 		node = expr();
@@ -302,9 +312,13 @@ Node	*stmt()
 Node	*filescope()
 {
 	Node	*node;
-	Token	*tok = consume_ident();
+	Token	*tok;
 	locals = NULL;
 	
+	if (!consume_ident_str("int"))
+		error_at(token->str, "intが必要です");
+
+	tok = consume_ident();
 	if (tok != NULL)
 	{
 		node = new_node(ND_FUNCDEF, NULL, NULL);
@@ -315,15 +329,18 @@ Node	*filescope()
 		if (!consume("("))
 			error_at(token->str, "(ではないトークンです");
 
-		// TODO same name args check
 		for (;;)
 		{
 			if (consume(")"))
 				break;
+			if (!consume_ident_str("int"))
+				error_at(token->str,"intが必要です");
+
 			Token *arg = consume_ident();
 			if (arg == NULL)
 				error_at(token->str, ")ではないトークンです");
 			create_local_var(arg->str, arg->len);
+
 			node->argdef_count++;
 			if (consume(")"))
 				break;
