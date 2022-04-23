@@ -21,4 +21,4 @@ fclean: clean
 
 re: fclean $(NAME)
 
-.PHONEY: test clean fclean re
+.PHONY: test clean fclean re

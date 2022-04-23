@@ -16,6 +16,22 @@ assert() {
   fi
 }
 
+
+assert_out(){
+	expected="$1"
+	input="$2"
+	
+	./9cc "$input" > tmp.s
+	cc -o tmp tmp.s "test/print.c"
+	actual=`./tmp`
+	
+  	if [ "$actual" = "$expected" ]; then
+  	  echo "$input => $actual"
+  	else
+  	  echo "$input => $expected expected, but got $actual"
+  	  exit 1
+  	fi
+}
 assert 0 "main(){0;}"
 assert 42 "main(){42;}"
 
@@ -78,4 +94,23 @@ assert 55 "main(){s = 0;for(a=0;a<=10;a=a+1) s = s + a; return s;}"
 assert 10 "main(){{return 10;}}"
 assert 10 "main(){{a = 3; b = 7;return a+b;}}"
 assert 55 "main(){a = 1; s = 0;for (;;) { s = s + a; a = a + 1; if (a == 11) { return s; }}}"
+
+assert_out "1" "main(){pint(1);}"
+assert_out "1 1 2 3 5 8 13 21 34 55 " "
+fib(x)
+{
+	if (x == 0)
+		return 1;
+	if (x == 1)
+		return 1;
+	return fib(x-2) + fib(x-1);
+}
+main(){
+	for(i=0;i<10;i=i+1)
+	{
+		x = fib(i);
+		pint(x);
+		pspace(1);
+	}
+}"
 echo OK

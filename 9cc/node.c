@@ -25,7 +25,7 @@ int	create_local_var(char *name, int len)
 	lvar->name = name;
 	lvar->len = len;
 	if (locals == NULL)
-		lvar->offset = 0;
+		lvar->offset = 8;
 	else
 		lvar->offset = locals->offset + 8;
 	locals = lvar;
@@ -52,6 +52,7 @@ int	is_block_node(Node *node)
 		case ND_IF:
 		case ND_WHILE:
 		case ND_FOR:
+		case ND_RETURN:
 			return true;
 		default:
 			return false;

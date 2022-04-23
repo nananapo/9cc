@@ -213,6 +213,8 @@ void	gen_call(Node *node)
 	}
 
 	printf("    call _%s\n", strndup(node->fname, node->flen));
+	// returnがある想定
+	printf("    push rax\n");
 	return;
 }
 
@@ -236,6 +238,7 @@ bool	gen_filescope(Node *node)
 		printf("    sub rsp, %d\n", (node->locals_len - node->argdef_count) * 8);
 		
 		gen(node->lhs);
+
 		if (!is_block_node(node->lhs))
 			printf("    pop rax\n");
 
