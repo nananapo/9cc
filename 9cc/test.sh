@@ -119,4 +119,11 @@ assert 10 "main()
 	addr = &test;
 	return *addr;
 }"
+assert 10 "main()
+{
+	test = 10;
+	addr = &test;
+	addr_ptr = &addr;
+	return **addr_ptr;
+}"
 echo OK
