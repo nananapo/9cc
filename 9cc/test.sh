@@ -123,6 +123,7 @@ assert 10 "int main()
 	addr = &test;
 	return *addr;
 }"
+
 assert 10 "int main()
 {
 	int test;
@@ -133,4 +134,14 @@ assert 10 "int main()
 	addr_ptr = &addr;
 	return **addr_ptr;
 }"
+
+assert 10 "int add(int a, int b)
+{
+	return a + b;
+}
+int main()
+{
+	return add(4,6);
+}"
+
 echo OK

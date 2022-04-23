@@ -329,23 +329,24 @@ Node	*filescope()
 		if (!consume("("))
 			error_at(token->str, "(ではないトークンです");
 
-		for (;;)
+		if (!consume(")"))
 		{
-			if (consume(")"))
-				break;
-			if (!consume_ident_str("int"))
-				error_at(token->str,"intが必要です");
+			for (;;)
+			{
+				if (!consume_ident_str("int"))
+					error_at(token->str,"intが必要です");
 
-			Token *arg = consume_ident();
-			if (arg == NULL)
-				error_at(token->str, ")ではないトークンです");
-			create_local_var(arg->str, arg->len);
+				Token *arg = consume_ident();
+				if (arg == NULL)
+					error_at(token->str, ")ではないトークンです");
+				create_local_var(arg->str, arg->len);
 
-			node->argdef_count++;
-			if (consume(")"))
-				break;
-			if (consume(","))
-				error_at(token->str, ",が必要です");
+				node->argdef_count++;
+				if (consume(")"))
+					break;
+				if (!consume(","))
+					error_at(token->str, ",が必要です");
+			}
 		}
 		node->lhs = stmt();
 		node->locals_len = get_locals_count();
