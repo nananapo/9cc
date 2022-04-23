@@ -32,6 +32,8 @@ struct Token
 typedef enum
 {
 	ND_DUMMY,
+	ND_FUNCDEF,
+	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
 	ND_ADD,
@@ -49,7 +51,6 @@ typedef enum
 	ND_ELSE,
 	ND_WHILE,
 	ND_FOR,
-	ND_CALL,
 } NodeKind;
 
 struct Node
@@ -60,9 +61,14 @@ struct Node
 	int			val;
 	int			offset;
 
+	// call & func
 	char		*fname;
 	int			flen;
-	Node		*args;
+	Node		*args; // call only
+	
+	// func
+	int			argdef_count;
+	int			locals_len;
 };
 
 struct	LVar
@@ -73,6 +79,7 @@ struct	LVar
 	int		offset;
 };
 
+int	is_block_node(Node *node);
 
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);

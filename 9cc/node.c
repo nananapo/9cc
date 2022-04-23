@@ -6,8 +6,8 @@
 
 extern Node		*code[];
 extern Token	*token;
-
-extern LVar		*locals;
+extern char		*func_defs[];
+LVar		*locals;
 
 LVar	*find_lvar(Token *tok)
 {
@@ -15,6 +15,47 @@ LVar	*find_lvar(Token *tok)
 		if (var->len == tok->len && memcmp(tok->str, var->name, var->len) == 0)
 			return var;
 	return NULL;
+}
+
+int	create_local_var(char *name, int len)
+{
+	LVar *lvar = calloc(1, sizeof(LVar));
+	lvar->next = locals;
+	lvar->name = name;
+	lvar->len = len;
+	if (locals == NULL)
+		lvar->offset = 0;
+	else
+		lvar->offset = locals->offset + 8;
+	locals = lvar;
+	return lvar->offset;
+}
+
+int	get_locals_count()
+{
+	int	i = 0;
+	LVar *tmp = locals;
+	while (tmp)
+	{
+		i++;
+		tmp = tmp->next;
+	}
+	return i;
+}
+
+int	is_block_node(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_BLOCK:
+		case ND_IF:
+		case ND_ELSE:
+		case ND_WHILE:
+		case ND_FOR:
+			return true;
+		default:
+			return false;
+	}
 }
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
@@ -74,22 +115,9 @@ Node *primary()
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
 		LVar	*lvar = find_lvar(tok);
 		if (lvar)
-		{
 			node->offset = lvar->offset;
-		}
 		else
-		{
-			lvar = calloc(1, sizeof(LVar));
-			lvar->next = locals;
-			lvar->name = tok->str;
-			lvar->len = tok->len;
-			if (locals == NULL)
-				lvar->offset = 0;
-			else
-				lvar->offset = locals->offset + 8;
-			node->offset = lvar->offset;
-			locals = lvar;
-		}
+			node->offset = create_local_var(tok->str, tok->len);
 		return node;
 	}
 	return new_node_num(expect_number());
@@ -257,12 +285,57 @@ Node	*stmt()
 	return node;
 }
 
+Node	*filescope()
+{
+	Node	*node;
+	Token	*tok = consume_ident();
+	locals = NULL;
+	
+	if (tok != NULL)
+	{
+		node = new_node(ND_FUNCDEF, NULL, NULL);
+		node->fname = tok->str;
+		node->flen = tok->len;
+		node->argdef_count = 0;
+
+		if (!consume("("))
+			error_at(token->str, "(ではないトークンです");
+
+		// TODO same name args check
+		for (;;)
+		{
+			if (consume(")"))
+				break;
+			Token *arg = consume_ident();
+			if (arg == NULL)
+				error_at(token->str, ")ではないトークンです");
+			create_local_var(arg->str, arg->len);
+			node->argdef_count++;
+			if (consume(")"))
+				break;
+			if (consume(","))
+				error_at(token->str, ",が必要です");
+		}
+		node->lhs = stmt();
+		node->locals_len = get_locals_count();
+		
+		int i = 0;
+		while (func_defs[i])
+			i += 1;
+		func_defs[i] = strndup(node->fname, node->flen);
+		
+		return node;
+	}
+	error_at(token->str, "不明なトークンです");
+	return NULL;
+}
+
 void	program()
 {
 	int	i;
 
 	i = 0;
 	while (!at_eof())
-		code[i++] = stmt();
+		code[i++] = filescope();
 	code[i] = NULL;
 }

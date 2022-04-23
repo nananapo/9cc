@@ -5,9 +5,8 @@ char	*user_input;
 
 Token	*token;
 
+char	*func_defs[100];
 Node	*code[100];
-
-LVar	*locals = NULL;
 
 int main(int argc, char **argv)
 {
@@ -26,22 +25,23 @@ int main(int argc, char **argv)
 	program();
 
 	printf(".intel_syntax noprefix\n");
-	printf(".global _main\n");
-	printf("_main:\n");
 	
-	printf("    push rbp\n");
-	printf("    mov rbp, rsp\n");
-	printf("    sub rsp, 208\n");
+	printf(".global ");
+	i = 0;
+	while (func_defs[i])
+	{
+		printf("_%s", func_defs[i]);
+		if (func_defs[i + 1])
+			printf(", ");
+		i++;
+	}
+	printf("\n");
 
 	i = 0;
 	while (code[i])
 	{
 		gen(code[i++]);
-		printf("    pop rax\n");
 	}
 
-	printf("    mov rsp, rbp\n");
-	printf("    pop rbp\n");
-	printf("    ret\n");
 	return (0);
 }
