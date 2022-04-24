@@ -146,4 +146,46 @@ int main()
 
 assert 0 "int main(){int a; int *aa;int **aaa;return 0;}"
 assert 0 "int main(){return 0;}int *sub(){}int *sub2(int *a,int **b){}"
+
+assert 3 "int main()
+{
+	int x;
+	int *y;
+	y = &x;
+	*y = 3;
+	return x;
+}"
+
+assert 42 "int main()
+{
+	int x;
+	int *y;
+	int **z;
+	x = 3;
+	y = &x;
+	z = &y;
+	**z = 42;
+	return x;
+}"
+
+assert_out "42 24" "int swap(int *x, int *y)
+{
+	int tmp;
+	tmp = *x;
+	*x = *y;
+	*y = tmp;
+	return 0;
+}
+
+int main()
+{
+	int x;
+	int y;
+	x = 24;
+	y = 42;
+	swap(&x, &y);
+	pint(x);
+	pspace(1);
+	pint(y);
+}"
 echo OK

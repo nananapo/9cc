@@ -269,7 +269,14 @@ bool	gen_formula(Node *node)
 			printf("    push rax\n");
 			return true;
 		case ND_ASSIGN:
-			gen_lval(node->lhs);
+			if (node->lhs->kind == ND_LVAR)
+				gen_lval(node->lhs);
+			else if (node->lhs->kind == ND_DEREF)
+			{
+				gen(node->lhs->lhs);
+			}
+			else
+				error("代入の左辺値が識別子かアドレスではありません");
 			gen(node->rhs);
 			printf("    pop rdi\n");
 			printf("    pop rax\n");
