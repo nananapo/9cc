@@ -1,8 +1,29 @@
-#include <stdio.h>
+#include <unistd.h>
+
+static void	putchar(char c)
+{
+	write(1, &c, 1);
+}
+
+static int	recpint(int a)
+{
+	if (-9 <= a && a <= 9)
+	{
+		if (a < 0)
+			a = -a;
+		putchar('0' + a);
+		return 0;
+	}
+	recpint(a / 10);
+	recpint(a % 10);
+	return 0;
+}
 
 int	pint(int a)
 {
-	printf("%d",a);
+	if (a < 0)
+		putchar('-');
+	recpint(a);
 	return 0;
 }
 
@@ -12,12 +33,12 @@ int	pspace(int count)
 
 	i = 0;
 	while (i++ < count)
-		printf(" ");
+		putchar(' ');
 	return 0;
 }
 
 int	pline()
 {
-	printf("\n");
+	putchar('\n');
 	return 0;
 }
