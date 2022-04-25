@@ -95,8 +95,10 @@ assert 10 "int main(){{return 10;}}"
 assert 10 "int main(){{int a;int b;a = 3; b = 7;return a+b;}}"
 assert 55 "int main(){int a;int s;a = 1; s = 0;for (;;) { s = s + a; a = a + 1; if (a == 11) { return s; }}}"
 
-assert_out "1" "int main(){pint(1);}"
-assert_out "1 1 2 3 5 8 13 21 34 55 " "int fib(int x)
+assert_out "1" "int pint(int i); int main(){pint(1);}"
+assert_out "1 1 2 3 5 8 13 21 34 55 " "int pint(int i);
+int pspace(int n);
+int fib(int x)
 {
 	if (x == 0)
 		return 1;
@@ -118,7 +120,7 @@ int main(){
 assert 10 "int main()
 {
 	int test;
-	int addr;
+	int *addr;
 	test = 10;
 	addr = &test;
 	return *addr;
@@ -127,8 +129,8 @@ assert 10 "int main()
 assert 10 "int main()
 {
 	int test;
-	int addr;
-	int addr_ptr;
+	int *addr;
+	int **addr_ptr;
 	test = 10;
 	addr = &test;
 	addr_ptr = &addr;
@@ -168,7 +170,9 @@ assert 42 "int main()
 	return x;
 }"
 
-assert_out "42 24" "int swap(int *x, int *y)
+assert_out "42 24" "int pint(int i);
+int pspace(int n);
+int swap(int *x, int *y)
 {
 	int tmp;
 	tmp = *x;

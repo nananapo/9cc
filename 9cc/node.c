@@ -8,6 +8,7 @@
 extern Node		*code[];
 extern Token	*token;
 extern Node		*func_defs[];
+extern Node		*func_protos[];
 
 LVar		*locals;
 
@@ -73,16 +74,42 @@ Node	*get_function_by_name(char *name, int len)
 			return tmp;
 		i++;
 	}
+
+	i = 0;
+	while (func_protos[i])
+	{
+		Node *tmp = func_protos[i];
+		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
+			return tmp;
+		i++;
+	}
 	return NULL;
 }
 
 Type	*new_primitive_type(PrimitiveType pri)
 {
-	Type	*type  = calloc(1, sizeof(Type));
+	Type	*type = calloc(1, sizeof(Type));
 	type->ty = pri;
 	type->ptr_to = NULL;
 	type->next = NULL;
 	return type;
+}
+
+Type	*new_type_ptr_to(Type *ptr_to)
+{
+	Type	*type = new_primitive_type(PTR);
+	type->ptr_to = ptr_to;
+	return type;
+}
+
+// 2つのTypeが一致するかどうか
+int	type_equal(Type *t1, Type *t2)
+{
+	if (t1->ty != t2->ty)
+		return 0;
+	if (t1->ty == PTR)
+		return type_equal(t1->ptr_to, t2->ptr_to);
+	return 1;
 }
 
 Type	*consume_defident_type()
@@ -94,8 +121,9 @@ Type	*consume_defident_type()
 	Type *type = new_primitive_type(INT);
 	while (consume("*"))
 	{
-		type->ptr_to = new_primitive_type(PTR);
-		type = type->ptr_to;
+		Type *tmp = new_primitive_type(PTR);
+		tmp->ptr_to = type;
+		type = tmp;
 	}
 
 	return type;
@@ -177,23 +205,45 @@ Node *primary()
 				}
 			}
 			
+			// TODO これは違うパスでいいかも
 			Node *refunc = get_function_by_name(node->fname, node->flen);
+
 			// 関数定義が見つからない場合
 			if (refunc == NULL)
-				fprintf(stderr, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
+				error_at(token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
 			else
 			{
 				// 引数の数を確認
-				// if ()
+				if (node->argdef_count != refunc->argdef_count)
+					error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
+
+				Type *def = refunc->arg_type;
+				Node *use = node->args;
+				while (def != NULL)
+				{
+					if (!type_equal(def, use->type))
+						error_at(token->str, "関数%sの引数の型が一致しません", strndup(node->fname, node->flen));
+					def = def->next;
+					use = use->next;
+				}
+
+				// 型を返り値の型に設定
+				node->type = refunc->ret_type;
 			}
+
+
 			return node;
 		}
+
+		// use ident
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
 		LVar	*lvar = find_lvar(tok->str, tok->len);
-		if (lvar)
-			node->offset = lvar->offset;
-		else
+
+		if (lvar == NULL)
 			error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
+		
+		node->offset = lvar->offset;
+		node->type = lvar->type;
 		return node;
 	}
 
@@ -203,14 +253,37 @@ Node *primary()
 
 Node *unary()
 {
+	Node	*node;
 	if (consume("+"))
-		return primary();
+	{
+		node = primary();
+		if (node->type->ty == PTR)
+			error_at(token->str, "ポインタ型に対してunary -を適用できません");
+		return node;
+	}
 	else if (consume("-"))
-		return  new_node(ND_SUB, new_node_num(0), primary());
+	{
+		node = new_node(ND_SUB, new_node_num(0), primary());
+		if (node->rhs->type->ty == PTR)
+			error_at(token->str, "ポインタ型に対してunary -を適用できません");
+		node->type = node->rhs->type;
+		return node;
+	}
 	else if (consume("*"))
-		return new_node(ND_DEREF, unary(), NULL);
+	{
+		node = new_node(ND_DEREF, unary(), NULL);
+		if (node->lhs->type->ty != PTR)
+			error_at(token->str, "ポインタではない型に対してunary *を適用できません");
+		node->type = node->lhs->type->ptr_to;	
+		return node;
+	}
 	else if (consume("&"))
-		return new_node(ND_ADDR, unary(), NULL);
+	{
+		node = new_node(ND_ADDR, unary(), NULL);
+		// TODO 左辺値かどうかのチェック
+		node->type = new_type_ptr_to(node->lhs->type);
+		return node;
+	}
 	return primary();
 }
 
@@ -225,6 +298,10 @@ Node *mul()
 			node = new_node(ND_DIV, node, unary());
 		else
 			return node;
+
+		if (node->lhs->type->ty != INT || node->rhs->type->ty != INT)
+			error_at(token->str, "ポインタ型に* か / を適用できません");
+		node->type = new_primitive_type(INT);
 	}
 }
 
@@ -239,6 +316,22 @@ Node *add()
 			node = new_node(ND_SUB, node, mul());
 		else
 			return node;
+		
+		// TODO 片方がポインタならポインタ型にする
+		if (node->lhs->type->ty != node->rhs->type->ty)
+		{
+			if (node->lhs->type->ty == PTR)
+				node->type = node->lhs->type;
+			else
+				node->type = node->rhs->type;
+		}
+		else
+		{
+			if (node->lhs->type->ty == PTR)
+				error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
+			// とりあえずINT
+			node->type = new_primitive_type(INT);
+		}
 	}
 }
 
@@ -257,6 +350,11 @@ Node *relational()
 			node = new_node(ND_LESSEQ, add(), node);
 		else
 			return node;
+
+		node->type = new_primitive_type(INT);
+
+		if (node->lhs->type->ty != node->rhs->type->ty)
+			error_at(token->str, "ポインタ型とintを比較することはできません");
 	}
 }
 
@@ -271,6 +369,11 @@ Node *equality()
 			node = new_node(ND_NEQUAL, node, relational());
 		else
 			return node;
+
+		node->type = new_primitive_type(INT);
+
+		if (node->lhs->type->ty != node->rhs->type->ty)
+			error_at(token->str, "ポインタ型とintを比較することはできません");
 	}
 }
 
@@ -278,7 +381,12 @@ Node	*assign()
 {
 	Node	*node = equality();
 	if (consume("="))
+	{
 		node = new_node(ND_ASSIGN, node, assign());
+		if (node->lhs->type->ty != node->rhs->type->ty)
+			error_at(token->str, "左辺と右辺の型が一致しません");
+		node->type = node->lhs->type;
+	}
 	return node;
 }
 
@@ -292,7 +400,10 @@ Node	*stmt()
 	Node	*node;
 
 	if (consume_with_type(TK_RETURN))
+	{
+		// TODO 型チェック
 		node = new_node(ND_RETURN, expr(), NULL);
+	}
 	else if (consume_with_type(TK_IF))
 	{
 		if (!consume("("))
@@ -375,6 +486,9 @@ Node	*stmt()
 	}
 	if(!consume(";"))
 		error_at(token->str, ";ではないトークンです");
+
+	//TODO type
+
 	return node;
 }
 
@@ -400,6 +514,7 @@ Node	*filescope()
 	node->flen = tok->len;
 	node->ret_type = ret_type;
 	node->argdef_count = 0;
+	// TODO type
 
 	// args
 	if (!consume("("))
@@ -439,8 +554,15 @@ Node	*filescope()
 		i += 1;
 	func_defs[i] = node;
 
-	node->lhs = stmt();
-	node->locals_len = get_locals_count();
+	if (consume(";"))
+	{
+		node->kind = ND_PROTOTYPE;
+	}
+	else
+	{
+		node->lhs = stmt();
+		node->locals_len = get_locals_count();
+	}
 	
 	return node;
 }

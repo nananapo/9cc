@@ -33,8 +33,8 @@ struct Token
 
 typedef enum
 {
-	ND_DUMMY,
 	ND_FUNCDEF,
+	ND_PROTOTYPE,
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
@@ -111,9 +111,11 @@ struct Node
 struct	LVar
 {
 	LVar	*next;
+
 	char	*name;
 	int		len;
 	int		offset;
+
 	Type	*type;
 };
 

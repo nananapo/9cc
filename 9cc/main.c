@@ -6,6 +6,7 @@ char	*user_input;
 Token	*token;
 
 Node	*func_defs[100];
+Node	*func_protos[100];
 Node	*code[100];
 
 int main(int argc, char **argv)

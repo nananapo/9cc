@@ -307,6 +307,8 @@ bool	gen_formula(Node *node)
 
 void	gen(Node *node)
 {
+	if (node->kind == ND_PROTOTYPE)
+		return;
 	if (gen_filescope(node)) return;
 	if (gen_block(node)) return;
 	if (gen_formula(node)) return;

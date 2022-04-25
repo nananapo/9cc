@@ -3,9 +3,6 @@
 int main(void)
 {
 	int x = 42;
-	int *p;
-
-	printf("%p\n", &x);
-	printf("%p\n", &x + 1);
-	
+	int y = 42;
+	printf("%d\n", &x > &y);
 }
