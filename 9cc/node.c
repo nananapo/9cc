@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 extern Node		*code[];
 extern Token	*token;
@@ -62,11 +63,25 @@ int	is_block_node(Node *node)
 	}
 }
 
+Node	*get_function_by_name(char *name, int len)
+{
+	int i = 0;
+	while (func_defs[i])
+	{
+		Node *tmp = func_defs[i];
+		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
+			return tmp;
+		i++;
+	}
+	return NULL;
+}
+
 Type	*new_primitive_type(PrimitiveType pri)
 {
 	Type	*type  = calloc(1, sizeof(Type));
 	type->ty = pri;
 	type->ptr_to = NULL;
+	type->next = NULL;
 	return type;
 }
 
@@ -140,26 +155,37 @@ Node *primary()
 			node->fname = tok->str;
 			node->flen = tok->len;
 			node->args = NULL;
-			
-			// TODO 関数定義を探して、戻り値の型と引数の方をチェックする
-			
+			node->argdef_count = 0;
 
 			if (!consume(")"))
 			{
-				Node *arg = new_node(ND_DUMMY, expr(), NULL);
+				Node *arg = expr();
 				node->args = arg;
+				node->argdef_count = 1;
+
 				for (;;)
 				{	
 					if (consume(")"))
 						break;
 					if (!consume(","))
 						error_at(token->str, "トークンが,ではありません");
-					arg->rhs = new_node(ND_DUMMY, expr(), NULL);
-					arg = arg->rhs;
+					
+					arg = expr();
+					arg->next = node->args;
+					node->args = arg;
+					node->argdef_count += 1;
 				}
 			}
-
 			
+			Node *refunc = get_function_by_name(node->fname, node->flen);
+			// 関数定義が見つからない場合
+			if (refunc == NULL)
+				fprintf(stderr, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
+			else
+			{
+				// 引数の数を確認
+				// if ()
+			}
 			return node;
 		}
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
@@ -382,16 +408,23 @@ Node	*filescope()
 	{
 		for (;;)
 		{
+			// 型宣言の確認
 			Type *type = consume_defident_type();
 			if (type == NULL)
 				error_at(token->str,"型宣言が必要です");
 
+			// 型情報を保存
+			type->next = node->arg_type;
+			node->arg_type = type;
+			node->argdef_count++;
+
+			// 仮引数名
 			Token *arg = consume_ident();
 			if (arg == NULL)
 				error_at(token->str, ")ではないトークンです");
 			create_local_var(arg->str, arg->len, type);
-
-			node->argdef_count++;
+			
+			// )か,
 			if (consume(")"))
 				break;
 			if (!consume(","))

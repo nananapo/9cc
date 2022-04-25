@@ -6,6 +6,7 @@
 typedef struct Token Token;
 typedef struct Node Node;
 typedef struct LVar LVar;
+
 typedef struct Type	Type;
 
 typedef enum
@@ -66,6 +67,9 @@ struct Type
 {
 	PrimitiveType	ty;
 	Type		*ptr_to;
+
+	// arg用
+	Type		*next;
 };
 
 struct Node
@@ -90,12 +94,18 @@ struct Node
 	// call & func
 	char		*fname;
 	int			flen;
-	Node		*args; // call only
+	int			argdef_count;
+	
+	// call
+	Node		*args;
 	
 	// func
-	int			argdef_count;
 	int			locals_len;
+	Type		*arg_type;
 	Type		*ret_type;
+
+	// general
+	Node		*next;
 };
 
 struct	LVar

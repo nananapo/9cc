@@ -195,22 +195,19 @@ void	gen_call(Node *node)
 	int		i = 0;
 	while (tmp != NULL && i < ARG_REG_COUNT)
 	{
-		if (tmp->lhs != NULL)
-			gen(tmp->lhs);
-		tmp = tmp->rhs;
+		gen(tmp);
+		tmp = tmp->next;
 		i++;
 	}
 
+	// TODO 6個までしか考えてない
 	tmp = node->args;
 	i = 0;
 	while (tmp != NULL && i < ARG_REG_COUNT)
 	{
-		if (tmp->lhs != NULL)
-		{
-			printf("    pop rax\n");
-			printf("    mov %s, rax\n", arg_regs[i]);
-		}
-		tmp = tmp->rhs;
+		printf("    pop rax\n");
+		printf("    mov %s, rax\n", arg_regs[node->argdef_count - i - 1]);
+		tmp = tmp->next;
 		i++;
 	}
 
