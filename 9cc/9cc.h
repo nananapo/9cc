@@ -56,9 +56,15 @@ typedef enum
 	ND_DEFVAR
 } NodeKind;
 
+typedef enum
+{
+	INT,
+	PTR
+} PrimitiveType;
+
 struct Type
 {
-	enum {INT, PTR}	ty;
+	PrimitiveType	ty;
 	Type		*ptr_to;
 };
 

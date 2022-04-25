@@ -5,7 +5,7 @@ char	*user_input;
 
 Token	*token;
 
-char	*func_defs[100];
+Node	*func_defs[100];
 Node	*code[100];
 
 int main(int argc, char **argv)
@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 	i = 0;
 	while (func_defs[i])
 	{
-		printf("_%s", func_defs[i]);
+		printf("_%s", func_defs[i]->fname);
 		if (func_defs[i + 1])
 			printf(", ");
 		i++;

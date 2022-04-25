@@ -6,14 +6,14 @@
 
 extern Node		*code[];
 extern Token	*token;
-extern char		*func_defs[];
+extern Node		*func_defs[];
 
 LVar		*locals;
 
-LVar	*find_lvar(Token *tok)
+LVar	*find_lvar(char *str, int len)
 {
 	for (LVar *var = locals; var; var = var->next)
-		if (var->len == tok->len && memcmp(tok->str, var->name, var->len) == 0)
+		if (var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
 	return NULL;
 }
@@ -62,9 +62,10 @@ int	is_block_node(Node *node)
 	}
 }
 
-Type	*new_type()
+Type	*new_primitive_type(PrimitiveType pri)
 {
-	Type	*type = calloc(1, sizeof(Type));
+	Type	*type  = calloc(1, sizeof(Type));
+	type->ty = pri;
 	type->ptr_to = NULL;
 	return type;
 }
@@ -75,12 +76,10 @@ Type	*consume_defident_type()
 	if (!consume_ident_str("int"))
 		return NULL;
 
-	Type *type = new_type();
-	type->ty = INT;
+	Type *type = new_primitive_type(INT);
 	while (consume("*"))
 	{
-		type->ptr_to = new_type();
-		type->ty = PTR;
+		type->ptr_to = new_primitive_type(PTR);
 		type = type->ptr_to;
 	}
 
@@ -105,14 +104,16 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	// call & deffunc
 	node->fname = NULL;
 	node->args = NULL;
+
+	node->type = NULL;
 	return node;
 }
 
 Node *new_node_num(int val)
 {
-	Node *node = calloc(1, sizeof(Node));
-	node->kind = ND_NUM;
+	Node *node = new_node(ND_NUM, NULL, NULL);
 	node->val = val;
+	node->type = new_primitive_type(INT);
 	return node;
 }
 
@@ -120,21 +121,29 @@ Node *primary()
 {
 	Token	*tok;
 
+	// 括弧
 	if (consume("("))
 	{
 		Node	*node = expr();
 		expect(")");
 		return node;
 	}
+	
+	// identかcall
 	tok = consume_ident();
 	if (tok)
 	{
+		// call func
 		if (consume("("))
 		{
 			Node	*node = new_node(ND_CALL, NULL, NULL);
 			node->fname = tok->str;
 			node->flen = tok->len;
 			node->args = NULL;
+			
+			// TODO 関数定義を探して、戻り値の型と引数の方をチェックする
+			
+
 			if (!consume(")"))
 			{
 				Node *arg = new_node(ND_DUMMY, expr(), NULL);
@@ -149,16 +158,20 @@ Node *primary()
 					arg = arg->rhs;
 				}
 			}
+
+			
 			return node;
 		}
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
-		LVar	*lvar = find_lvar(tok);
+		LVar	*lvar = find_lvar(tok->str, tok->len);
 		if (lvar)
 			node->offset = lvar->offset;
 		else
 			error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
 		return node;
 	}
+
+	// 数字
 	return new_node_num(expect_number());
 }
 
@@ -357,7 +370,7 @@ Node	*filescope()
 
 	// create node
 	node = new_node(ND_FUNCDEF, NULL, NULL);
-	node->fname = tok->str;
+	node->fname = strndup(tok->str, tok->len);
 	node->flen = tok->len;
 	node->ret_type = ret_type;
 	node->argdef_count = 0;
@@ -386,13 +399,15 @@ Node	*filescope()
 		}
 	}
 
-	node->lhs = stmt();
-	node->locals_len = get_locals_count();
-	
+	// func_defsに代入
+	// TODO 関数名被り
 	int i = 0;
 	while (func_defs[i])
 		i += 1;
-	func_defs[i] = strndup(node->fname, node->flen);
+	func_defs[i] = node;
+
+	node->lhs = stmt();
+	node->locals_len = get_locals_count();
 	
 	return node;
 }
