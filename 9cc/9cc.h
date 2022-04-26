@@ -3,7 +3,9 @@
 
 # define ASM_MOV "mov"
 # define ASM_PUSH "push"
-
+# define RAX "rax"
+# define RBP "rbp"
+# define RSP "rsp"
 #include <stdbool.h>
 
 typedef struct Token Token;

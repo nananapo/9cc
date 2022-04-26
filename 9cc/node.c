@@ -57,24 +57,6 @@ int	get_locals_count()
 	return i;
 }
 
-/*
-int	is_block_node(Node *node)
-{
-	switch (node->kind)
-	{
-		case ND_BLOCK:
-		case ND_IF:
-		case ND_WHILE:
-		case ND_FOR:
-		case ND_RETURN:
-		case ND_DEFVAR:
-			return true;
-		default:
-			return false;
-	}
-}
-*/
-
 Node	*get_function_by_name(char *name, int len)
 {
 	int i = 0;

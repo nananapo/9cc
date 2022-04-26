@@ -19,7 +19,7 @@ int	align_to(int n, int align)
 void	push()
 {
 	push_count++;
-	printf("    %s rax\n", ASM_PUSH);
+	printf("    %s %s\n", ASM_PUSH, RAX);
 }
 
 void	pushi(int data)
@@ -34,6 +34,16 @@ void	pop(char *reg)
 	printf("    pop %s\n", reg);
 }
 
+void	mov(char *dst, char *from)
+{
+	printf("    %s %s, %s\n", ASM_MOV, dst, from);
+}
+
+void	movi(char *dst, int i)
+{
+	printf("    %s %s, %d\n", ASM_MOV, dst, i);
+}
+
 void	comment(char *c)
 {
 	printf("# %s\n", c);
@@ -44,12 +54,11 @@ int	type_size(Type *type);
 // 変数のアドレスをpushする
 void	gen_lval(Node *node)
 {
-	comment("lval");
-
 	if (node->kind != ND_LVAR)
 		error("代入の左辺値が変数ではありません");
-	printf("    %s rax, rbp\n", ASM_MOV);
-	printf("    sub rax, %d\n", node->offset);
+	
+	mov(RAX, RBP);
+	printf("    sub %s, %d\n", RAX, node->offset);
 }
 
 // 四則演算
@@ -249,12 +258,11 @@ void	gen_call(Node *node)
 	while (tmp != NULL && i < ARG_REG_COUNT)
 	{
 		gen(tmp);
-		printf("    %s %s, rax\n", ASM_MOV, arg_regs[node->argdef_count - i - 1]);
+		mov(arg_regs[node->argdef_count - i - 1], RAX);
 		tmp = tmp->next;
 		i++;
 	}
 
-	comment("call func");
 	printf("    call _%s\n", strndup(node->fname, node->flen));
 	return;
 }
@@ -268,11 +276,19 @@ void	init_stack_size(Node *node)
 	}
 }
 
+static void prologue()
+{
+	// prologue
+	mov(RAX, RBP);
+	push();
+	mov(RBP, RSP);
+}
+
 static void	epilogue()
 {
 	// epilogue
-	printf("    %s rsp, rbp\n", ASM_MOV);
-	pop("rbp");
+	mov(RSP, RBP);
+	pop(RBP);
 	printf("    ret\n");
 }
 
@@ -282,14 +298,10 @@ bool	gen_filescope(Node *node)
 	
 	if (node->kind == ND_FUNCDEF)
 	{
-		printf("_%s:\n", strndup(node->fname, node->flen));
-	
 		push_count = 0; // pushを初期化
 
-		// prologue
-		printf("    %s rax, rbp\n", ASM_MOV);
-		push();
-		printf("    %s rbp, rsp\n", ASM_MOV);
+		printf("_%s:\n", strndup(node->fname, node->flen));	
+		prologue();
 
 		init_stack_size(node);
 		if (node->stack_size != 0)
@@ -297,11 +309,11 @@ bool	gen_filescope(Node *node)
 			printf("    sub rsp, %d\n", align_to(node->stack_size, 16));
 
 			i = 0;
-			printf("    mov rax, rbp\n");
+			mov(RAX, RBP);
 			while (i < node->argdef_count && i < ARG_REG_COUNT)
 			{
 				printf("    sub rax, 8\n");
-				printf("    mov [rax], %s\n", arg_regs[i++]);
+				mov("[rax]", arg_regs[i++]);
 			}
 		}
 
@@ -319,11 +331,11 @@ bool	gen_formula(Node *node)
 	switch (node->kind)
 	{
 		case ND_NUM:
-			printf("    mov rax, %d\n", node->val);
+			movi(RAX, node->val);
 			return true;
 		case ND_LVAR:
 			gen_lval(node);
-			printf("    %s rax, [rax]\n", ASM_MOV);
+			mov(RAX, "[rax]");
 			return true;
 		case ND_ASSIGN:
 			if (node->lhs->kind == ND_LVAR)
@@ -336,8 +348,7 @@ bool	gen_formula(Node *node)
 			push();
 			gen(node->rhs);
 			pop("rdi");
-
-			printf("    %s [rdi], rax\n", ASM_MOV);
+			mov("[rdi]", RAX);
 			return true;
 		case ND_RETURN:
 			gen(node->lhs);
@@ -351,7 +362,7 @@ bool	gen_formula(Node *node)
 			return true;
 		case ND_DEREF:
 			gen(node->lhs);
-			printf("    %s rax,[rax]\n", ASM_MOV);
+			mov(RAX, "[rax]");
 			return true;
 		default:
 			break;
