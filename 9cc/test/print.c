@@ -1,6 +1,8 @@
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
 
-static void	putchar(char c)
+static void	my_putchar(char c)
 {
 	write(1, &c, 1);
 }
@@ -11,7 +13,7 @@ static int	recpint(int a)
 	{
 		if (a < 0)
 			a = -a;
-		putchar('0' + a);
+		my_putchar('0' + a);
 		return 0;
 	}
 	recpint(a / 10);
@@ -22,7 +24,7 @@ static int	recpint(int a)
 int	pint(int a)
 {
 	if (a < 0)
-		putchar('-');
+		my_putchar('-');
 	recpint(a);
 	return 0;
 }
@@ -33,12 +35,32 @@ int	pspace(int count)
 
 	i = 0;
 	while (i++ < count)
-		putchar(' ');
+		my_putchar(' ');
 	return 0;
 }
 
 int	pline()
 {
-	putchar('\n');
+	my_putchar('\n');
+	return 0;
+}
+
+int pptr(int *ptr)
+{
+	printf("ptr : %p\n", ptr);
+	return 0;
+}
+
+int *my_malloc_int(int size)
+{
+	write(2, "called malloc\n", 14);
+	int* ptr = (int *)malloc(sizeof(int) * size);
+//	printf("ptr %p\n", ptr);
+	return ptr;
+}
+
+int	pcheck()
+{
+	write(1, "check\n", 6);
 	return 0;
 }

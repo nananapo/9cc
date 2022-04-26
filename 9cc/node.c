@@ -20,6 +20,15 @@ LVar	*find_lvar(char *str, int len)
 	return NULL;
 }
 
+int	type_size(Type *type)
+{
+	if (type->ty == INT)
+		return 8;
+	if (type->ty == PTR)
+		return 8;
+	return -1;
+}
+
 int	create_local_var(char *name, int len, Type *type)
 {
 	// TODO check same
@@ -29,9 +38,9 @@ int	create_local_var(char *name, int len, Type *type)
 	lvar->len = len;
 	lvar->type = type;
 	if (locals == NULL)
-		lvar->offset = 8;
+		lvar->offset = type_size(type);
 	else
-		lvar->offset = locals->offset + 8;
+		lvar->offset = locals->offset + type_size(type);
 	locals = lvar;
 	return lvar->offset;
 }
@@ -48,6 +57,7 @@ int	get_locals_count()
 	return i;
 }
 
+/*
 int	is_block_node(Node *node)
 {
 	switch (node->kind)
@@ -63,6 +73,7 @@ int	is_block_node(Node *node)
 			return false;
 	}
 }
+*/
 
 Node	*get_function_by_name(char *name, int len)
 {
@@ -549,18 +560,25 @@ Node	*filescope()
 
 	// func_defsに代入
 	// TODO 関数名被り
-	int i = 0;
-	while (func_defs[i])
-		i += 1;
-	func_defs[i] = node;
 
 	if (consume(";"))
 	{
 		node->kind = ND_PROTOTYPE;
+
+		int i = 0;
+		while (func_protos[i])
+			i += 1;
+		func_protos[i] = node;
 	}
 	else
 	{
+		int i = 0;
+		while (func_defs[i])
+			i += 1;
+		func_defs[i] = node;
+
 		node->lhs = stmt();
+		node->locals = locals;
 		node->locals_len = get_locals_count();
 	}
 	

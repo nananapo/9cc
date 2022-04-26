@@ -1,6 +1,9 @@
 #ifndef NINECC_H
 # define NINECC_H
 
+# define ASM_MOV "mov"
+# define ASM_PUSH "push"
+
 #include <stdbool.h>
 
 typedef struct Token Token;
@@ -77,6 +80,8 @@ struct Node
 	NodeKind	kind;
 	Node		*lhs;
 	Node		*rhs;
+
+	// num
 	int			val;
 
 	// ident
@@ -103,6 +108,8 @@ struct Node
 	int			locals_len;
 	Type		*arg_type;
 	Type		*ret_type;
+	int			stack_size;
+	LVar 		*locals;
 
 	// general
 	Node		*next;
@@ -119,7 +126,7 @@ struct	LVar
 	Type	*type;
 };
 
-int	is_block_node(Node *node);
+//int	is_block_node(Node *node);
 
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
@@ -138,6 +145,9 @@ bool	at_eof();
 
 Token	*tokenize(char *p);
 Token *new_token(TokenKind kind, Token *cur, char *str);
+
+Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+Type	*new_primitive_type(PrimitiveType pri);
 
 void	gen(Node *node);
 

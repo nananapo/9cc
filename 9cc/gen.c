@@ -2,30 +2,101 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 int	jumpLabelCount = 0;
 
 #define ARG_REG_COUNT 6
 char *arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
+int	push_count = 0;
+
+int	align_to(int n, int align)
+{
+	return (n + align - 1) / align * align;
+}
+
+void	push()
+{
+	push_count++;
+	printf("    %s rax\n", ASM_PUSH);
+}
+
+void	pushi(int data)
+{
+	push_count++;
+	printf("    %s %d\n", ASM_PUSH, data);
+}
+
+void	pop(char *reg)
+{
+	push_count--;
+	printf("    pop %s\n", reg);
+}
+
+void	comment(char *c)
+{
+	printf("# %s\n", c);
+}
+
+int	type_size(Type *type);
+
 // 変数のアドレスをpushする
 void	gen_lval(Node *node)
 {
+	comment("lval");
+
 	if (node->kind != ND_LVAR)
 		error("代入の左辺値が変数ではありません");
-	printf("    mov rax, rbp\n");
+	printf("    %s rax, rbp\n", ASM_MOV);
 	printf("    sub rax, %d\n", node->offset);
-	printf("    push rax\n");
 }
 
 // 四則演算
 void	gen_calc(Node *node)
 {
-	gen(node->lhs);
-	gen(node->rhs);
+	switch (node->kind)
+	{
+		case ND_ADD:
+		case ND_SUB:
+			if (node->type->ty == PTR)
+			{
+				// 左辺をポインタ型にする
+				if (node->rhs->type->ty == PTR)
+				{
+					Node *tmp = node->lhs;
+					node->lhs = node->rhs;
+					node->rhs = tmp;
+				}
+				// sizeを求める
+				int	size;
+				if (node->lhs->type->ptr_to->ty == INT)
+				{
+					size = 4;
+				}
+				else
+				{
+					size = 8;
+				}
 
-	printf("    pop rdi\n");
-	printf("    pop rax\n");
+				// 右辺を掛け算に置き換える
+				Node *size_node = new_node(ND_NUM, NULL, NULL);
+				size_node->val = size;
+				size_node->type = new_primitive_type(INT);
+				node->rhs = new_node(ND_MUL, node->rhs, size_node);
+				size_node->type = new_primitive_type(INT);
+			}
+			break;
+		default:
+			break;
+	}
+
+	// TODO ここも怪しい
+	gen(node->rhs);
+	push();
+	gen(node->lhs);
+
+	pop("rdi"); // rhs = rdi
 
 	switch (node->kind)
 	{
@@ -66,7 +137,6 @@ void	gen_calc(Node *node)
 			fprintf(stderr, "不明なノード %d\n", node->kind);
 			break;
 	}
-	printf("    push rax\n");
 }
 
 bool	gen_block(Node *node)
@@ -82,15 +152,12 @@ bool	gen_block(Node *node)
 				if (node->lhs == NULL)
 					break;
 				gen(node->lhs);
-				if (!is_block_node(node->lhs))
-					printf("    pop rax\n");
 				node = node->rhs;
 			}
 			return true;
 		case ND_IF:
 			// if
 			gen(node->lhs);
-			printf("    pop rax\n");
 			printf("    cmp rax, 0\n");
 
 			lend = jumpLabelCount++;
@@ -99,8 +166,6 @@ bool	gen_block(Node *node)
 			{
 				printf("    je .Lend%d\n", lend);
 				gen(node->rhs);
-				if (!is_block_node(node->rhs))
-					printf("    pop rax\n");
 			}
 			else
 			{
@@ -109,15 +174,11 @@ bool	gen_block(Node *node)
 				
 				// if stmt
 				gen(node->rhs);
-				if (!is_block_node(node->rhs))
-					printf("    pop rax\n");
 				printf("    jmp .Lend%d\n", lend);
 
 				// else
 				printf(".Lelse%d:\n", lelse);
 				gen(node->els);
-				if (!is_block_node(node->els))
-					printf("    pop rax\n");
 			}
 			printf(".Lend%d:\n", lend);
 			return true;
@@ -129,14 +190,11 @@ bool	gen_block(Node *node)
 			
 			// if
 			gen(node->lhs);
-			printf("    pop rax\n");
 			printf("    cmp rax, 0\n");
 			printf("    je .Lend%d\n", lend);
 			
 			// while block
 			gen(node->rhs);
-			if (!is_block_node(node->rhs))
-				printf("    pop rax\n");
 			
 			// next
 			printf("    jmp .Lbegin%d\n", lbegin);
@@ -150,32 +208,25 @@ bool	gen_block(Node *node)
 			
 			// init
 			if (node->for_init != NULL)
-			{
 				gen(node->for_init);
-				printf("    pop rax\n");
-			}
+
 			printf(".Lbegin%d:\n", lbegin);
 			
 			// if
 			if(node->for_if != NULL)
 			{
 				gen(node->for_if);
-				printf("    pop rax\n");
 				printf("    cmp rax, 0\n");
 				printf("    je .Lend%d\n", lend);
 			}
 
 			// for-block
 			gen(node->lhs);
-			if (!is_block_node(node->lhs))
-				printf("    pop rax\n");
 
 			// next
 			if(node->for_next != NULL)
-			{
 				gen(node->for_next);
-				printf("    pop rax\n");
-			}
+
 			printf("    jmp .Lbegin%d\n", lbegin);
 			
 			//end
@@ -192,29 +243,37 @@ bool	gen_block(Node *node)
 void	gen_call(Node *node)
 {
 	Node	*tmp = node->args;
-	int		i = 0;
-	while (tmp != NULL && i < ARG_REG_COUNT)
-	{
-		gen(tmp);
-		tmp = tmp->next;
-		i++;
-	}
-
-	// TODO 6個までしか考えてない
-	tmp = node->args;
+	int		i;
+	
 	i = 0;
 	while (tmp != NULL && i < ARG_REG_COUNT)
 	{
-		printf("    pop rax\n");
-		printf("    mov %s, rax\n", arg_regs[node->argdef_count - i - 1]);
+		gen(tmp);
+		printf("    %s %s, rax\n", ASM_MOV, arg_regs[node->argdef_count - i - 1]);
 		tmp = tmp->next;
 		i++;
 	}
 
+	comment("call func");
 	printf("    call _%s\n", strndup(node->fname, node->flen));
-	// returnがある想定
-	printf("    push rax\n");
 	return;
+}
+
+void	init_stack_size(Node *node)
+{
+	node->stack_size = 0;
+	for  (LVar *var = node->locals;var;var = var->next)
+	{
+		node->stack_size += type_size(var->type);
+	}
+}
+
+static void	epilogue()
+{
+	// epilogue
+	printf("    %s rsp, rbp\n", ASM_MOV);
+	pop("rbp");
+	printf("    ret\n");
 }
 
 bool	gen_filescope(Node *node)
@@ -225,26 +284,29 @@ bool	gen_filescope(Node *node)
 	{
 		printf("_%s:\n", strndup(node->fname, node->flen));
 	
+		push_count = 0; // pushを初期化
+
 		// prologue
-		printf("    push rbp\n");
-		printf("    mov rbp, rsp\n");
-		i = 0;
-		while (i < node->argdef_count && i < ARG_REG_COUNT)
+		printf("    %s rax, rbp\n", ASM_MOV);
+		push();
+		printf("    %s rbp, rsp\n", ASM_MOV);
+
+		init_stack_size(node);
+		if (node->stack_size != 0)
 		{
-			printf("    push %s\n", arg_regs[i]);
-			i++;
+			printf("    sub rsp, %d\n", align_to(node->stack_size, 16));
+
+			i = 0;
+			printf("    mov rax, rbp\n");
+			while (i < node->argdef_count && i < ARG_REG_COUNT)
+			{
+				printf("    sub rax, 8\n");
+				printf("    mov [rax], %s\n", arg_regs[i++]);
+			}
 		}
-		printf("    sub rsp, %d\n", (node->locals_len - node->argdef_count) * 8);
-		
+
 		gen(node->lhs);
-
-		if (!is_block_node(node->lhs))
-			printf("    pop rax\n");
-
-		//epi
-		printf("    mov rsp, rbp\n");
-		printf("    pop rbp\n");
-		printf("    ret\n");
+		epilogue();
 		return true;
 	}
 	return false;
@@ -257,35 +319,29 @@ bool	gen_formula(Node *node)
 	switch (node->kind)
 	{
 		case ND_NUM:
-			printf("    push %d\n", node->val);
+			printf("    mov rax, %d\n", node->val);
 			return true;
 		case ND_LVAR:
 			gen_lval(node);
-			printf("    pop rax\n");
-			printf("    mov rax, [rax]\n");
-			printf("    push rax\n");
+			printf("    %s rax, [rax]\n", ASM_MOV);
 			return true;
 		case ND_ASSIGN:
 			if (node->lhs->kind == ND_LVAR)
 				gen_lval(node->lhs);
 			else if (node->lhs->kind == ND_DEREF)
-			{
 				gen(node->lhs->lhs);
-			}
 			else
 				error("代入の左辺値が識別子かアドレスではありません");
+
+			push();
 			gen(node->rhs);
-			printf("    pop rdi\n");
-			printf("    pop rax\n");
-			printf("    mov [rax], rdi\n");
-			printf("    push rdi\n");
+			pop("rdi");
+
+			printf("    %s [rdi], rax\n", ASM_MOV);
 			return true;
 		case ND_RETURN:
 			gen(node->lhs);
-			printf("    pop rax\n");
-			printf("    mov rsp, rbp\n");
-			printf("    pop rbp\n");
-			printf("    ret\n");
+			epilogue();
 			return true;
 		case ND_CALL:
 			gen_call(node);
@@ -295,9 +351,7 @@ bool	gen_formula(Node *node)
 			return true;
 		case ND_DEREF:
 			gen(node->lhs);
-			printf("    pop rax\n");
-			printf("    mov rax,[rax]\n");
-			printf("    push rax\n");
+			printf("    %s rax,[rax]\n", ASM_MOV);
 			return true;
 		default:
 			break;
