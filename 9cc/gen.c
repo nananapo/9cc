@@ -54,7 +54,7 @@ void	init_stack_size(Node *node)
 	node->stack_size = 0;
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		node->stack_size += type_size(var->type);
+		node->stack_size += type_size(var->type, 8);
 	}
 	node->stack_size = align_to(node->stack_size, 16);
 }

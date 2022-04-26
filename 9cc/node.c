@@ -20,13 +20,18 @@ LVar	*find_lvar(char *str, int len)
 	return NULL;
 }
 
-int	type_size(Type *type)
+static int max(int a, int b)
+{
+	return a > b ? a : b;
+}
+
+int	type_size(Type *type, int min_size)
 {
 	if (type->ty == INT)
-		return 8;
+		return max(4, min_size);
 	if (type->ty == PTR)
-		return 8;
-	return -1;
+		return max(8, min_size);
+	return max(-1, min_size);
 }
 
 int	create_local_var(char *name, int len, Type *type)
@@ -38,9 +43,9 @@ int	create_local_var(char *name, int len, Type *type)
 	lvar->len = len;
 	lvar->type = type;
 	if (locals == NULL)
-		lvar->offset = type_size(type);
+		lvar->offset = type_size(type, 8);
 	else
-		lvar->offset = locals->offset + type_size(type);
+		lvar->offset = locals->offset + type_size(type, 8);
 	locals = lvar;
 	return lvar->offset;
 }
@@ -275,6 +280,12 @@ Node *unary()
 		node = new_node(ND_ADDR, unary(), NULL);
 		// TODO 左辺値かどうかのチェック
 		node->type = new_type_ptr_to(node->lhs->type);
+		return node;
+	}
+	else if (consume_with_type(TK_SIZEOF))
+	{
+		node = unary();
+		node = new_node_num(type_size(node->type, 0));
 		return node;
 	}
 	return primary();

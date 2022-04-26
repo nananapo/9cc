@@ -25,6 +25,7 @@ typedef enum
 	TK_WHILE,
 	TK_FOR,
 	TK_EOF,
+	TK_SIZEOF,
 } TokenKind;
 
 struct Token
@@ -155,6 +156,6 @@ void	gen(Node *node);
 
 void	program();
 
-int	type_size(Type *type);
+int	type_size(Type *type, int min_size);
 
 #endif

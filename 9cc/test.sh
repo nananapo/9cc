@@ -218,4 +218,12 @@ assert_out "42 24" "int	main()
 	pint(*(ptr + 1));
 	return 0;
 }"
+
+assert 4 "int main(){return sizeof 1;}"
+assert 4 "int main(){return sizeof(1);}"
+assert 4 "int main(){int a;return sizeof(a);}"
+
+assert 8 "int main(){int *a;return sizeof(a);}"
+assert 8 "int main(){int a;return sizeof(&a);}"
+
 echo OK
