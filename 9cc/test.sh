@@ -28,7 +28,8 @@ $2"
 	./9cc "$input" > tmp.s
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp`
-	
+
+	echo "#-- Test----------------------------"
   	if [ "$actual" = "$expected" ]; then
   	  echo "$input => $actual"
   	else
@@ -99,7 +100,9 @@ assert 10 "int main(){{return 10;}}"
 assert 10 "int main(){{int a;int b;a = 3; b = 7;return a+b;}}"
 assert 55 "int main(){int a;int s;a = 1; s = 0;for (;;) { s = s + a; a = a + 1; if (a == 11) { return s; }}}"
 
+assert_out "1" "int main(){int i;pint(1);}"
 assert_out "1" "int main(){pint(1);}"
+
 assert_out "1 1 2 3 5 8 13 21 34 55 " "int fib(int x)
 {
 	if (x == 0)

@@ -9,7 +9,7 @@ int	jumpLabelCount = 0;
 #define ARG_REG_COUNT 6
 char *arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 
-int	push_count = 0;
+int stack_count = 0;
 
 int	align_to(int n, int align)
 {
@@ -18,20 +18,20 @@ int	align_to(int n, int align)
 
 void	push()
 {
-	push_count++;
-	printf("    %s %s\n", ASM_PUSH, RAX);
+	stack_count += 8;
+	printf("    %s %s # stack=%d\n", ASM_PUSH, RAX, stack_count);
 }
 
 void	pushi(int data)
 {
-	push_count++;
-	printf("    %s %d\n", ASM_PUSH, data);
+	stack_count += 8;
+	printf("    %s %d # stack=%d\n", ASM_PUSH, data, stack_count);
 }
 
 void	pop(char *reg)
 {
-	push_count--;
-	printf("    pop %s\n", reg);
+	stack_count -= 8;
+	printf("    pop %s # stack=%d\n", reg, stack_count);
 }
 
 void	mov(char *dst, char *from)
@@ -49,9 +49,33 @@ void	comment(char *c)
 	printf("# %s\n", c);
 }
 
-int	type_size(Type *type);
+void	init_stack_size(Node *node)
+{
+	node->stack_size = 0;
+	for  (LVar *var = node->locals;var;var = var->next)
+	{
+		node->stack_size += type_size(var->type);
+	}
+	node->stack_size = align_to(node->stack_size, 16);
+}
 
-// 変数のアドレスをpushする
+static void prologue()
+{
+	// prologue
+	mov(RAX, RBP);
+	push();
+	mov(RBP, RSP);
+}
+
+static void	epilogue()
+{
+	// epilogue
+	mov(RSP, RBP);
+	pop(RBP);
+	printf("    ret\n");
+}
+
+// 変数のアドレスをraxに移動する
 void	gen_lval(Node *node)
 {
 	if (node->kind != ND_LVAR)
@@ -262,34 +286,23 @@ void	gen_call(Node *node)
 		tmp = tmp->next;
 		i++;
 	}
+	
+	bool	aligned = stack_count % 16 != 0;
+	if (!aligned)
+	{
+		comment("allign");
+		printf("# stack = %d\n", stack_count);
+		pushi(1);
+	}
+
+	printf("#count %d\n", stack_count);
 
 	printf("    call _%s\n", strndup(node->fname, node->flen));
+
+	if (!aligned)
+		pop("rdi");
+
 	return;
-}
-
-void	init_stack_size(Node *node)
-{
-	node->stack_size = 0;
-	for  (LVar *var = node->locals;var;var = var->next)
-	{
-		node->stack_size += type_size(var->type);
-	}
-}
-
-static void prologue()
-{
-	// prologue
-	mov(RAX, RBP);
-	push();
-	mov(RBP, RSP);
-}
-
-static void	epilogue()
-{
-	// epilogue
-	mov(RSP, RBP);
-	pop(RBP);
-	printf("    ret\n");
 }
 
 bool	gen_filescope(Node *node)
@@ -298,16 +311,15 @@ bool	gen_filescope(Node *node)
 	
 	if (node->kind == ND_FUNCDEF)
 	{
-		push_count = 0; // pushを初期化
-
 		printf("_%s:\n", strndup(node->fname, node->flen));	
 		prologue();
 
 		init_stack_size(node);
+		stack_count += node->stack_size; // pushを初期化
+
+		printf("    sub rsp, %d\n", node->stack_size);// stack_size
 		if (node->stack_size != 0)
 		{
-			printf("    sub rsp, %d\n", align_to(node->stack_size, 16));
-
 			i = 0;
 			mov(RAX, RBP);
 			while (i < node->argdef_count && i < ARG_REG_COUNT)
@@ -319,6 +331,13 @@ bool	gen_filescope(Node *node)
 
 		gen(node->lhs);
 		epilogue();
+
+		stack_count -= node->stack_size;
+		printf("#count %d\n", stack_count);
+		
+		if (stack_count != 0)
+			error("stack_countが0ではありません");
+
 		return true;
 	}
 	return false;
@@ -353,6 +372,7 @@ bool	gen_formula(Node *node)
 		case ND_RETURN:
 			gen(node->lhs);
 			epilogue();
+			stack_count += 8;
 			return true;
 		case ND_CALL:
 			gen_call(node);

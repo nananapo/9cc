@@ -8,5 +8,6 @@ int	pptr(int *ptr);
 int	main()
 {
 	int i;
+	int j;
 	pline();
 }

@@ -25,9 +25,7 @@ int main(int argc, char **argv)
 	token = tokenize(argv[1]);
 	program();
 
-//	printf(".section	__TEXT,__text,regular,pure_instructions\n");
 	printf(".intel_syntax noprefix\n");
-//	printf(".build_version macos, 11, 0	sdk_version 12, 1\n");
 	printf(".p2align	4, 0x90\n");
 
 	printf(".global ");

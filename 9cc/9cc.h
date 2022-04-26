@@ -154,4 +154,7 @@ Type	*new_primitive_type(PrimitiveType pri);
 void	gen(Node *node);
 
 void	program();
+
+int	type_size(Type *type);
+
 #endif
