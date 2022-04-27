@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+
+static void	expr(Node *node);
+
 int	jumpLabelCount = 0;
 
 #define ARG_REG_COUNT 6
@@ -76,7 +79,7 @@ static void	epilogue()
 }
 
 // 変数のアドレスをraxに移動する
-void	gen_lval(Node *node)
+static void	lval(Node *node)
 {
 	if (node->kind != ND_LVAR)
 		error("代入の左辺値が変数ではありません");
@@ -85,195 +88,7 @@ void	gen_lval(Node *node)
 	printf("    sub %s, %d\n", RAX, node->offset);
 }
 
-// 四則演算
-void	gen_calc(Node *node)
-{
-	switch (node->kind)
-	{
-		case ND_ADD:
-		case ND_SUB:
-			if (node->type->ty == PTR)
-			{
-				// 左辺をポインタ型にする
-				if (node->rhs->type->ty == PTR)
-				{
-					Node *tmp = node->lhs;
-					node->lhs = node->rhs;
-					node->rhs = tmp;
-				}
-				// sizeを求める
-				int	size;
-				if (node->lhs->type->ptr_to->ty == INT)
-				{
-					size = 4;
-				}
-				else
-				{
-					size = 8;
-				}
-
-				// 右辺を掛け算に置き換える
-				Node *size_node = new_node(ND_NUM, NULL, NULL);
-				size_node->val = size;
-				size_node->type = new_primitive_type(INT);
-				node->rhs = new_node(ND_MUL, node->rhs, size_node);
-				size_node->type = new_primitive_type(INT);
-			}
-			break;
-		default:
-			break;
-	}
-
-	// TODO ここも怪しい
-	gen(node->rhs);
-	push();
-	gen(node->lhs);
-
-	pop("rdi"); // rhs = rdi
-
-	switch (node->kind)
-	{
-		case ND_ADD:
-			printf("    add rax, rdi\n");
-			break;
-		case ND_SUB:
-			printf("    sub rax, rdi\n");
-			break;
-		case ND_MUL:
-			printf("    imul rax, rdi\n");
-			break;
-		case ND_DIV:
-			printf("    cqo\n");
-			printf("    idiv rdi\n");
-			break;
-		case ND_EQUAL:
-			printf("    cmp rdi, rax\n");
-			printf("    sete al\n");
-			printf("    movzx rax, al\n");
-			break;
-		case ND_NEQUAL:
-			printf("    cmp rdi, rax\n");
-			printf("    setne al\n");
-			printf("    movzx rax, al\n");
-			break;
-		case ND_LESS:
-			printf("    cmp rax, rdi\n");
-			printf("    setl al\n");
-			printf("    movzx rax, al\n");
-			break;
-		case ND_LESSEQ:
-			printf("    cmp rax, rdi\n");
-			printf("    setle al\n");
-			printf("    movzx rax, al\n");
-			break;
-		default:
-			fprintf(stderr, "不明なノード %d\n", node->kind);
-			break;
-	}
-}
-
-bool	gen_block(Node *node)
-{
-	int	lend;
-	int	lbegin;
-
-	switch (node->kind)
-	{
-		case ND_BLOCK:
-			while(node != NULL)
-			{
-				if (node->lhs == NULL)
-					break;
-				gen(node->lhs);
-				node = node->rhs;
-			}
-			return true;
-		case ND_IF:
-			// if
-			gen(node->lhs);
-			printf("    cmp rax, 0\n");
-
-			lend = jumpLabelCount++;
-
-			if (node->els == NULL)
-			{
-				printf("    je .Lend%d\n", lend);
-				gen(node->rhs);
-			}
-			else
-			{
-				int lelse = jumpLabelCount++;
-				printf("    je .Lelse%d\n", lelse);
-				
-				// if stmt
-				gen(node->rhs);
-				printf("    jmp .Lend%d\n", lend);
-
-				// else
-				printf(".Lelse%d:\n", lelse);
-				gen(node->els);
-			}
-			printf(".Lend%d:\n", lend);
-			return true;
-		case ND_WHILE:
-			lbegin = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			printf(".Lbegin%d:\n", lbegin);
-			
-			// if
-			gen(node->lhs);
-			printf("    cmp rax, 0\n");
-			printf("    je .Lend%d\n", lend);
-			
-			// while block
-			gen(node->rhs);
-			
-			// next
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			// end
-			printf(".Lend%d:\n", lend);
-			return true;
-		case ND_FOR:
-			lbegin = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			// init
-			if (node->for_init != NULL)
-				gen(node->for_init);
-
-			printf(".Lbegin%d:\n", lbegin);
-			
-			// if
-			if(node->for_if != NULL)
-			{
-				gen(node->for_if);
-				printf("    cmp rax, 0\n");
-				printf("    je .Lend%d\n", lend);
-			}
-
-			// for-block
-			gen(node->lhs);
-
-			// next
-			if(node->for_next != NULL)
-				gen(node->for_next);
-
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			//end
-			printf(".Lend%d:\n", lend);
-			return true;
-		case ND_DEFVAR:
-			return true;
-		default:
-			break;
-	}
-	return false;
-}
-
-void	gen_call(Node *node)
+static void	call(Node *node)
 {
 	Node	*tmp = node->args;
 	int		i;
@@ -281,7 +96,7 @@ void	gen_call(Node *node)
 	i = 0;
 	while (tmp != NULL && i < ARG_REG_COUNT)
 	{
-		gen(tmp);
+		expr(tmp);
 		mov(arg_regs[node->argdef_count - i - 1], RAX);
 		tmp = tmp->next;
 		i++;
@@ -305,9 +120,355 @@ void	gen_call(Node *node)
 	return;
 }
 
-bool	gen_filescope(Node *node)
+
+static void	primary(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_LVAR:
+			lval(node);
+			mov(RAX, "[rax]");
+			return;
+		case ND_CALL:
+			call(node);
+			return;
+		case ND_NUM:
+			movi(RAX, node->val);
+			return;
+		case ND_PROTOTYPE:
+		case ND_DEFVAR:
+			return;
+		default:
+			error("不明なノード %d", node->kind);
+			break;
+	}
+}
+
+static void unary(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_ADDR:
+		case ND_DEREF:
+			break;
+		default:
+			primary(node);
+			return;
+	}
+	
+	switch(node->kind)
+	{
+		case ND_ADDR:
+			lval(node->lhs);
+			break;
+		case ND_DEREF:
+			expr(node->lhs);
+			mov(RAX, "[rax]");
+			break;
+		default:
+			break;
+	}
+}
+
+static void	mul(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_MUL:
+		case ND_DIV:
+			break;
+		default:
+			unary(node);
+			return;
+	}
+
+	expr(node->rhs);
+	push();
+	expr(node->lhs);
+	pop("rdi");
+
+	switch (node->kind)
+	{
+		case ND_MUL:
+			printf("    imul rax, rdi\n");
+			break;
+		case ND_DIV:
+			printf("    cqo\n");
+			printf("    idiv rdi\n");
+			break;
+		default:
+			break;
+	}
+}
+
+static void	add(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_ADD:
+		case ND_SUB:
+			break;
+		default:
+			mul(node);
+			return;
+	}
+
+	// ポインタ
+	if (node->type->ty == PTR)
+	{
+		// 左辺をポインタ型にする
+		if (node->rhs->type->ty == PTR)
+		{
+			Node *tmp = node->lhs;
+			node->lhs = node->rhs;
+			node->rhs = tmp;
+		}
+
+		// 右辺を掛け算に置き換える
+		Node *size_node = new_node(ND_NUM, NULL, NULL);
+		size_node->val = type_size(node->lhs->type->ptr_to, 0);
+		size_node->type = new_primitive_type(INT);
+		node->rhs = new_node(ND_MUL, node->rhs, size_node);
+		size_node->type = new_primitive_type(INT);
+	}
+
+	expr(node->rhs);
+	push();
+	expr(node->lhs);
+	pop("rdi");
+
+	switch (node->kind)
+	{
+		case ND_ADD:
+			printf("    add rax, rdi\n");
+			break;
+		case ND_SUB:
+			printf("    sub rax, rdi\n");
+			break;
+		default:
+			break;
+	}
+}
+
+static void relational(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_LESS:
+		case ND_LESSEQ:
+			break;
+		default:
+			add(node);
+			return;
+	}
+
+	expr(node->rhs);
+	push();
+	expr(node->lhs);
+	pop("rdi");
+
+	switch (node->kind)
+	{
+		case ND_LESS:
+			printf("    cmp rax, rdi\n");
+			printf("    setl al\n");
+			printf("    movzx rax, al\n");
+			break;
+		case ND_LESSEQ:
+			printf("    cmp rax, rdi\n");
+			printf("    setle al\n");
+			printf("    movzx rax, al\n");
+			break;
+		default:
+			break;
+	}
+}
+
+static void	equality(Node *node)
+{
+	switch (node->kind)
+	{
+		case ND_EQUAL:
+		case ND_NEQUAL:
+			break;
+		default:
+			relational(node);
+			return;
+	}
+
+	expr(node->rhs);
+	push();
+	expr(node->lhs);
+	pop("rdi");
+
+	switch (node->kind)
+	{
+		case ND_EQUAL:
+			printf("    cmp rdi, rax\n");
+			printf("    sete al\n");
+			printf("    movzx rax, al\n");
+			break;
+		case ND_NEQUAL:
+			printf("    cmp rdi, rax\n");
+			printf("    setne al\n");
+			printf("    movzx rax, al\n");
+			break;
+		default:
+			break;
+	}
+}
+
+static void	assign(Node *node)
+{
+	if (node->kind != ND_ASSIGN)
+	{
+		equality(node);
+		return;
+	}
+	
+	if (node->lhs->kind == ND_LVAR)
+		lval(node->lhs);
+	else if (node->lhs->kind == ND_DEREF)
+		expr(node->lhs->lhs);
+	else
+		error("代入の左辺値が識別子かアドレスではありません");
+
+	push();
+	expr(node->rhs);
+	pop("rdi");
+	mov("[rdi]", RAX);
+}
+
+static void	expr(Node *node)
+{
+	assign(node);
+}
+
+static void stmt(Node *node)
+{
+	int	lend;
+	int	lbegin;
+
+	switch (node->kind)
+	{
+		case ND_RETURN:
+		case ND_IF:
+		case ND_WHILE:
+		case ND_FOR:
+		case ND_BLOCK:
+			break;
+		default:
+			expr(node);
+			return;
+	}
+
+	switch (node->kind)
+	{
+		case ND_RETURN:
+			expr(node->lhs);
+			epilogue();
+			stack_count += 8;
+			return;
+		case ND_IF:
+			// if
+			expr(node->lhs);
+			printf("    cmp rax, 0\n");
+
+			lend = jumpLabelCount++;
+
+			if (node->els == NULL)
+			{
+				printf("    je .Lend%d\n", lend);
+				stmt(node->rhs);
+			}
+			else
+			{
+				int lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				
+				// if stmt
+				stmt(node->rhs);
+				printf("    jmp .Lend%d\n", lend);
+
+				// else
+				printf(".Lelse%d:\n", lelse);
+				stmt(node->els);
+			}
+			printf(".Lend%d:\n", lend);
+			return;
+		case ND_WHILE:
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			printf(".Lbegin%d:\n", lbegin);
+			
+			// if
+			expr(node->lhs);
+			printf("    cmp rax, 0\n");
+			printf("    je .Lend%d\n", lend);
+			
+			// while block
+			stmt(node->rhs);
+			
+			// next
+			printf("    jmp .Lbegin%d\n", lbegin);
+			
+			// end
+			printf(".Lend%d:\n", lend);
+			return;
+		case ND_FOR:
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			// init
+			if (node->for_init != NULL)
+				expr(node->for_init);
+
+			printf(".Lbegin%d:\n", lbegin);
+			
+			// if
+			if(node->for_if != NULL)
+			{
+				expr(node->for_if);
+				printf("    cmp rax, 0\n");
+				printf("    je .Lend%d\n", lend);
+			}
+
+			// for-block
+			stmt(node->lhs);
+
+			// next
+			if(node->for_next != NULL)
+				expr(node->for_next);
+
+			printf("    jmp .Lbegin%d\n", lbegin);
+			
+			//end
+			printf(".Lend%d:\n", lend);
+			return;
+		case ND_BLOCK:
+			while(node != NULL)
+			{
+				if (node->lhs == NULL)
+					break;
+				stmt(node->lhs);
+				node = node->rhs;
+			}
+			return;
+		default:
+			break;
+	}
+}
+
+static void	filescope(Node *node)
 {
 	int		i = 0;
+
+	if (node->kind != ND_FUNCDEF)
+	{
+		stmt(node);
+		return;
+	}
 	
 	if (node->kind == ND_FUNCDEF)
 	{
@@ -317,9 +478,9 @@ bool	gen_filescope(Node *node)
 		init_stack_size(node);
 		stack_count += node->stack_size; // pushを初期化
 
-		printf("    sub rsp, %d\n", node->stack_size);// stack_size
 		if (node->stack_size != 0)
 		{
+			printf("    sub rsp, %d\n", node->stack_size);// stack_size
 			i = 0;
 			mov(RAX, RBP);
 			while (i < node->argdef_count && i < ARG_REG_COUNT)
@@ -329,7 +490,7 @@ bool	gen_filescope(Node *node)
 			}
 		}
 
-		gen(node->lhs);
+		stmt(node->lhs);
 		epilogue();
 
 		stack_count -= node->stack_size;
@@ -338,64 +499,14 @@ bool	gen_filescope(Node *node)
 		if (stack_count != 0)
 			error("stack_countが0ではありません");
 
-		return true;
+		return;
 	}
-	return false;
-}
-
-bool	gen_formula(Node *node)
-{
-	int		i = 0;
-	
-	switch (node->kind)
-	{
-		case ND_NUM:
-			movi(RAX, node->val);
-			return true;
-		case ND_LVAR:
-			gen_lval(node);
-			mov(RAX, "[rax]");
-			return true;
-		case ND_ASSIGN:
-			if (node->lhs->kind == ND_LVAR)
-				gen_lval(node->lhs);
-			else if (node->lhs->kind == ND_DEREF)
-				gen(node->lhs->lhs);
-			else
-				error("代入の左辺値が識別子かアドレスではありません");
-
-			push();
-			gen(node->rhs);
-			pop("rdi");
-			mov("[rdi]", RAX);
-			return true;
-		case ND_RETURN:
-			gen(node->lhs);
-			epilogue();
-			stack_count += 8;
-			return true;
-		case ND_CALL:
-			gen_call(node);
-			return true;
-		case ND_ADDR:
-			gen_lval(node->lhs);
-			return true;
-		case ND_DEREF:
-			gen(node->lhs);
-			mov(RAX, "[rax]");
-			return true;
-		default:
-			break;
-	}
-	return false;
+	return;
 }
 
 void	gen(Node *node)
 {
-	if (node->kind == ND_PROTOTYPE)
+	if (node->kind == ND_PROTOTYPE || node->kind == ND_DEFVAR)
 		return;
-	if (gen_filescope(node)) return;
-	if (gen_block(node)) return;
-	if (gen_formula(node)) return;
-	gen_calc(node);
+	filescope(node);
 }

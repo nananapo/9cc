@@ -10,155 +10,29 @@ extern Token	*token;
 extern Node		*func_defs[];
 extern Node		*func_protos[];
 
+// Parse
+Type	*consume_defident_type();
+
+// Node
+static Node	*expr();
+Node	*get_function_by_name(char *name, int len);
+Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
+Node *new_node_num(int val);
+
+// Type
+Type	*new_primitive_type(PrimitiveType pri);
+Type	*new_type_ptr_to(Type *ptr_to);
+bool	type_equal(Type *t1, Type *t2);
+int	type_size(Type *type, int min_size);
+
+// LVar
+LVar	*find_lvar(char *str, int len);
+int	create_local_var(char *name, int len, Type *type);
+int	get_locals_count();
+
 LVar		*locals;
 
-LVar	*find_lvar(char *str, int len)
-{
-	for (LVar *var = locals; var; var = var->next)
-		if (var->len == len && memcmp(str, var->name, var->len) == 0)
-			return var;
-	return NULL;
-}
-
-static int max(int a, int b)
-{
-	return a > b ? a : b;
-}
-
-int	type_size(Type *type, int min_size)
-{
-	if (type->ty == INT)
-		return max(4, min_size);
-	if (type->ty == PTR)
-		return max(8, min_size);
-	return max(-1, min_size);
-}
-
-int	create_local_var(char *name, int len, Type *type)
-{
-	// TODO check same
-	LVar *lvar = calloc(1, sizeof(LVar));
-	lvar->next = locals;
-	lvar->name = name;
-	lvar->len = len;
-	lvar->type = type;
-	if (locals == NULL)
-		lvar->offset = type_size(type, 8);
-	else
-		lvar->offset = locals->offset + type_size(type, 8);
-	locals = lvar;
-	return lvar->offset;
-}
-
-int	get_locals_count()
-{
-	int	i = 0;
-	LVar *tmp = locals;
-	while (tmp)
-	{
-		i++;
-		tmp = tmp->next;
-	}
-	return i;
-}
-
-Node	*get_function_by_name(char *name, int len)
-{
-	int i = 0;
-	while (func_defs[i])
-	{
-		Node *tmp = func_defs[i];
-		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
-			return tmp;
-		i++;
-	}
-
-	i = 0;
-	while (func_protos[i])
-	{
-		Node *tmp = func_protos[i];
-		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
-			return tmp;
-		i++;
-	}
-	return NULL;
-}
-
-Type	*new_primitive_type(PrimitiveType pri)
-{
-	Type	*type = calloc(1, sizeof(Type));
-	type->ty = pri;
-	type->ptr_to = NULL;
-	type->next = NULL;
-	return type;
-}
-
-Type	*new_type_ptr_to(Type *ptr_to)
-{
-	Type	*type = new_primitive_type(PTR);
-	type->ptr_to = ptr_to;
-	return type;
-}
-
-// 2つのTypeが一致するかどうか
-int	type_equal(Type *t1, Type *t2)
-{
-	if (t1->ty != t2->ty)
-		return 0;
-	if (t1->ty == PTR)
-		return type_equal(t1->ptr_to, t2->ptr_to);
-	return 1;
-}
-
-Type	*consume_defident_type()
-{
-	// type
-	if (!consume_ident_str("int"))
-		return NULL;
-
-	Type *type = new_primitive_type(INT);
-	while (consume("*"))
-	{
-		Type *tmp = new_primitive_type(PTR);
-		tmp->ptr_to = type;
-		type = tmp;
-	}
-
-	return type;
-}
-
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
-{
-	Node *node = calloc(1, sizeof(Node));
-	node->kind = kind;
-	node->lhs = lhs;
-	node->rhs = rhs;
-
-	// for
-	node->for_init = NULL;
-	node->for_if = NULL;
-	node->for_next = NULL;
-
-	// else
-	node->els = NULL;
-	
-	// call & deffunc
-	node->fname = NULL;
-	node->args = NULL;
-
-	node->type = NULL;
-	return node;
-}
-
-Node *new_node_num(int val)
-{
-	Node *node = new_node(ND_NUM, NULL, NULL);
-	node->val = val;
-	node->type = new_primitive_type(INT);
-	return node;
-}
-
-Node *primary()
+static Node *primary()
 {
 	Token	*tok;
 
@@ -249,7 +123,7 @@ Node *primary()
 	return new_node_num(expect_number());
 }
 
-Node *unary()
+static Node *unary()
 {
 	Node	*node;
 	if (consume("+"))
@@ -291,7 +165,7 @@ Node *unary()
 	return primary();
 }
 
-Node *mul()
+static Node *mul()
 {
 	Node *node = unary();
 	for (;;)
@@ -309,7 +183,7 @@ Node *mul()
 	}
 }
 
-Node *add()
+static Node *add()
 {
 	Node *node = mul();
 	for (;;)
@@ -339,7 +213,7 @@ Node *add()
 	}
 }
 
-Node *relational()
+static Node *relational()
 {
 	Node *node = add();
 	for (;;)
@@ -362,7 +236,7 @@ Node *relational()
 	}
 }
 
-Node *equality()
+static Node *equality()
 {
 	Node *node = relational();
 	for (;;)
@@ -381,7 +255,7 @@ Node *equality()
 	}
 }
 
-Node	*assign()
+static Node	*assign()
 {
 	Node	*node = equality();
 	if (consume("="))
@@ -394,12 +268,12 @@ Node	*assign()
 	return node;
 }
 
-Node	*expr()
+static Node	*expr()
 {
 	return assign();
 }
 
-Node	*stmt()
+static Node	*stmt()
 {
 	Node	*node;
 
@@ -496,7 +370,7 @@ Node	*stmt()
 	return node;
 }
 
-Node	*filescope()
+static Node	*filescope()
 {
 	Node	*node;
 	Token	*tok;
@@ -553,7 +427,6 @@ Node	*filescope()
 
 	// func_defsに代入
 	// TODO 関数名被り
-
 	if (consume(";"))
 	{
 		node->kind = ND_PROTOTYPE;

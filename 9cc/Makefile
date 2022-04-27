@@ -14,7 +14,7 @@ test: $(NAME)
 	./$(TEST_SCRIPT)
 
 clean:
-	rm -rf $(OBJS) *~ tmp* *dSYM
+	rm -rf $(OBJS) *~ tmp* *dSYM a.out
 
 fclean: clean
 	rm -rf $(NAME)

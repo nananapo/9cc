@@ -98,6 +98,23 @@ Token	*consume_ident_str(char *p)
 	return ret;
 }
 
+Type	*consume_defident_type()
+{
+	// type
+	if (!consume_ident_str("int"))
+		return NULL;
+
+	Type *type = new_primitive_type(INT);
+	while (consume("*"))
+	{
+		Type *tmp = new_primitive_type(PTR);
+		tmp->ptr_to = type;
+		type = tmp;
+	}
+
+	return type;
+}
+
 void	expect(char *op)
 {
 	if (token->kind != TK_RESERVED ||

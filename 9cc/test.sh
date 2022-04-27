@@ -18,6 +18,8 @@ assert() {
 
 
 assert_out(){
+	echo "#-- Test----------------------------"
+
 	expected="$1"
 	input="int pint(int i);
 int pspace(int n);
@@ -29,7 +31,6 @@ $2"
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp`
 
-	echo "#-- Test----------------------------"
   	if [ "$actual" = "$expected" ]; then
   	  echo "$input => $actual"
   	else

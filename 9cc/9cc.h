@@ -134,7 +134,6 @@ struct	LVar
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
 
-Node	*expr();
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
 
@@ -150,12 +149,12 @@ Token	*tokenize(char *p);
 Token *new_token(TokenKind kind, Token *cur, char *str);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+// Type
 Type	*new_primitive_type(PrimitiveType pri);
+int	type_size(Type *type, int min_size);
 
 void	gen(Node *node);
 
 void	program();
-
-int	type_size(Type *type, int min_size);
 
 #endif
