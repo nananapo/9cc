@@ -32,6 +32,63 @@ int	get_locals_count();
 
 LVar		*locals;
 
+static Node *call(Token *tok)
+{
+	Node	*node = new_node(ND_CALL, NULL, NULL);
+
+	node->fname = tok->str;
+	node->flen = tok->len;
+	node->args = NULL;
+	node->argdef_count = 0;
+
+	if (!consume(")"))
+	{
+		Node *arg = expr();
+		node->args = arg;
+		node->argdef_count = 1;
+
+		for (;;)
+		{	
+			if (consume(")"))
+				break;
+			if (!consume(","))
+				error_at(token->str, "トークンが,ではありません");
+			
+			arg = expr();
+			arg->next = node->args;
+			node->args = arg;
+			node->argdef_count += 1;
+		}
+	}
+	
+	// TODO これは違うパスでいいかも
+	Node *refunc = get_function_by_name(node->fname, node->flen);
+
+	// 関数定義が見つからない場合
+	if (refunc == NULL)
+		error_at(token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
+	else
+	{
+		// 引数の数を確認
+		if (node->argdef_count != refunc->argdef_count)
+			error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
+
+		Type *def = refunc->arg_type;
+		Node *use = node->args;
+		while (def != NULL)
+		{
+			if (!type_equal(def, use->type))
+				error_at(token->str, "関数%sの引数の型が一致しません", strndup(node->fname, node->flen));
+			def = def->next;
+			use = use->next;
+		}
+
+		// 型を返り値の型に設定
+		node->type = refunc->ret_type;
+	}
+	return node;
+}
+
 static Node *primary()
 {
 	Token	*tok;
@@ -50,62 +107,7 @@ static Node *primary()
 	{
 		// call func
 		if (consume("("))
-		{
-			Node	*node = new_node(ND_CALL, NULL, NULL);
-			node->fname = tok->str;
-			node->flen = tok->len;
-			node->args = NULL;
-			node->argdef_count = 0;
-
-			if (!consume(")"))
-			{
-				Node *arg = expr();
-				node->args = arg;
-				node->argdef_count = 1;
-
-				for (;;)
-				{	
-					if (consume(")"))
-						break;
-					if (!consume(","))
-						error_at(token->str, "トークンが,ではありません");
-					
-					arg = expr();
-					arg->next = node->args;
-					node->args = arg;
-					node->argdef_count += 1;
-				}
-			}
-			
-			// TODO これは違うパスでいいかも
-			Node *refunc = get_function_by_name(node->fname, node->flen);
-
-			// 関数定義が見つからない場合
-			if (refunc == NULL)
-				error_at(token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
-			else
-			{
-				// 引数の数を確認
-				if (node->argdef_count != refunc->argdef_count)
-					error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
-
-				Type *def = refunc->arg_type;
-				Node *use = node->args;
-				while (def != NULL)
-				{
-					if (!type_equal(def, use->type))
-						error_at(token->str, "関数%sの引数の型が一致しません", strndup(node->fname, node->flen));
-					def = def->next;
-					use = use->next;
-				}
-
-				// 型を返り値の型に設定
-				node->type = refunc->ret_type;
-			}
-
-
-			return node;
-		}
+			return call(tok);
 
 		// use ident
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
