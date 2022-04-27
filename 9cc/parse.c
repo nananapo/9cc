@@ -16,11 +16,10 @@ static char *reserved_words[] = {
 	">=", "<=", "==", "!=",
 	">", "<", "=",
 	"+", "-", "*", "/", "&",
-	"(", ")", "{", "}",
-	",", ";"
+	"(", ")", "{", "}", "[", "]",
+	",", ";",
+	NULL
 };
-
-#define RESERVED_WORD_COUNT 18
 
 void	error_at(char *loc, char *fmt, ...)
 {
@@ -48,15 +47,11 @@ Token *new_token(TokenKind kind, Token *cur, char *str)
 
 char	*match_reserved_word(char *str)
 {
-	int	i;
-
-	i = -1;
-	while (++i < RESERVED_WORD_COUNT)
+	for(int i=0;reserved_words[i];i++)
 		if (strncmp(reserved_words[i], str, strlen(reserved_words[i])) == 0)
 			return reserved_words[i];
 	return NULL;
 }
-
 
 bool	consume(char *op)
 {
