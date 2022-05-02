@@ -4,7 +4,7 @@
 
 extern LVar		*locals;
 
-int	type_size(Type *type, int min_size);
+int	align_to(int n, int align);
 
 LVar	*find_lvar(char *str, int len)
 {
@@ -23,9 +23,9 @@ int	create_local_var(char *name, int len, Type *type)
 	lvar->len = len;
 	lvar->type = type;
 	if (locals == NULL)
-		lvar->offset = type_size(type, 8);
+		lvar->offset = align_to(type_size(type), 8);
 	else
-		lvar->offset = locals->offset + type_size(type, 8);
+		lvar->offset = align_to(locals->offset + type_size(type), 8);
 	locals = lvar;
 	return lvar->offset;
 }

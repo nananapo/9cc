@@ -63,6 +63,15 @@ bool	consume(char *op)
 	return true;
 }
 
+bool consume_number(int *result)
+{
+	if (token->kind != TK_NUM)
+		return false;
+	*result = token->val;
+	token = token->next;
+	return true;	
+}
+
 bool	consume_with_type(TokenKind kind)
 {
 	if (token->kind != kind)
@@ -93,21 +102,45 @@ Token	*consume_ident_str(char *p)
 	return ret;
 }
 
-Type	*consume_defident_type()
+// 型宣言の前部分 (type ident arrayのtype部分)を読む
+Type	*consume_type_before()
 {
-	// type
+	Type	*type;
+	Type	*tmp;
+
+	// type name
 	if (!consume_ident_str("int"))
 		return NULL;
 
-	Type *type = new_primitive_type(INT);
+	type = new_primitive_type(INT);
 	while (consume("*"))
 	{
-		Type *tmp = new_primitive_type(PTR);
+		tmp = new_primitive_type(PTR);
 		tmp->ptr_to = type;
 		type = tmp;
 	}
-
 	return type;
+}
+
+// 型宣言のarray部分を読む
+void	expect_type_after(Type **type)// expect size
+{
+	Type	*tmp;
+	int		size;
+
+	while (consume("["))
+	{
+		tmp = new_primitive_type(ARRAY);
+		tmp->ptr_to = *type;
+		*type = tmp;
+
+		if (!consume_number(&size))
+			error_at(token->str, "配列のサイズが定義されていません");
+		tmp->array_size = size;
+		if (!consume("]"))
+			error_at(token->str, "]がありません");
+	}
+	return;
 }
 
 void	expect(char *op)

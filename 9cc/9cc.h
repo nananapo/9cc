@@ -66,13 +66,16 @@ typedef enum
 typedef enum
 {
 	INT,
-	PTR
+	PTR,
+	ARRAY
 } PrimitiveType;
 
 struct Type
 {
 	PrimitiveType	ty;
 	Type		*ptr_to;
+
+	int array_size;
 
 	// arg用
 	Type		*next;
@@ -149,9 +152,16 @@ Token	*tokenize(char *p);
 Token *new_token(TokenKind kind, Token *cur, char *str);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
-int	type_size(Type *type, int min_size);
+int		type_size(Type *type);
+Type	*new_primitive_type(PrimitiveType pri);
+Type	*new_type_ptr_to(Type *ptr_to);
+bool	type_equal(Type *t1, Type *t2);
+
+Type	*consume_type_before();
+void	expect_type_after(Type **type);
 
 void	gen(Node *node);
 

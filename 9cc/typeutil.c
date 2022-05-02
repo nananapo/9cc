@@ -29,15 +29,19 @@ bool	type_equal(Type *t1, Type *t2)
 		return false;
 	if (t1->ty == PTR)
 		return type_equal(t1->ptr_to, t2->ptr_to);
+	if (t1->ty == ARRAY)
+		return type_equal(t1->ptr_to, t2->ptr_to);
 	return true;
 }
 
 // typeのサイズを取得する
-int	type_size(Type *type, int min_size)
+int	type_size(Type *type)
 {
 	if (type->ty == INT)
-		return max(4, min_size);
+		return 4;
 	if (type->ty == PTR)
-		return max(8, min_size);
-	return max(-1, min_size);
+		return 8;
+	if (type->ty == ARRAY)
+		return type_size(type->ptr_to) * type->array_size;
+	return -1;
 }

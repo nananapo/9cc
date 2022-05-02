@@ -10,25 +10,16 @@ extern Token	*token;
 extern Node		*func_defs[];
 extern Node		*func_protos[];
 
-// Parse
-Type	*consume_defident_type();
-
 // Node
 static Node	*expr();
-Node	*get_function_by_name(char *name, int len);
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs);
-Node *new_node_num(int val);
 
-// Type
-Type	*new_primitive_type(PrimitiveType pri);
-Type	*new_type_ptr_to(Type *ptr_to);
-bool	type_equal(Type *t1, Type *t2);
-int	type_size(Type *type, int min_size);
+Node	*get_function_by_name(char *name, int len);
+Node	*new_node_num(int val);
 
 // LVar
 LVar	*find_lvar(char *str, int len);
-int	create_local_var(char *name, int len, Type *type);
-int	get_locals_count();
+int		create_local_var(char *name, int len, Type *type);
+int		get_locals_count();
 
 LVar		*locals;
 
@@ -131,14 +122,14 @@ static Node *unary()
 	if (consume("+"))
 	{
 		node = primary();
-		if (node->type->ty == PTR)
+		if (node->type->ty != INT)
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		return node;
 	}
 	else if (consume("-"))
 	{
 		node = new_node(ND_SUB, new_node_num(0), primary());
-		if (node->rhs->type->ty == PTR)
+		if (node->rhs->type->ty != INT)
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		node->type = node->rhs->type;
 		return node;
@@ -146,7 +137,7 @@ static Node *unary()
 	else if (consume("*"))
 	{
 		node = new_node(ND_DEREF, unary(), NULL);
-		if (node->lhs->type->ty != PTR)
+		if (node->lhs->type->ty == INT)
 			error_at(token->str, "ポインタではない型に対してunary *を適用できません");
 		node->type = node->lhs->type->ptr_to;	
 		return node;
@@ -161,7 +152,7 @@ static Node *unary()
 	else if (consume_with_type(TK_SIZEOF))
 	{
 		node = unary();
-		node = new_node_num(type_size(node->type, 0));
+		node = new_node_num(type_size(node->type));
 		return node;
 	}
 	return primary();
@@ -200,14 +191,14 @@ static Node *add()
 		// TODO 片方がポインタならポインタ型にする
 		if (node->lhs->type->ty != node->rhs->type->ty)
 		{
-			if (node->lhs->type->ty == PTR)
+			if (node->lhs->type->ty != INT)
 				node->type = node->lhs->type;
 			else
 				node->type = node->rhs->type;
 		}
 		else
 		{
-			if (node->lhs->type->ty == PTR)
+			if (node->lhs->type->ty != INT)
 				error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
 			// とりあえずINT
 			node->type = new_primitive_type(INT);
@@ -350,12 +341,16 @@ static Node	*stmt()
 	}
 	else
 	{
-		Type	*type = consume_defident_type();
+		Type	*type = consume_type_before();
 		if (type != NULL)
 		{
 			Token *tok = consume_ident();
+
 			if (tok == NULL)
 				error_at(token->str, "識別子が必要です");
+
+			expect_type_after(&type);
+
 			node = new_node(ND_DEFVAR, NULL, NULL);
 			node->offset = create_local_var(tok->str, tok->len, type);
 		}
@@ -367,8 +362,6 @@ static Node	*stmt()
 	if(!consume(";"))
 		error_at(token->str, ";ではないトークンです");
 
-	//TODO type
-
 	return node;
 }
 
@@ -379,7 +372,7 @@ static Node	*filescope()
 	locals = NULL;
 
 	// return type
-	Type	*ret_type = consume_defident_type();
+	Type	*ret_type = consume_type_before();
 	if (ret_type == NULL)
 		error_at(token->str, "型宣言が必要です");
 
@@ -394,7 +387,6 @@ static Node	*filescope()
 	node->flen = tok->len;
 	node->ret_type = ret_type;
 	node->argdef_count = 0;
-	// TODO type
 
 	// args
 	if (!consume("("))
@@ -404,20 +396,23 @@ static Node	*filescope()
 		for (;;)
 		{
 			// 型宣言の確認
-			Type *type = consume_defident_type();
+			Type *type = consume_type_before();
 			if (type == NULL)
 				error_at(token->str,"型宣言が必要です");
-
-			// 型情報を保存
-			type->next = node->arg_type;
-			node->arg_type = type;
-			node->argdef_count++;
 
 			// 仮引数名
 			Token *arg = consume_ident();
 			if (arg == NULL)
 				error_at(token->str, ")ではないトークンです");
 			create_local_var(arg->str, arg->len, type);
+
+			// arrayかどうかを確かめる
+			expect_type_after(&type);
+
+			// 型情報を保存
+			type->next = node->arg_type;
+			node->arg_type = type;
+			node->argdef_count++;
 			
 			// )か,
 			if (consume(")"))
