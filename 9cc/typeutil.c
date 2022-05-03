@@ -26,7 +26,12 @@ Type	*new_type_ptr_to(Type *ptr_to)
 bool	type_equal(Type *t1, Type *t2)
 {
 	if (t1->ty != t2->ty)
+	{
+		if ((t1->ty == PTR && t2->ty == ARRAY)
+			|| (t1->ty == ARRAY && t2->ty == PTR))
+			return type_equal(t1->ptr_to, t2->ptr_to); // TODO とりあえず
 		return false;
+	}
 	if (t1->ty == PTR)
 		return type_equal(t1->ptr_to, t2->ptr_to);
 	if (t1->ty == ARRAY)

@@ -85,6 +85,15 @@ static void	epilogue()
 	printf("    ret\n");
 }
 
+static void	load(Type *type)
+{
+	if (type->ty == ARRAY)
+	{
+		return ;
+	}
+	mov(RAX, "[rax]");
+}
+
 // 変数のアドレスをraxに移動する
 static void	lval(Node *node)
 {
@@ -134,7 +143,7 @@ static void	primary(Node *node)
 	{
 		case ND_LVAR:
 			lval(node);
-			mov(RAX, "[rax]");
+			load(node->type);
 			return;
 		case ND_CALL:
 			call(node);
@@ -170,7 +179,7 @@ static void unary(Node *node)
 			break;
 		case ND_DEREF:
 			expr(node->lhs);
-			mov(RAX, "[rax]");
+			load(node->type);
 			break;
 		default:
 			break;

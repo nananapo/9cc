@@ -100,6 +100,7 @@ static Node *primary()
 		if (consume("("))
 			return call(tok);
 
+		//if (consume("["))
 		// use ident
 		Node	*node = new_node(ND_LVAR, NULL, NULL);
 		LVar	*lvar = find_lvar(tok->str, tok->len);
@@ -254,8 +255,8 @@ static Node	*assign()
 	if (consume("="))
 	{
 		node = new_node(ND_ASSIGN, node, assign());
-		if (node->lhs->type->ty != node->rhs->type->ty)
-			error_at(token->str, "左辺と右辺の型が一致しません");
+		if (!type_equal(node->lhs->type, node->rhs->type))
+			error_at(token->str, "左辺(%d)と右辺(%d)の型が一致しません", node->lhs->type->ty, node->rhs->type->ty);
 		node->type = node->lhs->type;
 	}
 	return node;
