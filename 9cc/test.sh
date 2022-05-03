@@ -230,5 +230,8 @@ assert 8 "int main(){int a;return sizeof(&a);}"
 
 assert 10 "int main(){int a[3]; int *b; b = a; *b = 10; return *a;}"
 assert 33 "int main(){int a[3]; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return (*a + *(a + 1) + *(a + 2));}"
+assert 10 "int main(){int a[3]; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return *a;}"
+assert 11 "int main(){int a[3]; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return *(a + 1);}"
+assert 12 "int main(){int a[3]; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return *(a + 2);}"
 assert 33 "int main(){int a[3]; int b; int c; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return (*a + *(a + 1) + *(a + 2));}"
 echo OK
