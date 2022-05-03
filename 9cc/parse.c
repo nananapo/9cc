@@ -125,18 +125,14 @@ Type	*consume_type_before()
 // 型宣言のarray部分を読む
 void	expect_type_after(Type **type)// expect size
 {
-	Type	*tmp;
 	int		size;
 
 	while (consume("["))
 	{
-		tmp = new_primitive_type(ARRAY);
-		tmp->ptr_to = *type;
-		*type = tmp;
-
+		*type = new_type_array(*type);
 		if (!consume_number(&size))
 			error_at(token->str, "配列のサイズが定義されていません");
-		tmp->array_size = size;
+		(*type)->array_size = size;
 		if (!consume("]"))
 			error_at(token->str, "]がありません");
 	}

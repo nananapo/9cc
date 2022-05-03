@@ -158,6 +158,7 @@ Type	*new_primitive_type(PrimitiveType pri);
 int		type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
+Type	*new_type_array(Type *ptr_to);
 bool	type_equal(Type *t1, Type *t2);
 
 Type	*consume_type_before();

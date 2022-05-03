@@ -22,6 +22,13 @@ Type	*new_type_ptr_to(Type *ptr_to)
 	return type;
 }
 
+Type	*new_type_array(Type *ptr_to)
+{
+	Type	*type = new_primitive_type(ARRAY);
+	type->ptr_to = ptr_to;
+	return type;
+}
+
 // 2つのTypeが一致するかどうか
 bool	type_equal(Type *t1, Type *t2)
 {
