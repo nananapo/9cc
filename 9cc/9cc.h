@@ -155,7 +155,7 @@ Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
-int		type_size(Type *type);
+int		type_size(Type *type, int min);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);

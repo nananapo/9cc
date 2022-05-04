@@ -23,9 +23,9 @@ int	create_local_var(char *name, int len, Type *type)
 	lvar->len = len;
 	lvar->type = type;
 	if (locals == NULL)
-		lvar->offset = align_to(type_size(type), 8);
+		lvar->offset = align_to(type_size(type, 8), 8);
 	else
-		lvar->offset = align_to(locals->offset + type_size(type), 8);
+		lvar->offset = align_to(locals->offset + type_size(type, 8), 8);
 	locals = lvar;
 	return lvar->offset;
 }

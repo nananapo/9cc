@@ -153,7 +153,7 @@ static Node *unary()
 	else if (consume_with_type(TK_SIZEOF))
 	{
 		node = unary();
-		node = new_node_num(type_size(node->type));
+		node = new_node_num(type_size(node->type, 0));
 		return node;
 	}
 	return primary();

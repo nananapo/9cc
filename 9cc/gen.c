@@ -64,7 +64,7 @@ void	init_stack_size(Node *node)
 	node->stack_size = 0;
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		node->stack_size += max(8, type_size(var->type));
+		node->stack_size += type_size(var->type, 8);
 	}
 	node->stack_size = align_to(node->stack_size, 16);
 }
@@ -230,10 +230,10 @@ static void	add(Node *node)
 	}
 
 	// ポインタ
-	if (node->type->ty == PTR)
+	if (node->type->ty == PTR || node->type->ty == ARRAY)
 	{
 		// 左辺をポインタ型にする
-		if (node->rhs->type->ty == PTR)
+		if (node->rhs->type->ty == PTR || node->rhs->type->ty == ARRAY)
 		{
 			Node *tmp = node->lhs;
 			node->lhs = node->rhs;
@@ -242,7 +242,7 @@ static void	add(Node *node)
 
 		// 右辺を掛け算に置き換える
 		Node *size_node = new_node(ND_NUM, NULL, NULL);
-		size_node->val = type_size(node->lhs->type->ptr_to);
+		size_node->val = type_size(node->lhs->type->ptr_to, 0);
 		size_node->type = new_primitive_type(INT);
 		node->rhs = new_node(ND_MUL, node->rhs, size_node);
 		size_node->type = new_primitive_type(INT);

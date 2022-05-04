@@ -47,13 +47,13 @@ bool	type_equal(Type *t1, Type *t2)
 }
 
 // typeのサイズを取得する
-int	type_size(Type *type)
+int	type_size(Type *type, int min)
 {
 	if (type->ty == INT)
-		return 4;
+		return max(4, min);
 	if (type->ty == PTR)
-		return 8;
+		return max(8, min);
 	if (type->ty == ARRAY)
-		return type_size(type->ptr_to) * type->array_size;
+		return max(min, type_size(type->ptr_to, min) * type->array_size);
 	return -1;
 }
