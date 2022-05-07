@@ -83,11 +83,12 @@ static Node *call(Token *tok)
 static Node *primary()
 {
 	Token	*tok;
+	Node	*node;
 
 	// 括弧
 	if (consume("("))
 	{
-		Node	*node = expr();
+		node = expr();
 		expect(")");
 		return node;
 	}
@@ -98,23 +99,65 @@ static Node *primary()
 	{
 		// call func
 		if (consume("("))
-			return call(tok);
-
-		//if (consume("["))
+			node = call(tok);
 		// use ident
-		Node	*node = new_node(ND_LVAR, NULL, NULL);
-		LVar	*lvar = find_lvar(tok->str, tok->len);
+		else
+		{
+			node = new_node(ND_LVAR, NULL, NULL);
+			LVar	*lvar = find_lvar(tok->str, tok->len);
 
-		if (lvar == NULL)
-			error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
-		
-		node->offset = lvar->offset;
-		node->type = lvar->type;
+			if (lvar == NULL)
+				error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
+
+			node->offset = lvar->offset;
+			node->type = lvar->type;
+		}
+
+		// 添字によるDEREF
+		while (consume("["))
+		{
+			Node	*add = new_node(ND_ADD, node, expr());
+
+			if (add->lhs->type->ty != PTR && add->lhs->type->ty != ARRAY)
+				error_at(token->str, "ポインタ型ではありません");
+			if (add->rhs->type->ty != INT)
+				error_at(token->str, "添字の型がINTではありません");
+			add->type = add->lhs->type;
+
+			node = new_node(ND_DEREF, add, NULL);
+			node->type = node->lhs->type->ptr_to;
+
+			if (!consume("]"))
+				error_at(token->str, "%s");
+		}
+
 		return node;
 	}
 
-	// 数字
-	return new_node_num(expect_number());
+	// 数
+	int number;
+	if (!consume_number(&number))
+		error_at(token->str, "数字が必要です");
+	node = new_node_num(number);
+
+	// TODO 添字によるDEREF
+	while (consume("["))
+	{
+		Node	*add = new_node(ND_ADD, expr(), node);
+
+		if (add->lhs->type->ty != PTR && add->lhs->type->ty != ARRAY)
+			error_at(token->str, "ポインタ型ではありません");
+		if (add->rhs->type->ty != INT)
+			error_at(token->str, "添字の型がINTではありません");
+		add->type = add->lhs->type;
+
+		node = new_node(ND_DEREF, add, NULL);
+		node->type = node->lhs->type->ptr_to;
+
+		if (!consume("]"))
+			error_at(token->str, "%s");
+	}
+	return node;
 }
 
 static Node *unary()

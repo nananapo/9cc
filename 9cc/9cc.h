@@ -146,6 +146,7 @@ Token	*consume_ident();
 Token	*consume_ident_str(char *p);
 void	expect(char *op);
 int		expect_number();
+bool consume_number(int *result);
 bool	at_eof();
 
 Token	*tokenize(char *p);

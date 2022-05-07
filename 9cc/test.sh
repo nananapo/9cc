@@ -244,4 +244,30 @@ assert 6 "int main(){int a[3][3]; **a=1;*(*a+1)=2;*(*a+2)=3; **(a+1)=4;*(*(a+1)+
 assert 7 "int main(){int a[3][3]; **a=1;*(*a+1)=2;*(*a+2)=3; **(a+1)=4;*(*(a+1)+1)=5;*(*(a+1)+2)=6; **(a+2)=7;*(*(a+2)+1)=8;*(*(a+2)+2)=9; return **(a+2);}"
 assert 8 "int main(){int a[3][3]; **a=1;*(*a+1)=2;*(*a+2)=3; **(a+1)=4;*(*(a+1)+1)=5;*(*(a+1)+2)=6; **(a+2)=7;*(*(a+2)+1)=8;*(*(a+2)+2)=9; return *(*(a+2)+1);}"
 assert 9 "int main(){int a[3][3]; **a=1;*(*a+1)=2;*(*a+2)=3; **(a+1)=4;*(*(a+1)+1)=5;*(*(a+1)+2)=6; **(a+2)=7;*(*(a+2)+1)=8;*(*(a+2)+2)=9; return *(*(a+2)+2);}"
+
+assert 1 "int main(){ int a[3]; a[0] = 1; return a[0];}"
+assert 1 "int main(){ int a[3]; a[0] = 1; a[1] = 10; return a[0];}"
+assert 10 "int main(){ int a[3]; a[0] = 1; a[1] = 10; return a[1];}"
+assert 100 "int main(){ int a[3]; a[0] = 1; a[1] = 10; a[2] = 100; return a[2];}"
+
+assert 1 "int main(){ int a[3]; 0[a] = 1; return a[0];}"
+assert 1 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return a[0];}"
+assert 10 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return a[1];}"
+assert 100 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; 2[a] = 100; return a[2];}"
+
+assert 1 "int main(){ int a[3]; 0[a] = 1; return 0[a];}"
+assert 1 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return 0[a];}"
+assert 10 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return 1[a];}"
+assert 100 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; 2[a] = 100; return 2[a];}"
+
+assert 1 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][0];}"
+assert 2 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][1];}"
+assert 3 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][2];}"
+assert 4 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[1][0];}"
+assert 5 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[1][1];}"
+assert 6 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[1][2];}"
+assert 7 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[2][0];}"
+assert 8 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[2][1];}"
+assert 9 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[2][2];}"
+
 echo OK
