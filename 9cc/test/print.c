@@ -51,6 +51,13 @@ int pptr(int *ptr)
 	return 0;
 }
 
+int	ptr42(int *ptr)
+{
+	*ptr = 42;
+	pint(*ptr);
+	return 0;
+}
+
 int *my_malloc_int(int size)
 {
 	write(2, "called malloc\n", 14);

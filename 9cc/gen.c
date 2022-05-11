@@ -47,6 +47,12 @@ void	movi(char *dst, int i)
 	printf("    %s %s, %d\n", ASM_MOV, dst, i);
 }
 
+void	load_global(Node *node)
+{
+	printf("    mov rax, [rip + _%s@GOTPCREL]\n",
+		strndup(node->var_name, node->var_name_len));
+}
+
 void	comment(char *c)
 {
 	printf("# %s\n", c);
@@ -87,18 +93,21 @@ static void	epilogue()
 
 static void	load(Type *type)
 {
+	
 	if (type->ty == ARRAY)
 	{
+		//printf("なにこれ\n");
 		return ;
 	}
+	
 	mov(RAX, "[rax]");
 }
 
 // 変数のアドレスをraxに移動する
 static void	lval(Node *node)
 {
-	if (node->kind != ND_LVAR)
-		error("代入の左辺値が変数ではありません");
+	if (node->kind != ND_LVAR && node->kind != ND_LVAR_GLOBAL)
+		error("代入の左辺値が変数ではありません %d", node->kind);
 	
 	mov(RAX, RBP);
 	printf("    sub %s, %d\n", RAX, node->offset);
@@ -136,13 +145,18 @@ static void	call(Node *node)
 	return;
 }
 
-
 static void	primary(Node *node)
 {
+	char *ch;
+
 	switch (node->kind)
 	{
 		case ND_LVAR:
 			lval(node);
+			load(node->type);
+			return;
+		case ND_LVAR_GLOBAL:
+			load_global(node);
 			load(node->type);
 			return;
 		case ND_CALL:
@@ -344,6 +358,8 @@ static void	assign(Node *node)
 	
 	if (node->lhs->kind == ND_LVAR)
 		lval(node->lhs);
+	else if (node->lhs->kind == ND_LVAR_GLOBAL)
+		load_global(node->lhs);
 	else if (node->lhs->kind == ND_DEREF)
 		expr(node->lhs->lhs);
 	else
@@ -476,48 +492,59 @@ static void stmt(Node *node)
 	}
 }
 
+static void	funcdef(Node *node)
+{
+	int		i;
+
+	printf("_%s:\n", strndup(node->fname, node->flen));	
+	prologue();
+
+	init_stack_size(node);
+	stack_count += node->stack_size; // pushを初期化
+
+	if (node->stack_size != 0)
+	{
+		printf("    sub rsp, %d\n", node->stack_size);// stack_size
+		if (node->argdef_count != 0)
+			mov(RAX, RBP);
+		i = 0;
+		while (i < node->argdef_count && i < ARG_REG_COUNT)
+		{
+			printf("    sub rax, 8\n");
+			mov("[rax]", arg_regs[i++]);
+		}
+	}
+
+	stmt(node->lhs);
+	epilogue();
+
+	stack_count -= node->stack_size;
+	printf("#count %d\n", stack_count);
+	
+	if (stack_count != 0)
+		error("stack_countが0ではありません");
+}
+
+static void globaldef(Node *node)
+{
+/*	printf("_%s:\n    .zero %d\n",
+		strndup(node->var_name, node->var_name_len),
+		type_size(node->type, 0));
+*/
+	printf(".zerofill __DATA,__common,_%s,%d,2\n",
+		strndup(node->var_name, node->var_name_len),
+		type_size(node->type, 0));
+
+}
+
 static void	filescope(Node *node)
 {
-	int		i = 0;
-
-	if (node->kind != ND_FUNCDEF)
-	{
-		stmt(node);
-		return;
-	}
-	
 	if (node->kind == ND_FUNCDEF)
-	{
-		printf("_%s:\n", strndup(node->fname, node->flen));	
-		prologue();
-
-		init_stack_size(node);
-		stack_count += node->stack_size; // pushを初期化
-
-		if (node->stack_size != 0)
-		{
-			printf("    sub rsp, %d\n", node->stack_size);// stack_size
-			i = 0;
-			mov(RAX, RBP);
-			while (i < node->argdef_count && i < ARG_REG_COUNT)
-			{
-				printf("    sub rax, 8\n");
-				mov("[rax]", arg_regs[i++]);
-			}
-		}
-
-		stmt(node->lhs);
-		epilogue();
-
-		stack_count -= node->stack_size;
-		printf("#count %d\n", stack_count);
-		
-		if (stack_count != 0)
-			error("stack_countが0ではありません");
-
-		return;
-	}
-	return;
+		funcdef(node);
+	else if (node->kind == ND_GLOBAL)
+		globaldef(node);
+	else
+		stmt(node);
 }
 
 void	gen(Node *node)

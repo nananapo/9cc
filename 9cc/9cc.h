@@ -60,7 +60,9 @@ typedef enum
 	ND_FOR,
 	ND_ADDR,
 	ND_DEREF,
-	ND_DEFVAR
+	ND_DEFVAR,
+	ND_GLOBAL,
+ 	ND_LVAR_GLOBAL
 } NodeKind;
 
 typedef enum
@@ -86,6 +88,9 @@ struct Node
 	NodeKind	kind;
 	Node		*lhs;
 	Node		*rhs;
+
+	char		*var_name;
+	int			var_name_len;
 
 	// num
 	int			val;
@@ -153,6 +158,8 @@ Token	*tokenize(char *p);
 Token *new_token(TokenKind kind, Token *cur, char *str);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+
+Node	*find_global(char *str, int len);
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);

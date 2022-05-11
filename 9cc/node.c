@@ -9,6 +9,7 @@ extern Node		*code[];
 extern Token	*token;
 extern Node		*func_defs[];
 extern Node		*func_protos[];
+extern Node		*global_vars[];
 
 // Node
 static Node	*expr();
@@ -103,14 +104,28 @@ static Node *primary()
 		// use ident
 		else
 		{
-			node = new_node(ND_LVAR, NULL, NULL);
 			LVar	*lvar = find_lvar(tok->str, tok->len);
-
-			if (lvar == NULL)
-				error_at(tok->str, "%sが定義されていません", strndup(tok->str, tok->len));
-
-			node->offset = lvar->offset;
-			node->type = lvar->type;
+			if (lvar != NULL)
+			{
+				node = new_node(ND_LVAR, NULL, NULL);
+				node->offset = lvar->offset;
+				node->type = lvar->type;
+			}
+			else
+			{
+				Node *glovar = find_global(tok->str, tok->len);
+				if (glovar != NULL)
+				{
+					node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
+					node->var_name = glovar->var_name;
+					node->var_name_len = glovar->var_name_len;
+					node->type = glovar->type;
+				}
+				else
+					error_at(tok->str,
+						"%sが定義されていません",
+						strndup(tok->str, tok->len));
+			}
 		}
 
 		// 添字によるDEREF
@@ -409,32 +424,53 @@ static Node	*stmt()
 	return node;
 }
 
-static Node	*filescope()
+static Node	*global_var(Type *type, Token *ident)
+{
+	int		i;
+	Node	*node;
+
+	// 後ろの型を読む
+	expect_type_after(&type);
+
+	node = new_node(ND_GLOBAL, NULL, NULL);
+	node->type = type;
+	node->var_name = strndup(ident->str, ident->len);
+	node->var_name_len = ident->len;
+
+	// 代入文
+	if (consume("="))
+	{
+		// TODO
+	}
+
+	if (!consume(";"))
+		error_at(token->str, ";必要です。");
+
+	i = -1;
+	while (global_vars[++i])
+		continue;
+	global_vars[i] = node;
+
+	return node;
+}
+
+// TODO ブロック抜けたらlocalsを戻す
+
+// (まで読んだところから読む
+static Node	*funcdef(Type *ret_type, Token *ident)
 {
 	Node	*node;
-	Token	*tok;
+
 	locals = NULL;
-
-	// return type
-	Type	*ret_type = consume_type_before();
-	if (ret_type == NULL)
-		error_at(token->str, "型宣言が必要です");
-
-	// function name
-	tok = consume_ident();
-	if (tok == NULL)
-		error_at(token->str, "不明なトークンです");
 
 	// create node
 	node = new_node(ND_FUNCDEF, NULL, NULL);
-	node->fname = strndup(tok->str, tok->len);
-	node->flen = tok->len;
+	node->fname = strndup(ident->str, ident->len);
+	node->flen = ident->len;
 	node->ret_type = ret_type;
 	node->argdef_count = 0;
 
 	// args
-	if (!consume("("))
-		error_at(token->str, "(ではないトークンです");
 	if (!consume(")"))
 	{
 		for (;;)
@@ -479,17 +515,39 @@ static Node	*filescope()
 	}
 	else
 	{
+		
 		int i = 0;
 		while (func_defs[i])
 			i += 1;
 		func_defs[i] = node;
-
 		node->lhs = stmt();
 		node->locals = locals;
 		node->locals_len = get_locals_count();
 	}
 	
 	return node;
+}
+
+static Node	*filescope()
+{
+	Token	*tok;
+	locals = NULL;
+
+	// type
+	Type	*ret_type = consume_type_before();
+	if (ret_type == NULL)
+		error_at(token->str, "型宣言が必要です");
+
+	// ident
+	tok = consume_ident();
+	if (tok == NULL)
+		error_at(token->str, "不明なトークンです");
+
+	// function definition
+	if (consume("("))
+		return funcdef(ret_type, tok);
+	else
+		return global_var(ret_type, tok);
 }
 
 void	program()

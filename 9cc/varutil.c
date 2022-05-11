@@ -3,14 +3,25 @@
 #include <string.h>
 
 extern LVar		*locals;
+extern Node		*global_vars[];
 
 int	align_to(int n, int align);
-
 LVar	*find_lvar(char *str, int len)
 {
 	for (LVar *var = locals; var; var = var->next)
 		if (var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
+	return NULL;
+}
+
+Node	*find_global(char *str, int len)
+{
+	for (int i = 0; global_vars[i]; i++)
+		if (len == global_vars[i]->var_name_len
+			&& memcmp(str,
+					global_vars[i]->var_name,
+					global_vars[i]->var_name_len) == 0)
+			return global_vars[i];
 	return NULL;
 }
 

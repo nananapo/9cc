@@ -270,4 +270,10 @@ assert 7 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0;
 assert 8 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[2][1];}"
 assert 9 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[2][2];}"
 
+
+assert 0 "int a; int main() { return a; }"
+assert 100 "int a; int main() { a = 100; return a;}"
+assert 127 "int a; int main() { a = a + 127; return a; }"
+assert 111 "int a; int main() { a = 25; int a; a = 111; return a; }"
+
 echo OK

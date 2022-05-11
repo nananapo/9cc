@@ -9,6 +9,8 @@ Node	*func_defs[100];
 Node	*func_protos[100];
 Node	*code[100];
 
+Node	*global_vars[100];
+
 int main(int argc, char **argv)
 {
 	char	*str;
@@ -28,7 +30,7 @@ int main(int argc, char **argv)
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");
 
-	printf(".global ");
+	printf(".globl ");
 	i = 0;
 	while (func_defs[i])
 	{
@@ -37,13 +39,19 @@ int main(int argc, char **argv)
 			printf(", ");
 		i++;
 	}
+	i = 0;
+	while (global_vars[i])
+	{
+		if (func_defs[0] != NULL)
+			printf(",");
+		printf("_%s", global_vars[i]->var_name);
+		i++;
+	}
 	printf("\n");
 
 	i = 0;
 	while (code[i])
-	{
 		gen(code[i++]);
-	}
 
 	return (0);
 }
