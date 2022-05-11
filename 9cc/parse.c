@@ -109,10 +109,13 @@ Type	*consume_type_before()
 	Type	*tmp;
 
 	// type name
-	if (!consume_ident_str("int"))
-		return NULL;
+	if (consume_ident_str("int"))
+		type = new_primitive_type(INT);
+	else if (consume_ident_str("char"))
+		type = new_primitive_type(CHAR);
+	else
+		return (NULL);
 
-	type = new_primitive_type(INT);
 	while (consume("*"))
 	{
 		tmp = new_primitive_type(PTR);

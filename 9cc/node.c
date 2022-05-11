@@ -133,10 +133,10 @@ static Node *primary()
 		{
 			Node	*add = new_node(ND_ADD, node, expr());
 
-			if (add->lhs->type->ty != PTR && add->lhs->type->ty != ARRAY)
+			if (!is_pointer_type(add->lhs->type))
 				error_at(token->str, "ポインタ型ではありません");
-			if (add->rhs->type->ty != INT)
-				error_at(token->str, "添字の型がINTではありません");
+			if (!is_integer_type(add->rhs->type))
+				error_at(token->str, "添字の型が整数ではありません");
 			add->type = add->lhs->type;
 
 			node = new_node(ND_DEREF, add, NULL);
@@ -160,10 +160,10 @@ static Node *primary()
 	{
 		Node	*add = new_node(ND_ADD, expr(), node);
 
-		if (add->lhs->type->ty != PTR && add->lhs->type->ty != ARRAY)
+		if (!is_pointer_type(add->lhs->type))
 			error_at(token->str, "ポインタ型ではありません");
-		if (add->rhs->type->ty != INT)
-			error_at(token->str, "添字の型がINTではありません");
+		if (!is_integer_type(add->rhs->type))
+			error_at(token->str, "添字の型が整数ではありません");
 		add->type = add->lhs->type;
 
 		node = new_node(ND_DEREF, add, NULL);
@@ -181,14 +181,14 @@ static Node *unary()
 	if (consume("+"))
 	{
 		node = primary();
-		if (node->type->ty != INT)
+		if (is_pointer_type(node->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		return node;
 	}
 	else if (consume("-"))
 	{
 		node = new_node(ND_SUB, new_node_num(0), primary());
-		if (node->rhs->type->ty != INT)
+		if (is_pointer_type(node->rhs->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		node->type = node->rhs->type;
 		return node;
@@ -196,8 +196,8 @@ static Node *unary()
 	else if (consume("*"))
 	{
 		node = new_node(ND_DEREF, unary(), NULL);
-		if (node->lhs->type->ty == INT)
-			error_at(token->str, "ポインタではない型に対してunary *を適用できません");
+		if (!is_pointer_type(node->lhs->type))
+			error_at(token->str, "ポインタではない型(%d)に対してunary *を適用できません", node->lhs->type->ty);
 		node->type = node->lhs->type->ptr_to;	
 		return node;
 	}
@@ -211,7 +211,7 @@ static Node *unary()
 	else if (consume_with_type(TK_SIZEOF))
 	{
 		node = unary();
-		node = new_node_num(type_size(node->type, 0));
+		node = new_node_num(type_size(node->type));
 		return node;
 	}
 	return primary();
@@ -229,7 +229,8 @@ static Node *mul()
 		else
 			return node;
 
-		if (node->lhs->type->ty != INT || node->rhs->type->ty != INT)
+		if (!is_integer_type(node->lhs->type)
+		|| !is_integer_type(node->rhs->type))
 			error_at(token->str, "ポインタ型に* か / を適用できません");
 		node->type = new_primitive_type(INT);
 	}
@@ -246,22 +247,53 @@ static Node *add()
 			node = new_node(ND_SUB, node, mul());
 		else
 			return node;
-		
-		// TODO 片方がポインタならポインタ型にする
-		if (node->lhs->type->ty != node->rhs->type->ty)
+
+		Type	*l;
+		Type	*r;
+
+		l = node->lhs->type;
+		r = node->rhs->type;
+		// 左辺をポインタにする
+		if (is_pointer_type(r))
 		{
-			if (node->lhs->type->ty != INT)
-				node->type = node->lhs->type;
-			else
-				node->type = node->rhs->type;
+			Type	*tmp;
+			tmp = l;
+			l = r;
+			r = tmp;
 		}
-		else
+
+		// 両方がポインタならエラー
+		if (is_pointer_type(l)
+		&& is_pointer_type(r))
+			error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
+
+		// ポインタと整数の演算
+		if (is_pointer_type(l)
+		&& is_integer_type(r))
 		{
-			if (node->lhs->type->ty != INT)
-				error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
-			// とりあえずINT
-			node->type = new_primitive_type(INT);
+			node->type = l;
+			continue ;
 		}
+
+		// 両方整数なら型の優先順位を考慮
+		if (is_integer_type(l)
+		|| is_integer_type(r))
+		{
+			// Intを左に寄せる
+			if (r->ty == INT)
+			{
+				Type	*tmp;
+				tmp = l;
+				l = r;
+				r = tmp;
+			}
+			// 左辺の型にする
+			node->type = l;
+			continue ;
+		}
+
+		error_at(token->str, "演算子 +, - が%dと%dの間に定義されていません",
+				node->lhs->type->ty, node->rhs->type->ty);
 	}
 }
 
@@ -283,8 +315,10 @@ static Node *relational()
 
 		node->type = new_primitive_type(INT);
 
-		if (node->lhs->type->ty != node->rhs->type->ty)
-			error_at(token->str, "ポインタ型とintを比較することはできません");
+		if (!can_compared(node->lhs->type, node->rhs->type))
+			error_at(token->str,
+					"%dと%dを比較することはできません",
+					node->lhs->type->ty, node->rhs->type->ty);
 	}
 }
 
@@ -302,8 +336,10 @@ static Node *equality()
 
 		node->type = new_primitive_type(INT);
 
-		if (node->lhs->type->ty != node->rhs->type->ty)
-			error_at(token->str, "ポインタ型とintを比較することはできません");
+		if (!can_compared(node->lhs->type, node->rhs->type))
+			error_at(token->str,
+					"%dと%dを比較することはできません",
+					node->lhs->type->ty, node->rhs->type->ty);
 	}
 }
 
@@ -313,8 +349,9 @@ static Node	*assign()
 	if (consume("="))
 	{
 		node = new_node(ND_ASSIGN, node, assign());
-		if (!type_equal(node->lhs->type, node->rhs->type))
-			error_at(token->str, "左辺(%d)と右辺(%d)の型が一致しません", node->lhs->type->ty, node->rhs->type->ty);
+		if (!can_assign(node->lhs->type, node->rhs->type))
+			error_at(token->str, "左辺(%d)と右辺(%d)の型が一致しません",
+					node->lhs->type->ty, node->rhs->type->ty);
 		node->type = node->lhs->type;
 	}
 	return node;

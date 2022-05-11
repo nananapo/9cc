@@ -47,13 +47,50 @@ bool	type_equal(Type *t1, Type *t2)
 }
 
 // typeのサイズを取得する
-int	type_size(Type *type, int min)
+int	type_size(Type *type)
 {
 	if (type->ty == INT)
-		return max(4, min);
+		return (4);
+	if (type->ty == CHAR)
+		return (1);
 	if (type->ty == PTR)
-		return max(8, min);
+		return (8);
 	if (type->ty == ARRAY)
-		return max(min, type_size(type->ptr_to, min) * type->array_size);
+		return type_size(type->ptr_to) * type->array_size;
 	return -1;
+}
+
+// 整数型かどうか判定する
+bool	is_integer_type(Type *type)
+{
+	return (type->ty == INT
+			|| type->ty == CHAR);
+}
+
+// 配列かどうか確認する
+bool	is_pointer_type(Type *type)
+{
+	return (type->ty == ARRAY
+			|| type->ty == PTR);
+}
+
+// 比較可能か調べる
+bool	can_compared(Type *l, Type *r)
+{
+	if (type_equal(l, r))
+		return (true);
+	if (is_integer_type(l) && is_integer_type(r))
+		return (true);
+	if (is_pointer_type(l) && is_pointer_type(r))
+		return (true);
+	return (false);
+}
+
+bool	can_assign(Type *l, Type *r)
+{
+	if (type_equal(l, r))
+		return (true);
+	if (is_integer_type(l) && is_integer_type(r))
+		return (true);
+	return (false);
 }

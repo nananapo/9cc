@@ -68,6 +68,7 @@ typedef enum
 typedef enum
 {
 	INT,
+	CHAR,
 	PTR,
 	ARRAY
 } PrimitiveType;
@@ -151,11 +152,11 @@ Token	*consume_ident();
 Token	*consume_ident_str(char *p);
 void	expect(char *op);
 int		expect_number();
-bool consume_number(int *result);
+bool	 consume_number(int *result);
 bool	at_eof();
 
 Token	*tokenize(char *p);
-Token *new_token(TokenKind kind, Token *cur, char *str);
+Token 	*new_token(TokenKind kind, Token *cur, char *str);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 
@@ -163,10 +164,14 @@ Node	*find_global(char *str, int len);
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
-int		type_size(Type *type, int min);
+int		type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
+bool	is_integer_type(Type *type);
+bool	is_pointer_type(Type *type);
+bool	can_assign(Type *l, Type *r);
+bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
 
 Type	*consume_type_before();

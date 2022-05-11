@@ -70,7 +70,7 @@ void	init_stack_size(Node *node)
 	node->stack_size = 0;
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		node->stack_size += type_size(var->type, 8);
+		node->stack_size += max(8, type_size(var->type));
 	}
 	node->stack_size = align_to(node->stack_size, 16);
 }
@@ -256,7 +256,7 @@ static void	add(Node *node)
 
 		// 右辺を掛け算に置き換える
 		Node *size_node = new_node(ND_NUM, NULL, NULL);
-		size_node->val = type_size(node->lhs->type->ptr_to, 0);
+		size_node->val = type_size(node->lhs->type->ptr_to);
 		size_node->type = new_primitive_type(INT);
 		node->rhs = new_node(ND_MUL, node->rhs, size_node);
 		size_node->type = new_primitive_type(INT);
@@ -529,11 +529,11 @@ static void globaldef(Node *node)
 {
 /*	printf("_%s:\n    .zero %d\n",
 		strndup(node->var_name, node->var_name_len),
-		type_size(node->type, 0));
+		type_size(node->type));
 */
 	printf(".zerofill __DATA,__common,_%s,%d,2\n",
 		strndup(node->var_name, node->var_name_len),
-		type_size(node->type, 0));
+		type_size(node->type));
 
 }
 

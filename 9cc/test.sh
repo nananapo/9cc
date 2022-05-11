@@ -219,10 +219,29 @@ assert_out "42 24" "int	main()
 	pint(*(ptr + 1));
 	return 0;
 }"
+assert_out "42 24" "int	main()
+{
+	int *ptr;
+	ptr = my_malloc_int(2);
+	*ptr = 42;
+	*(1 + ptr) = 24;
+	pint(*ptr);
+	pspace(1);
+	pint(*(1 + ptr));
+	return 0;
+}"
 
 assert 4 "int main(){return sizeof 1;}"
 assert 4 "int main(){return sizeof(1);}"
 assert 4 "int main(){int a;return sizeof(a);}"
+assert 28 "int main(){ int a[7]; return sizeof(a);}"
+assert 84 "int main(){ int a[7][3]; return sizeof(a);}" 
+assert 168 "int main(){ int *a[7][3]; return sizeof(a);}" 
+
+assert 1 "int main(){char a; return sizeof(a);}";
+assert 19 "int main(){char a[19]; return sizeof(a);}"
+assert 57 "int main(){char a[19][3]; return sizeof(a);}"
+assert 120 "int main(){char *a[5][3]; return sizeof(a);}"
 
 assert 8 "int main(){int *a;return sizeof(a);}"
 assert 8 "int main(){int a;return sizeof(&a);}"
@@ -283,5 +302,10 @@ assert 3 "int a[3]; int main() { int i; for(i = 0; i < 3; i = i + 1) a[i] = i + 
 assert 10 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[0];}"
 assert 20 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[1];}"
 assert 30 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[2];}"
+
+assert 54 "int main(){char a; a = 54; return a;}"
+assert 124 "int main(){char a[3]; a[2] = 124; a[1] = 110; return a[2];}"
+assert 54 "char a; int main() { a = 54; return a; }"
+assert 124 "char a[10]; int main() { a[5] = 124; a[3] = 5; return a[a[3]]; }"
 
 echo OK
