@@ -276,4 +276,12 @@ assert 100 "int a; int main() { a = 100; return a;}"
 assert 127 "int a; int main() { a = a + 127; return a; }"
 assert 111 "int a; int main() { a = 25; int a; a = 111; return a; }"
 
+assert 1 "int a[3]; int main() { int i; for(i = 0; i < 3; i = i + 1) a[i] = i + 1; return a[0]; }"
+assert 2 "int a[3]; int main() { int i; for(i = 0; i < 3; i = i + 1) a[i] = i + 1; return a[1]; }"
+assert 3 "int a[3]; int main() { int i; for(i = 0; i < 3; i = i + 1) a[i] = i + 1; return a[2]; }"
+
+assert 10 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[0];}"
+assert 20 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[1];}"
+assert 30 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[2];}"
+
 echo OK
