@@ -24,6 +24,8 @@ assert_out(){
 	input="int pint(int i);
 int pspace(int n);
 int pline();
+int my_putstr(char *s, int n);
+int my_print(char *s);
 int *my_malloc_int(int n);
 $2"
 	
@@ -303,18 +305,84 @@ assert 10 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[
 assert 20 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[1];}"
 assert 30 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[2];}"
 
-assert 54 "int main(){char a; a = 54; return a;}"
-
+assert 54 "int main(){char a; char b; a = 54; b = 32; return a;}"
+assert 32 "int main(){char a; char b; a = 54; b = 32; return b;}"
+assert 54 "int main(){char a; char b; b = 32; a = 54; return a;}"
+assert 32 "int main(){char a; char b; b = 32; a = 54; return b;}"
 
 assert 124 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[0];}"
 assert 110 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[1];}"
 assert 99 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[2];}"
 
+assert 54 "char a; char b; int main() { a = 54; b = 32; return a; }"
+assert 32 "char a; char b; int main() { a = 54; b = 32; return b; }"
+assert 54 "char a; char b; int main() { b = 32; a = 54; return a; }"
+assert 32 "char a; char b; int main() { b = 32; a = 54; return b; }"
+
 assert 124 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[2];}"
 assert 110 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[1];}"
 assert 99 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[0];}"
 
-assert 54 "char a; int main() { a = 54; return a; }"
-assert 124 "char a[10]; int main() { a[5] = 124; a[3] = 5; return a[a[3]]; }"
+assert 124 "char a[3]; int main() { a[0] = 124; a[1] = 1; a[2] = 0; return a[a[2]]; }"
+assert 1 "char a[3]; int main() { a[0] = 124; a[1] = 1; a[2] = 0; return a[a[1]]; }"
+
+assert_out "kanapo" "int main() {
+	char a[6];
+	a[0] = 107;
+	a[1] = 97;
+	a[2] = 110;
+	a[3] = 97;
+	a[4] = 112;
+	a[5] = 111;
+	my_putstr(a, 6);
+}"
+
+assert_out "kanapo" "int main() {
+	char a[7];
+	a[0] = 107;
+	a[1] = 97;
+	a[2] = 110;
+	a[3] = 97;
+	a[4] = 112;
+	a[5] = 111;
+	a[6] = 0;
+	my_print(a);
+}"
+
+assert_out "kanapo" "int main() {
+	char a[7];
+	a[0] = 107;
+	a[3] = 97;
+	a[5] = 111;
+	a[4] = 112;
+	a[6] = 0;
+	a[2] = 110;
+	a[1] = 97;
+	my_print(a);
+}"
+
+assert_out "kanapo" "char a[7];
+int main() {
+	a[0] = 107;
+	a[1] = 97;
+	a[2] = 110;
+	a[3] = 97;
+	a[4] = 112;
+	a[5] = 111;
+	a[6] = 0;
+	my_print(a);
+}"
+
+assert_out "kanapo" "char a[7];
+int main() {
+	a[5] = 111;
+	a[1] = 97;
+	a[2] = 110;
+	a[6] = 0;
+	a[4] = 112;
+	a[0] = 107;
+	a[3] = 97;
+	my_print(a);
+}"
 
 echo OK

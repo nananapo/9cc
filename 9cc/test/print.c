@@ -2,9 +2,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static void	my_putchar(char c)
+int	my_putchar(char c)
 {
 	write(1, &c, 1);
+	return 0;
+}
+
+int my_putstr(char *c, int n)
+{
+	write(1, c, n);
+	return 0;
+}
+
+int my_print(char *c)
+{
+	printf("%s", c);
+	return 0;
 }
 
 static int	recpint(int a)
