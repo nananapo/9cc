@@ -1,12 +1,21 @@
 #ifndef NINECC_H
 # define NINECC_H
 
+#include <stdbool.h>
+
 # define ASM_MOV "mov"
 # define ASM_PUSH "push"
+
 # define RAX "rax"
 # define RBP "rbp"
 # define RSP "rsp"
-#include <stdbool.h>
+
+# define EAX "eax"
+# define AL "al"
+
+# define BYTE_PTR "byte ptr"
+# define WORD_PTR "word ptr"
+# define DWORD_PTR "dword ptr"
 
 typedef struct Token Token;
 typedef struct Node Node;
@@ -173,6 +182,7 @@ bool	is_pointer_type(Type *type);
 bool	can_assign(Type *l, Type *r);
 bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
+char	*type_regname(Type *type);
 
 Type	*consume_type_before();
 void	expect_type_after(Type **type);

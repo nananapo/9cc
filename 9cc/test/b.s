@@ -15,7 +15,7 @@ _main:                                  ## @main
 	mov	dword ptr [rip + _a], 123
 	mov	eax, dword ptr [rip + _a]
 	pop	rbp
-	ret
+	et
 	.cfi_endproc
                                         ## -- End function
 	.globl	_a                              ## @a

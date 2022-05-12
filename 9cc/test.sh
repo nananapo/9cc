@@ -304,7 +304,16 @@ assert 20 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[
 assert 30 "int *a[3]; int main() { int i; int j; int k; a[0] = &i; a[1] = &j; a[2] = &k; i = 10; j = 20; k = 30; return *a[2];}"
 
 assert 54 "int main(){char a; a = 54; return a;}"
-assert 124 "int main(){char a[3]; a[2] = 124; a[1] = 110; return a[2];}"
+
+
+assert 124 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[0];}"
+assert 110 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[1];}"
+assert 99 "int main(){char a[3]; a[0] = 124; a[1] = 110; a[2] = 99; return a[2];}"
+
+assert 124 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[2];}"
+assert 110 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[1];}"
+assert 99 "int main(){char a[3]; a[2] = 124; a[1] = 110; a[0] = 99; return a[0];}"
+
 assert 54 "char a; int main() { a = 54; return a; }"
 assert 124 "char a[10]; int main() { a[5] = 124; a[3] = 5; return a[a[3]]; }"
 

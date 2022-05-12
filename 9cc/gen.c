@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-
 static void	expr(Node *node);
 
 int	jumpLabelCount = 0;
@@ -49,6 +48,8 @@ void	movi(char *dst, int i)
 
 void	load_global(Node *node)
 {
+	char	*prefix;
+
 	printf("    mov rax, [rip + _%s@GOTPCREL]\n",
 		strndup(node->var_name, node->var_name_len));
 }
@@ -67,11 +68,26 @@ int	max(int a, int b)
 
 void	init_stack_size(Node *node)
 {
+	int	i;
+
+	i = -1;
 	node->stack_size = 0;
+	printf("    # lvar stack : ");
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		node->stack_size += max(8, type_size(var->type));
+		/* 必要な分だけsubする
+		if (++i < node->argdef_count)
+		{*/
+			node->stack_size += max(8, type_size(var->type));
+			printf("+ %d", max(8, type_size(var->type)));
+		/*}
+		else
+		{
+			node->stack_size += type_size(var->type);
+			printf(" + %d", type_size(var->type));
+		}*/
 	}
+	printf(" = %d\n", node->stack_size);
 	node->stack_size = align_to(node->stack_size, 16);
 }
 
@@ -94,13 +110,41 @@ static void	epilogue()
 static void	load(Type *type)
 {
 	
-	if (type->ty == ARRAY)
+	if (type->ty == PTR)
 	{
-		//printf("なにこれ\n");
+		/*
+		if (type->ptr_to->ty == CHAR)
+		{
+			printf("movzx eax, BYTE PTR [%s]\n", RAX);
+			return ;
+		}
+		else if (type->ptr_to->ty == INT)
+		{
+			printf("movzx eax, WORD PTR [%s]\n", RAX);
+			return ;
+		}
+		*/
+		printf("#PTR\n");
+		mov(RAX, "[rax]");
 		return ;
 	}
-	
-	mov(RAX, "[rax]");
+	else if (type->ty == CHAR)
+	{
+		printf("#CHAR\n");
+		printf("movzx eax, BYTE PTR [%s]\n", RAX);
+		return ;
+	}
+	else if (type->ty == INT)
+	{
+		printf("#INT\n");
+		printf("movzx eax, WORD PTR [%s]\n", RAX);
+		return ;
+	}
+	else if (type->ty == ARRAY)
+	{
+		//printf("#ARR\n");
+		return ;
+	}
 }
 
 // 変数のアドレスをraxに移動する
@@ -135,7 +179,7 @@ static void	call(Node *node)
 		pushi(1);
 	}
 
-	printf("#count %d\n", stack_count);
+	printf("    #call stack count %d\n", stack_count);
 
 	printf("    call _%s\n", strndup(node->fname, node->flen));
 
@@ -367,8 +411,11 @@ static void	assign(Node *node)
 
 	push();
 	expr(node->rhs);
+
+	// レジスタの左辺の型に合わせる
+	char *reg = type_regname(node->lhs->type);
 	pop("rdi");
-	mov("[rdi]", RAX);
+	mov("[rdi]", reg);
 }
 
 static void	expr(Node *node)
@@ -399,7 +446,7 @@ static void stmt(Node *node)
 		case ND_RETURN:
 			expr(node->lhs);
 			epilogue();
-			stack_count += 8;
+			stack_count += 8; // rbpをpopしたけれど、epilogueでもpopするので+8
 			return;
 		case ND_IF:
 			// if
@@ -508,10 +555,12 @@ static void	funcdef(Node *node)
 		if (node->argdef_count != 0)
 			mov(RAX, RBP);
 		i = 0;
+		LVar *tmp = node->locals;
 		while (i < node->argdef_count && i < ARG_REG_COUNT)
 		{
 			printf("    sub rax, 8\n");
 			mov("[rax]", arg_regs[i++]);
+			tmp = tmp->next;
 		}
 	}
 

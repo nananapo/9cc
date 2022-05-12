@@ -1,4 +1,5 @@
 #include "9cc.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 static int max(int a, int b)
@@ -86,6 +87,7 @@ bool	can_compared(Type *l, Type *r)
 	return (false);
 }
 
+// lにrを代入可能か確かめる
 bool	can_assign(Type *l, Type *r)
 {
 	if (type_equal(l, r))
@@ -93,4 +95,20 @@ bool	can_assign(Type *l, Type *r)
 	if (is_integer_type(l) && is_integer_type(r))
 		return (true);
 	return (false);
+}
+
+char	*type_regname(Type *type)
+{
+	// アドレスは8byte
+	if (type->ty == PTR || type->ty == ARRAY)
+		return RAX;
+	// INTは4byte
+	if (type->ty == INT)
+		return EAX;
+	// CHARは1byte
+	if (type->ty == CHAR)
+		return AL;
+	printf("不明な型 %d\n", type->ty);
+	exit(1);
+	return NULL;
 }
