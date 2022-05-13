@@ -1,21 +1,26 @@
 #include "9cc.h"
 #include <stdio.h>
+#include <string.h>
 
-char	*user_input;
+char		*user_input;
 
-Token	*token;
+Token		*token;
 
-Node	*func_defs[100];
-Node	*func_protos[100];
-Node	*code[100];
+Node		*func_defs[100];
+Node		*func_protos[100];
+Node		*code[100];
 
-Node	*global_vars[100];
+Node		*global_vars[100];
+t_str_elem	*str_literals;
+
+char	*get_str_literal_name(int index);
 
 int main(int argc, char **argv)
 {
-	char	*str;
-	int		sign;
-	int		i;
+	char		*str;
+	int			sign;
+	int			i;
+	t_str_elem	*lit;
 
 	if (argc != 2)
 	{
@@ -31,6 +36,7 @@ int main(int argc, char **argv)
 	printf(".p2align	4, 0x90\n");
 
 	printf(".globl ");
+	// 関数
 	i = 0;
 	while (func_defs[i])
 	{
@@ -39,6 +45,7 @@ int main(int argc, char **argv)
 			printf(", ");
 		i++;
 	}
+	// グローバル変数
 	i = 0;
 	while (global_vars[i])
 	{
@@ -49,6 +56,16 @@ int main(int argc, char **argv)
 	}
 	printf("\n");
 
+	// 文字列リテラルを生成する
+	lit = str_literals;
+	while (lit != NULL)
+	{
+		printf("%s:\n", get_str_literal_name(lit->index));
+		printf("    .string \"%s\"\n", strndup(lit->str, lit->len));
+		lit = lit->next;
+	}
+
+	// コード生成
 	i = 0;
 	while (code[i])
 		gen(code[i++]);

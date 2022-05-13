@@ -5,6 +5,7 @@
 
 # define ASM_MOV "mov"
 # define ASM_PUSH "push"
+# define ASM_LEA "lea"
 
 # define RAX "rax"
 # define RBP "rbp"
@@ -33,6 +34,7 @@ typedef enum
 	TK_ELSE,
 	TK_WHILE,
 	TK_FOR,
+	TK_STR_LITERAL,
 	TK_EOF,
 	TK_SIZEOF,
 } TokenKind;
@@ -71,7 +73,8 @@ typedef enum
 	ND_DEREF,
 	ND_DEFVAR,
 	ND_GLOBAL,
- 	ND_LVAR_GLOBAL
+ 	ND_LVAR_GLOBAL,
+	ND_STR_LITERAL
 } NodeKind;
 
 typedef enum
@@ -104,6 +107,9 @@ struct Node
 
 	// num
 	int			val;
+
+	// str
+	int			str_index;
 
 	// ident
 	int			offset;
@@ -147,7 +153,13 @@ struct	LVar
 	Type	*type;
 };
 
-//int	is_block_node(Node *node);
+typedef struct s_str_literal_elem
+{
+	char						*str;
+	int							len;
+	struct s_str_literal_elem	*next;
+	int							index;
+}	t_str_elem;
 
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
@@ -159,6 +171,7 @@ bool	consume(char *op);
 bool	consume_with_type(TokenKind kind);
 Token	*consume_ident();
 Token	*consume_ident_str(char *p);
+Token	*consume_str_literal();
 void	expect(char *op);
 int		expect_number();
 bool	 consume_number(int *result);

@@ -5,24 +5,49 @@
 #include <string.h>
 #include <stdio.h>
 
-extern Node		*code[];
-extern Token	*token;
-extern Node		*func_defs[];
-extern Node		*func_protos[];
-extern Node		*global_vars[];
+extern Node			*code[];
+extern Token		*token;
+extern Node			*func_defs[];
+extern Node			*func_protos[];
+extern Node			*global_vars[];
+extern t_str_elem	*str_literals;
+
+LVar				*locals;
 
 // Node
 static Node	*expr();
 
-Node	*get_function_by_name(char *name, int len);
-Node	*new_node_num(int val);
+Node		*get_function_by_name(char *name, int len);
+Node		*new_node_num(int val);
 
 // LVar
-LVar	*find_lvar(char *str, int len);
-int		create_local_var(char *name, int len, Type *type);
-int		get_locals_count();
+LVar		*find_lvar(char *str, int len);
+int			create_local_var(char *name, int len, Type *type);
+int			get_locals_count();
 
-LVar		*locals;
+// リテラルを探す
+static int	get_str_literal_index(char *str, int len)
+{
+	t_str_elem	*tmp;
+
+	tmp = str_literals;
+	while (tmp != NULL)
+	{
+		if (len == tmp->len && strncmp(tmp->str, str, len))
+			return (tmp->index);
+		tmp = tmp->next;
+	}
+	tmp = malloc(sizeof(t_str_elem));
+	tmp->str = str;
+	tmp->len = len;
+	if (str_literals == NULL)
+		tmp->index = 0;
+	else
+		tmp->index = str_literals->index + 1;
+	tmp->next = str_literals;
+	str_literals = tmp;
+	return (tmp->index);
+}
 
 static Node *call(Token *tok)
 {
@@ -81,6 +106,37 @@ static Node *call(Token *tok)
 	return node;
 }
 
+// 添字によるDEREF
+static Node	*read_deref_index(Node *node)
+{
+	while (consume("["))
+	{
+		Node	*add = new_node(ND_ADD, node, expr());
+
+		// 左にポインタを寄せる
+		if (is_pointer_type(add->rhs->type))
+		{
+			Node	*tmp;
+			tmp = add->lhs;
+			add->lhs = add->rhs;
+			add->rhs = tmp;
+		}
+
+		if (!is_pointer_type(add->lhs->type))
+			error_at(token->str, "ポインタ型ではありません");
+		if (!is_integer_type(add->rhs->type))
+			error_at(token->str, "添字の型が整数ではありません");
+		add->type = add->lhs->type;
+
+		node = new_node(ND_DEREF, add, NULL);
+		node->type = node->lhs->type->ptr_to;
+
+		if (!consume("]"))
+			error_at(token->str, "%s");
+	}
+	return (node);
+}
+
 static Node *primary()
 {
 	Token	*tok;
@@ -127,26 +183,17 @@ static Node *primary()
 						strndup(tok->str, tok->len));
 			}
 		}
+		return read_deref_index(node);
+	}
 
-		// 添字によるDEREF
-		while (consume("["))
-		{
-			Node	*add = new_node(ND_ADD, node, expr());
-
-			if (!is_pointer_type(add->lhs->type))
-				error_at(token->str, "ポインタ型ではありません");
-			if (!is_integer_type(add->rhs->type))
-				error_at(token->str, "添字の型が整数ではありません");
-			add->type = add->lhs->type;
-
-			node = new_node(ND_DEREF, add, NULL);
-			node->type = node->lhs->type->ptr_to;
-
-			if (!consume("]"))
-				error_at(token->str, "%s");
-		}
-
-		return node;
+	// string
+	tok = consume_str_literal();
+	if (tok)
+	{
+		node = new_node(ND_STR_LITERAL, NULL, NULL);
+		node->str_index = get_str_literal_index(tok->str, tok->len);
+		node->type = new_type_ptr_to(new_primitive_type(CHAR));
+		return read_deref_index(node);
 	}
 
 	// 数
@@ -155,24 +202,7 @@ static Node *primary()
 		error_at(token->str, "数字が必要です");
 	node = new_node_num(number);
 
-	// TODO 添字によるDEREF
-	while (consume("["))
-	{
-		Node	*add = new_node(ND_ADD, expr(), node);
-
-		if (!is_pointer_type(add->lhs->type))
-			error_at(token->str, "ポインタ型ではありません");
-		if (!is_integer_type(add->rhs->type))
-			error_at(token->str, "添字の型が整数ではありません");
-		add->type = add->lhs->type;
-
-		node = new_node(ND_DEREF, add, NULL);
-		node->type = node->lhs->type->ptr_to;
-
-		if (!consume("]"))
-			error_at(token->str, "%s");
-	}
-	return node;
+	return read_deref_index(node);
 }
 
 static Node *unary()
@@ -456,7 +486,7 @@ static Node	*stmt()
 		}
 	}
 	if(!consume(";"))
-		error_at(token->str, ";ではないトークンです");
+		error_at(token->str, ";ではないトークン(%d)です", token->kind);
 
 	return node;
 }
@@ -481,7 +511,7 @@ static Node	*global_var(Type *type, Token *ident)
 	}
 
 	if (!consume(";"))
-		error_at(token->str, ";必要です。");
+		error_at(token->str, ";が必要です。");
 
 	i = -1;
 	while (global_vars[++i])

@@ -4,14 +4,15 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#define ARG_REG_COUNT 6
+
 static void	expr(Node *node);
 
-int	jumpLabelCount = 0;
+static int	jumpLabelCount = 0;
+static char	*arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static int	stack_count = 0;
 
-#define ARG_REG_COUNT 6
-char *arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-
-int stack_count = 0;
+extern t_str_elem	*str_literals;
 
 int	align_to(int n, int align)
 {
@@ -54,6 +55,15 @@ void	load_global(Node *node)
 		strndup(node->var_name, node->var_name_len));
 }
 
+char	*get_str_literal_name(int index)
+{
+	char	*tmp;
+
+	tmp = malloc(sizeof(char) * 100);
+	sprintf(tmp, "L_STR_%d", index);
+	return (tmp);
+}
+
 void	comment(char *c)
 {
 	printf("# %s\n", c);
@@ -75,7 +85,7 @@ void	init_stack_size(Node *node)
 	printf("    # lvar stack : ");
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		/* 必要な分だけsubする
+		/* TODO 必要な分だけsubする
 		if (++i < node->argdef_count)
 		{*/
 			node->stack_size += max(8, type_size(var->type));
@@ -112,37 +122,21 @@ static void	load(Type *type)
 	
 	if (type->ty == PTR)
 	{
-		/*
-		if (type->ptr_to->ty == CHAR)
-		{
-			printf("movzx eax, BYTE PTR [%s]\n", RAX);
-			return ;
-		}
-		else if (type->ptr_to->ty == INT)
-		{
-			printf("movzx eax, WORD PTR [%s]\n", RAX);
-			return ;
-		}
-		*/
-		printf("#PTR\n");
 		mov(RAX, "[rax]");
 		return ;
 	}
 	else if (type->ty == CHAR)
 	{
-		printf("#CHAR\n");
 		printf("movzx eax, BYTE PTR [%s]\n", RAX);
 		return ;
 	}
 	else if (type->ty == INT)
 	{
-		printf("#INT\n");
 		printf("movzx eax, WORD PTR [%s]\n", RAX);
 		return ;
 	}
 	else if (type->ty == ARRAY)
 	{
-		//printf("#ARR\n");
 		return ;
 	}
 }
@@ -202,6 +196,9 @@ static void	primary(Node *node)
 		case ND_LVAR_GLOBAL:
 			load_global(node);
 			load(node->type);
+			return;
+		case ND_STR_LITERAL:
+			printf("%s %s, [rip + %s]\n", ASM_LEA, RAX, get_str_literal_name(node->str_index));
 			return;
 		case ND_CALL:
 			call(node);

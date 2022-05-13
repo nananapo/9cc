@@ -102,6 +102,16 @@ Token	*consume_ident_str(char *p)
 	return ret;
 }
 
+Token	*consume_str_literal()
+{
+	Token	*ret;
+	if (token->kind != TK_STR_LITERAL)
+		return NULL;
+	ret = token;
+	token = token->next;
+	return ret;
+}
+
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
 Type	*consume_type_before()
 {
@@ -198,11 +208,12 @@ int	match_word(char *str, char *needle)
 
 Token	*tokenize(char *p)
 {
-	Token head;
-	head.next = NULL;
-	Token *cur = &head;
+	Token	head;
+	Token	*cur;
 	char	*res_result;
 
+	head.next = NULL;
+	cur = &head;
 	while (*p)
 	{
 		if (isspace(*p))
@@ -273,6 +284,19 @@ Token	*tokenize(char *p)
 			cur->val = strtol(p, &p, 10);
 			continue;
 		}
+		if (*p == '"')
+		{
+			cur = new_token(TK_STR_LITERAL, cur, ++p);
+			cur->len = 0;
+			while (*p && *p != '"')
+				p++;
+			if (*p != '"')
+				error_at(p, "文字列が終了しませんでした");
+			cur->len = p - cur->str;
+			p++;
+			continue ;
+		}
+
 		error_at(p, "failed to Tokenize");
 	}
 	
