@@ -198,7 +198,7 @@ static void	primary(Node *node)
 			load(node->type);
 			return;
 		case ND_STR_LITERAL:
-			printf("%s %s, [rip + %s]\n", ASM_LEA, RAX, get_str_literal_name(node->str_index));
+			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX, get_str_literal_name(node->str_index));
 			return;
 		case ND_CALL:
 			call(node);

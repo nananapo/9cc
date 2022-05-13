@@ -385,4 +385,26 @@ int main() {
 	my_print(a);
 }"
 
+assert_out "HelloWorld" "int printf(char *a);
+int main()
+{
+	printf(\"HelloWorld\");
+}"
+
+assert_out "HelloWorld" "int printf(char *a);
+int main()
+{
+	char *s;
+	s = \"HelloWorld\";
+	printf(s);
+}"
+
+assert_out "HelloWorld" "int printf(char *a);
+char *s;
+int main()
+{
+	s = \"HelloWorld\";
+	printf(s);
+}"
+
 echo OK
