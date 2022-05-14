@@ -16,7 +16,6 @@ assert() {
   fi
 }
 
-
 assert_out(){
 	echo "#-- Test----------------------------"
 
@@ -40,6 +39,39 @@ $2"
   	  exit 1
   	fi
 }
+
+assert_gcc(){
+	echo "#-- Test----------------------------"
+
+	input="int pint(int i);
+int pspace(int n);
+int pline();
+int my_putstr(char *s, int n);
+int my_print(char *s);
+int *my_malloc_int(int n);
+`cat test/unit/$1`"
+	
+	./9cc "$input" > tmp.s
+	cc -o tmp1 tmp.s "test/print.c"
+	./tmp1 > test/unit/actual.output
+	actual=`cat test/unit/actual.output`
+
+	echo $input > test/unit/tmp.c
+	cc -o tmp2 test/unit/tmp.c test/print.c
+	./tmp2 > test/unit/expected.output
+	expected=`cat test/unit/expected.output`
+
+	rm -rf test/unit/tmp.c tmp1 tmp2
+
+  	if [ "$actual" = "$expected" ]; then
+  	  echo "$1 => OK"
+  	else
+  	  echo "$1 => KO"
+  	  exit 1
+  	fi
+}
+
+
 assert 0 "int main(){0;}"
 assert 42 "int main(){42;}"
 
@@ -406,5 +438,20 @@ int main()
 	s = \"HelloWorld\";
 	printf(s);
 }"
+
+assert_out "1" "int main()
+{
+	pint(-(-1));
+}"
+
+assert_out "1" "int main()
+{
+	int n;
+
+	n = -1;
+	pint(-n);
+}"
+
+assert_gcc "8queen.c"
 
 echo OK

@@ -47,6 +47,27 @@ void	movi(char *dst, int i)
 	printf("    %s %s, %d\n", ASM_MOV, dst, i);
 }
 
+void	cmps(char *dst, char *from)
+{
+	printf("    cmp %s, %s\n", dst, from);
+}
+
+// rax, rdi
+void	cmp(Type *dst, Type *from)
+{
+	if (type_equal(dst, from))
+	{
+		if (dst->ty == PTR || dst->ty == ARRAY)
+			cmps(RAX, RDI);
+		else if (dst->ty == CHAR)
+			cmps(AL, DIL);
+		else if (dst->ty == INT)
+			cmps(EAX, EDI);
+		return ;
+	}
+	cmps(RAX, RDI);
+}
+
 void	load_global(Node *node)
 {
 	char	*prefix;
@@ -127,12 +148,12 @@ static void	load(Type *type)
 	}
 	else if (type->ty == CHAR)
 	{
-		printf("movzx eax, BYTE PTR [%s]\n", RAX);
+		printf("    movsx eax, BYTE PTR [%s]\n", RAX);
 		return ;
 	}
 	else if (type->ty == INT)
 	{
-		printf("movzx eax, WORD PTR [%s]\n", RAX);
+		printf("    movsx eax, WORD PTR [%s]\n", RAX);
 		return ;
 	}
 	else if (type->ty == ARRAY)
@@ -261,7 +282,14 @@ static void	mul(Node *node)
 	switch (node->kind)
 	{
 		case ND_MUL:
-			printf("    imul rax, rdi\n");
+			printf("    imul rax, rdi\n");	
+/*
+			if (node->type->ty == INT)
+			{
+				printf("    imul eax, edi\n");	
+			}
+			else
+*/
 			break;
 		case ND_DIV:
 			printf("    cqo\n");
@@ -300,6 +328,7 @@ static void	add(Node *node)
 		size_node->val = type_size(node->lhs->type->ptr_to);
 		size_node->type = new_primitive_type(INT);
 		node->rhs = new_node(ND_MUL, node->rhs, size_node);
+		node->rhs->type = node->lhs->type; // TODO
 		size_node->type = new_primitive_type(INT);
 	}
 
@@ -341,12 +370,12 @@ static void relational(Node *node)
 	switch (node->kind)
 	{
 		case ND_LESS:
-			printf("    cmp rax, rdi\n");
+			cmp(node->lhs->type, node->rhs->type);
 			printf("    setl al\n");
 			printf("    movzx rax, al\n");
 			break;
 		case ND_LESSEQ:
-			printf("    cmp rax, rdi\n");
+			cmp(node->lhs->type, node->rhs->type);
 			printf("    setle al\n");
 			printf("    movzx rax, al\n");
 			break;
@@ -375,12 +404,12 @@ static void	equality(Node *node)
 	switch (node->kind)
 	{
 		case ND_EQUAL:
-			printf("    cmp rdi, rax\n");
+			cmp(node->lhs->type, node->rhs->type);
 			printf("    sete al\n");
 			printf("    movzx rax, al\n");
 			break;
 		case ND_NEQUAL:
-			printf("    cmp rdi, rax\n");
+			cmp(node->lhs->type, node->rhs->type);
 			printf("    setne al\n");
 			printf("    movzx rax, al\n");
 			break;
@@ -448,7 +477,8 @@ static void stmt(Node *node)
 		case ND_IF:
 			// if
 			expr(node->lhs);
-			printf("    cmp rax, 0\n");
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
 
 			lend = jumpLabelCount++;
 
@@ -480,7 +510,8 @@ static void stmt(Node *node)
 			
 			// if
 			expr(node->lhs);
-			printf("    cmp rax, 0\n");
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
 			printf("    je .Lend%d\n", lend);
 			
 			// while block
@@ -506,7 +537,8 @@ static void stmt(Node *node)
 			if(node->for_if != NULL)
 			{
 				expr(node->for_if);
-				printf("    cmp rax, 0\n");
+				mov(RDI, "0");
+				cmp(node->for_if->type, new_primitive_type(INT));
 				printf("    je .Lend%d\n", lend);
 			}
 

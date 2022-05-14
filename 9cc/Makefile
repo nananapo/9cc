@@ -8,7 +8,7 @@ SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
 
 $(NAME): $(OBJS)
-	$(CC) -o $(NAME) $(OBJS) $(LDFLAGS)
+	$(CC) -g -o $(NAME) $(OBJS) $(LDFLAGS)
 
 test: $(NAME)
 	./$(TEST_SCRIPT)

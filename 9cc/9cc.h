@@ -8,11 +8,15 @@
 # define ASM_LEA "lea"
 
 # define RAX "rax"
+# define RDI "rdi"
 # define RBP "rbp"
 # define RSP "rsp"
 
 # define EAX "eax"
+# define EDI "edi"
+
 # define AL "al"
+# define DIL "dil"
 
 # define BYTE_PTR "byte ptr"
 # define WORD_PTR "word ptr"
