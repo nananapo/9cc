@@ -1,9 +1,10 @@
 #include "9cc.h"
+#include <stdio.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <stdbool.h>
 
 extern Node			*code[];
 extern Token		*token;
@@ -23,7 +24,7 @@ Node		*new_node_num(int val);
 
 // LVar
 LVar		*find_lvar(char *str, int len);
-int			create_local_var(char *name, int len, Type *type);
+int			create_local_var(char *name, int len, Type *type, bool is_arg);
 int			get_locals_count();
 
 // リテラルを探す
@@ -479,7 +480,7 @@ static Node	*stmt()
 			expect_type_after(&type);
 
 			node = new_node(ND_DEFVAR, NULL, NULL);
-			node->offset = create_local_var(tok->str, tok->len, type);
+			node->offset = create_local_var(tok->str, tok->len, type, false);
 		}
 		else
 		{
@@ -505,7 +506,8 @@ static Node	*global_var(Type *type, Token *ident)
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
 
-	/* 代入文
+	// 代入文
+	/*
 	if (consume("="))
 	{
 		// TODO
@@ -638,7 +640,7 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 			Token *arg = consume_ident();
 			if (arg == NULL)
 				error_at(token->str, ")ではないトークンです");
-			create_local_var(arg->str, arg->len, type);
+			create_local_var(arg->str, arg->len, type, true);
 
 			// arrayかどうかを確かめる
 			expect_type_after(&type);

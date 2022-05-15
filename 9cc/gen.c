@@ -14,6 +14,13 @@ static int	stack_count = 0;
 
 extern t_str_elem	*str_literals;
 
+int	max(int a, int b)
+{
+	if (a > b)
+		return a;
+	return b;
+}
+
 int	align_to(int n, int align)
 {
 	return (n + align - 1) / align * align;
@@ -90,33 +97,38 @@ void	comment(char *c)
 	printf("# %s\n", c);
 }
 
-int	max(int a, int b)
-{
-	if (a > b)
-		return a;
-	return b;
-}
-
 void	init_stack_size(Node *node)
 {
 	int	i;
+	int	size;
 
 	i = -1;
 	node->stack_size = 0;
-	printf("    # lvar stack : ");
+	printf("    # lvar stack :");
 	for  (LVar *var = node->locals;var;var = var->next)
 	{
-		/* TODO 必要な分だけsubする
+		size = type_size(var->type);
+		// TODO struct
 		if (++i < node->argdef_count)
-		{*/
-			node->stack_size += max(8, type_size(var->type));
-			printf("+ %d", max(8, type_size(var->type)));
-		/*}
+		{
+			node->stack_size += max(8, size);
+			printf(" + %d", max(8, size));
+		}
 		else
 		{
-			node->stack_size += type_size(var->type);
-			printf(" + %d", type_size(var->type));
-		}*/
+			if (size < 4)
+			{
+				if (node->stack_size % 4 + size <= 4)
+					node->stack_size += size;
+				else
+					node->stack_size = (node->stack_size + 3) / 4 * 4 + size;
+			}
+			else if (size == 4)
+				node->stack_size = (node->stack_size + 3) / 4 * 4 + size;
+			else
+				node->stack_size = (node->stack_size + 7) / 8 * 8 + size;
+			printf(" + %d(%d)", size, node->stack_size);
+		}
 	}
 	printf(" = %d\n", node->stack_size);
 	node->stack_size = align_to(node->stack_size, 16);

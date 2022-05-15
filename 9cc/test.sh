@@ -328,6 +328,8 @@ assert 1 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return 0[a];}"
 assert 10 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; return 1[a];}"
 assert 100 "int main(){ int a[3]; 0[a] = 1; 1[a] = 10; 2[a] = 100; return 2[a];}"
 
+assert_out "0 0 1 3 2 6 " "int main(){ int i; int j; j = 0; for (i=0; i<3; i=i+1){ pint(i); pspace(1); pint(j); pspace(1); j = j + 3;} return 0;}"
+
 assert 1 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][0];}"
 assert 2 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][1];}"
 assert 3 "int main(){ int a[3][3]; int i; int j; for (i=0; i<3; i=i+1) for (j=0; j<3; j=j+1) a[i][j] = i * 3 + (j+1); return a[0][2];}"
