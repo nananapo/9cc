@@ -504,11 +504,12 @@ static Node	*global_var(Type *type, Token *ident)
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
 
-	// 代入文
+	/* 代入文
 	if (consume("="))
 	{
 		// TODO
 	}
+	*/
 
 	if (!consume(";"))
 		error_at(token->str, ";が必要です。");
