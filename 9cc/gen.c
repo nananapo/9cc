@@ -148,12 +148,14 @@ static void	load(Type *type)
 	}
 	else if (type->ty == CHAR)
 	{
-		printf("    movsx eax, BYTE PTR [%s]\n", RAX);
+		printf("    mov al, %s [%s]\n", BYTE_PTR, RAX);
+		printf("    movzx %s, %s\n", RAX, AL);
 		return ;
 	}
 	else if (type->ty == INT)
 	{
-		printf("    movsx eax, WORD PTR [%s]\n", RAX);
+		printf("    mov %s, %s [%s]\n", EAX, DWORD_PTR, RAX);
+		//printf("    movzx %s, %s\n", RAX, EAX);
 		return ;
 	}
 	else if (type->ty == ARRAY)
@@ -441,7 +443,19 @@ static void	assign(Node *node)
 	// レジスタの左辺の型に合わせる
 	char *reg = type_regname(node->lhs->type);
 	pop("rdi");
-	mov("[rdi]", reg);
+
+	if (node->type->ty == CHAR)
+	{
+		mov("byte ptr [rdi]", reg);
+	}
+	else if (node->type->ty == INT)
+	{
+		mov("dword ptr [rdi]", reg);
+	}
+	else
+	{
+		mov("[rdi]", reg);
+	}
 }
 
 static void	expr(Node *node)

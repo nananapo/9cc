@@ -60,7 +60,15 @@ int	pline()
 
 int pptr(int *ptr)
 {
-	printf("ptr : %p\n", ptr);
+	printf("ptr		: %p\n", ptr);
+	printf("value	: %d\n", *ptr);
+	return 0;
+}
+
+int pptrc(char *ptr)
+{
+	printf("ptrc	: %p\n", ptr);
+	printf("value	: %d\n", *ptr);
 	return 0;
 }
 
