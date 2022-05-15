@@ -261,6 +261,7 @@ static void	arrow(Node *node, bool as_addr)
 	switch (node->kind)
 	{
 		case ND_STRUCT_VALUE:
+		case ND_STRUCT_PTR_VALUE:
 			break;
 		default:
 			return primary(node);
@@ -268,6 +269,12 @@ static void	arrow(Node *node, bool as_addr)
 
 	switch(node->kind)
 	{
+		case ND_STRUCT_PTR_VALUE:
+			arrow(node->lhs, false);
+			printf("    add rax, %d\n", node->struct_elem->offset);
+			if (!as_addr)
+				load(node->struct_elem->type);
+			break ;
 		case ND_STRUCT_VALUE:
 			arrow(node->lhs, true);
 			// TODO raxにレジスタが入っている
@@ -275,9 +282,9 @@ static void	arrow(Node *node, bool as_addr)
 			if (!as_addr)
 				// とりあえずloadしてみる
 				load(node->struct_elem->type);
-			break;
+			break ;
 		default:
-			break;
+			break ;
 	}
 }
 
@@ -478,6 +485,8 @@ static void	assign(Node *node)
 	else if (node->lhs->kind == ND_DEREF)
 		expr(node->lhs->lhs);
 	else if (node->lhs->kind == ND_STRUCT_VALUE)
+		arrow(node->lhs, true);
+	else if (node->lhs->kind == ND_STRUCT_PTR_VALUE)
 		arrow(node->lhs, true);
 	else
 		error("代入の左辺値が識別子かアドレスではありません");

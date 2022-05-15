@@ -214,8 +214,21 @@ static Node	*arrow_loop(Node *node)
 
 	if (consume("->"))
 	{
-		// TODO
-		return (NULL);
+		if (!is_pointer_type(node->type) || node->type->ptr_to->ty != STRUCT)
+			error_at(token->str, "struct*ではありません");
+		
+		ident = consume_ident();
+
+		if (ident == NULL)
+			error_at(token->str, "識別子が必要です");
+		elem = struct_get_member(node->type->ptr_to->strct, ident->str, ident->len);
+		if (elem == NULL)
+			error_at(token->str, "識別子が存在しません", strndup(ident->str, ident->len));
+		
+		node = new_node(ND_STRUCT_PTR_VALUE, node, NULL);
+		node->struct_elem = elem;
+		node->type = elem->type;	
+		return arrow_loop(node);
 	}
 	else if (consume("."))
 	{

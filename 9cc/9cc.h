@@ -84,7 +84,8 @@ typedef enum
  	ND_LVAR_GLOBAL,
 	ND_STR_LITERAL,
 	ND_STRUCT_DEF,
-	ND_STRUCT_VALUE
+	ND_STRUCT_VALUE,
+	ND_STRUCT_PTR_VALUE
 } NodeKind;
 
 typedef enum
