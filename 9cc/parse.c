@@ -112,26 +112,42 @@ Token	*consume_str_literal()
 	return ret;
 }
 
+void	consume_type_ptr(Type **type)
+{
+	Type	*tmp;
+
+	while (consume("*"))
+	{
+		tmp = new_primitive_type(PTR);
+		tmp->ptr_to = *type;
+		*type = tmp;
+	}
+}
+
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
 Type	*consume_type_before()
 {
 	Type	*type;
-	Type	*tmp;
+	Token	*ident;
 
 	// type name
 	if (consume_ident_str("int"))
 		type = new_primitive_type(INT);
 	else if (consume_ident_str("char"))
 		type = new_primitive_type(CHAR);
+	else if (consume_with_type(TK_STRUCT))
+	{
+		ident = consume_ident();
+		if (ident == NULL)
+			return (NULL);
+		type = new_struct_type(ident->str, ident->len);
+		if (type == NULL)
+			return (NULL);
+	}
 	else
 		return (NULL);
 
-	while (consume("*"))
-	{
-		tmp = new_primitive_type(PTR);
-		tmp->ptr_to = type;
-		type = tmp;
-	}
+	consume_type_ptr(&type);
 	return type;
 }
 
@@ -267,6 +283,13 @@ Token	*tokenize(char *p)
 		if (match_word(p, "sizeof"))
 		{
 			cur = new_token(TK_SIZEOF, cur, p);
+			cur->len = 6;
+			p += 6;
+			continue;
+		}
+		if (match_word(p, "struct"))
+		{
+			cur = new_token(TK_STRUCT, cur, p);
 			cur->len = 6;
 			p += 6;
 			continue;

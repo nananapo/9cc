@@ -641,7 +641,9 @@ static void	filescope(Node *node)
 
 void	gen(Node *node)
 {
-	if (node->kind == ND_PROTOTYPE || node->kind == ND_DEFVAR)
+	if (node->kind == ND_PROTOTYPE
+	|| node->kind == ND_DEFVAR
+	|| node->kind == ND_STRUCT_DEF)
 		return;
 	filescope(node);
 }

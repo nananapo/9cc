@@ -1,6 +1,9 @@
 #include "9cc.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+extern StructDef	*struct_defs[];
 
 static int max(int a, int b)
 {
@@ -30,6 +33,26 @@ Type	*new_type_array(Type *ptr_to)
 	return type;
 }
 
+Type	*new_struct_type(char *name, int len)
+{
+	Type	*type;
+	int		i;
+
+	type = new_primitive_type(STRUCT);
+	for (i = 0; struct_defs[i]; i++)
+	{
+		if (struct_defs[i]->name_len == len
+		&& strncmp(struct_defs[i]->name, name, len) == 0)
+		{
+			type->strct = struct_defs[i];
+			break ;
+		}
+	}
+	if (type->strct == NULL)
+		return (NULL);
+	return (type);
+}
+
 // 2つのTypeが一致するかどうか
 bool	type_equal(Type *t1, Type *t2)
 {
@@ -37,13 +60,15 @@ bool	type_equal(Type *t1, Type *t2)
 	{
 		if ((t1->ty == PTR && t2->ty == ARRAY)
 			|| (t1->ty == ARRAY && t2->ty == PTR))
-			return type_equal(t1->ptr_to, t2->ptr_to); // TODO とりあえず
+			return type_equal(t1->ptr_to, t2->ptr_to);
 		return false;
 	}
 	if (t1->ty == PTR)
 		return type_equal(t1->ptr_to, t2->ptr_to);
 	if (t1->ty == ARRAY)
 		return type_equal(t1->ptr_to, t2->ptr_to);
+	if (t1->ty == STRUCT)
+		return (t1->strct == t2->strct);
 	return true;
 }
 
@@ -57,7 +82,10 @@ int	type_size(Type *type)
 	if (type->ty == PTR)
 		return (8);
 	if (type->ty == ARRAY)
-		return type_size(type->ptr_to) * type->array_size;
+		return (type_size(type->ptr_to)
+				* type->array_size);
+	if (type->ty == STRUCT)
+		return (type->strct->mem_size);
 	return -1;
 }
 

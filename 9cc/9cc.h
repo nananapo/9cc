@@ -27,6 +27,7 @@ typedef struct Node Node;
 typedef struct LVar LVar;
 
 typedef struct Type	Type;
+typedef struct s_struct_definition StructDef;
 
 typedef enum
 {
@@ -41,6 +42,7 @@ typedef enum
 	TK_STR_LITERAL,
 	TK_EOF,
 	TK_SIZEOF,
+	TK_STRUCT
 } TokenKind;
 
 struct Token
@@ -79,7 +81,8 @@ typedef enum
 	ND_DEFVAR,
 	ND_GLOBAL,
  	ND_LVAR_GLOBAL,
-	ND_STR_LITERAL
+	ND_STR_LITERAL,
+	ND_STRUCT_DEF
 } NodeKind;
 
 typedef enum
@@ -87,7 +90,8 @@ typedef enum
 	INT,
 	CHAR,
 	PTR,
-	ARRAY
+	ARRAY,
+	STRUCT
 } PrimitiveType;
 
 struct Type
@@ -99,6 +103,8 @@ struct Type
 
 	// arg用
 	Type		*next;
+
+	StructDef	*strct;
 };
 
 struct Node
@@ -166,6 +172,25 @@ typedef struct s_str_literal_elem
 	int							index;
 }	t_str_elem;
 
+typedef struct s_struct_members
+{
+	Type					*type;
+	char					*name;
+	int						name_len;
+	int						offset;
+	struct s_struct_members	*next;
+}	StructMemberElem;
+
+struct s_struct_definition
+{
+	char				*name;
+	int					name_len;
+	int					mem_size; // -1ならまだ定義されていない
+	StructMemberElem	*members;
+};
+
+int	align_to(int a, int to);
+
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
 
@@ -182,6 +207,10 @@ int		expect_number();
 bool	 consume_number(int *result);
 bool	at_eof();
 
+Type	*consume_type_before();
+void	expect_type_after(Type **type);
+void	consume_type_ptr(Type **type);
+
 Token	*tokenize(char *p);
 Token 	*new_token(TokenKind kind, Token *cur, char *str);
 
@@ -195,6 +224,7 @@ int		type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
+Type	*new_struct_type(char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	can_assign(Type *l, Type *r);
@@ -202,8 +232,7 @@ bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
 
-Type	*consume_type_before();
-void	expect_type_after(Type **type);
+char	*get_str_literal_name(int index);
 
 void	gen(Node *node);
 

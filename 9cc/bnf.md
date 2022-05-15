@@ -1,9 +1,14 @@
 ```bnf
-filescope	= typep ident (types; | def-func)
+filescope	= "struct" ident ( strct-block ";" | ptrs def-func)
+			| typep ident (types ";" | def-func)
 
 def-func	= "(" def-params ")" (; | stmt)
 def-param	= typep ident
 def-params	= def-param ("," def-params)? | def-param?
+
+strct-block	= "{" struct-mems "}"
+struct-mem	= def-var ";"
+struct-mems	= struct-mem struct-mems? | struct-mem?
 
 stmt		= (if-stmt | while-stmt | for-stmt | "{" stmts "}")
 			| (def-var | "return" expr) ";"
@@ -36,8 +41,11 @@ call-params	= expr ("," call-params)? | expr?
 deref		= "[" expr "]"
 derefs		= deref derefs | deref?
 
-typep		= ("int" | "char") "*"?
+typep		= ("struct" ident | ("int" | "char")) ptrs
 types		= ("[" integer "]")?
+
+ptr			= "*"
+ptrs		= ptr ptrs? | ptr?
 
 ident		= (symbol | alphabet) strs
 

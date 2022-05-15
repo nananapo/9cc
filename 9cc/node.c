@@ -11,6 +11,7 @@ extern Node			*func_defs[];
 extern Node			*func_protos[];
 extern Node			*global_vars[];
 extern t_str_elem	*str_literals;
+extern StructDef	*struct_defs[];
 
 LVar				*locals;
 
@@ -522,6 +523,91 @@ static Node	*global_var(Type *type, Token *ident)
 	return node;
 }
 
+static Node	*struct_block(Token *ident)
+{
+	Type				*type;
+	StructDef			*def;
+	StructMemberElem	*tmp;
+	int					i;
+	int					typesize;
+
+/*
+	ident = consume_ident();
+	if (ident == NULL)
+		error_at(token->str, "識別子が必要です");
+
+	if (!consume("{"))
+		error_at(token->str, "{が必要です");
+*/
+
+	for (i = 0; struct_defs[i]; i++)
+		continue ;
+	def = calloc(1, sizeof(StructDef));
+	def->name = ident->str;
+	def->name_len = ident->len;
+	def->mem_size = -1;
+	struct_defs[i] = def;
+
+	while (1)
+	{
+		if (consume("}"))
+			break;
+		type = consume_type_before();
+		if (type == NULL)
+			error_at(token->str, "型宣言が必要です");
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(token->str, "識別子が必要です");
+		expect_type_after(&type);
+		if (!consume(";"))
+			error_at(token->str, ";が必要です");
+
+		tmp = calloc(1, sizeof(StructMemberElem));
+		tmp->name = ident->str;
+		tmp->name_len = ident->len;
+		tmp->next = def->members;
+
+		// 型のサイズを取得
+		typesize = type_size(type);
+		if (typesize == -1)
+			error_at(ident->str, "型のサイズが確定していません");
+
+		// offsetを設定
+		if (def->members ==  NULL)
+			tmp->offset = typesize;
+		else
+		{
+			i = def->members->offset;
+			if (typesize < 4)
+			{
+				if (i % 4 + typesize > 4)
+					tmp->offset = ((i + 4) / 4 * 4) + typesize;
+				else
+					tmp->offset = i + typesize;
+			}
+			else if (typesize == 4)
+				tmp->offset = ((i + 3) / 4) * 4 + typesize;
+			else
+				tmp->offset = ((i + 7) / 8) * 8 + typesize;
+		}
+		// printf("# OFFSET = %d\n", tmp->offset);
+		def->members = tmp;
+	}
+
+	// サイズを決定
+	if (def->members == NULL)
+		def->mem_size = 0;
+	else
+		def->mem_size = align_to(def->members->offset, 4);
+
+	// printf("# MEMSIZE = %d\n", def->mem_size);
+
+	if (!consume(";"))
+		error_at(token->str, ";が必要です");
+
+	return (new_node(ND_STRUCT_DEF, NULL, NULL));
+}
+
 // TODO ブロック抜けたらlocalsを戻す
 
 // (まで読んだところから読む
@@ -598,24 +684,42 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 
 static Node	*filescope()
 {
-	Token	*tok;
-	locals = NULL;
+	Token	*ident;
+	Type	*ret_type;
 
-	// type
-	Type	*ret_type = consume_type_before();
-	if (ret_type == NULL)
-		error_at(token->str, "型宣言が必要です");
+	// structの宣言か返り値がstructか
+	if (consume_with_type(TK_STRUCT))
+	{
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(token->str, "構造体の識別子が必要です");
+			
+		if (consume("{"))
+			return struct_block(ident);
 
-	// ident
-	tok = consume_ident();
-	if (tok == NULL)
-		error_at(token->str, "不明なトークンです");
-
-	// function definition
-	if (consume("("))
-		return funcdef(ret_type, tok);
+		ret_type = new_struct_type(ident->str, ident->len);
+		consume_type_ptr(&ret_type);
+	}
 	else
-		return global_var(ret_type, tok);
+		ret_type = consume_type_before();
+
+	// グローバル変数か関数宣言か
+	if (ret_type != NULL)
+	{
+		// ident
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(token->str, "不明なトークンです");
+
+		// function definition
+		if (consume("("))
+			return funcdef(ret_type, ident);
+		else
+			return global_var(ret_type, ident);
+	}
+
+	error_at(token->str, "パースに失敗しました[filescope]");
+	return (NULL);
 }
 
 void	program()

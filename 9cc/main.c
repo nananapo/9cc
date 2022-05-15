@@ -2,18 +2,20 @@
 #include <stdio.h>
 #include <string.h>
 
+# define N_MAX 100
+
 char		*user_input;
 
 Token		*token;
 
-Node		*func_defs[100];
-Node		*func_protos[100];
-Node		*code[100];
+Node		*func_defs[N_MAX];
+Node		*func_protos[N_MAX];
+Node		*code[N_MAX];
 
-Node		*global_vars[100];
+Node		*global_vars[N_MAX];
 t_str_elem	*str_literals;
 
-char	*get_str_literal_name(int index);
+StructDef	*struct_defs[N_MAX];
 
 int main(int argc, char **argv)
 {
