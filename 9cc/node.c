@@ -600,8 +600,12 @@ static Node	*struct_block(Token *ident)
 	if (def->members == NULL)
 		def->mem_size = 0;
 	else
-		def->mem_size = align_to(def->members->offset, 4);
-
+	{
+		if (def->members->offset < 4)
+			def->mem_size = def->members->offset;
+		else
+			def->mem_size = align_to(def->members->offset, 4);
+	}
 	// printf("# MEMSIZE = %d\n", def->mem_size);
 
 	if (!consume(";"))

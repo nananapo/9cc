@@ -479,4 +479,8 @@ int main()
 
 assert_gcc "8queen.c"
 
+assert_gcc "structsize1.c"
+
+assert_gcc "structsize2.c"
+
 echo OK
