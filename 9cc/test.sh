@@ -477,10 +477,85 @@ int main()
 	printf(s);
 }"
 
+assert "127" "int main(){
+	char a;
+	int i;
+	a = 127;
+	i = 222;
+	return a;
+}"
+
+assert "222" "int main(){
+	char a;
+	int i;
+	a = 127;
+	i = 222;
+	return i;
+}"
+
 assert_gcc "8queen.c"
 
-assert_gcc "structsize1.c"
+#assert_gcc "structsize1.c"
+#assert_gcc "structsize2.c"
 
-assert_gcc "structsize2.c"
+assert "125" "struct t1 {char a;};
+int main()
+{
+	struct t1 s;
+	s.a = 125;
+	return s.a;
+}"
+
+assert "101" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.a = 101;
+	return s.a;
+}"
+
+assert "102" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.b = 102;
+	return s.b;
+}"
+
+assert "55" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.a = 55;
+	s.b = 110;
+	return s.a;
+}"
+
+assert "110" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.a = 55;
+	s.b = 110;
+	return s.b;
+}"
+
+assert "55" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.b = 110;
+	s.a = 55;
+	return s.a;
+}"
+
+assert "110" "struct t1 {char a; char b;};
+int main()
+{
+	struct t1 s;
+	s.b = 110;
+	s.a = 55;
+	return s.b;
+}"
 
 echo OK

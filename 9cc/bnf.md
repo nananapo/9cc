@@ -26,10 +26,12 @@ equality	= relational (("==" | "!=" ) relational)?
 relational	= add (("<" | "<=" | ">" | ">=") add)?
 add			= mul (("+" | "-") mul)?
 mul			= unary (("*" | "/") unary)?
-unary		= ("+" | "-") primary
+unary		= ("+" | "-") arrow
 			| ("*" | "&") unary
 			| "sizeof" unary
-			| primary
+			| arrow
+
+arrow		= primary (("->" | ".") ident)?*
 
 primary		= ("(" expr ")"
 			| ident ("(" call-params ")")?

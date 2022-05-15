@@ -82,10 +82,17 @@ int	type_size(Type *type)
 	if (type->ty == PTR)
 		return (8);
 	if (type->ty == ARRAY)
-		return (type_size(type->ptr_to)
-				* type->array_size);
+	{
+		/*
+		if (type->ptr_to-> == PTR || type->ptr_to->ty == ARRAY)
+			return (type_size(type->ptr_to) * type->array_size);
+		if (is_integer_type(type->ptr_to))
+			return (type_size(type->ptr_to) * type->array_size);
+		*/
+		return (type_size(type->ptr_to) * type->array_size);
+	}
 	if (type->ty == STRUCT)
-		return (type->strct->mem_size);
+		return (align_to(type->strct->mem_size, 8));
 	return -1;
 }
 
@@ -139,4 +146,16 @@ char	*type_regname(Type *type)
 	printf("不明な型 %d\n", type->ty);
 	exit(1);
 	return NULL;
+}
+
+StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
+{
+	if (strct == NULL)
+		return (NULL);
+	for (StructMemberElem *mem = strct->members; mem != NULL; mem = mem->next)
+	{
+		if (mem->name_len == len && strncmp(name, mem->name, len) == 0)
+			return (mem);
+	}
+	return (NULL);
 }

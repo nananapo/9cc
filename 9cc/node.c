@@ -207,19 +207,60 @@ static Node *primary()
 	return read_deref_index(node);
 }
 
-static Node *unary()
+static Node	*arrow_loop(Node *node)
+{
+	Token				*ident;
+	StructMemberElem	*elem;
+
+	if (consume("->"))
+	{
+		// TODO
+		return (NULL);
+	}
+	else if (consume("."))
+	{
+		if (node->type->ty != STRUCT)
+			error_at(token->str, "structではありません");
+
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(token->str, "識別子が必要です");
+		elem = struct_get_member(node->type->strct, ident->str, ident->len);
+		if (elem == NULL)
+			error_at(token->str, "識別子が存在しません", strndup(ident->str, ident->len));
+
+		node = new_node(ND_STRUCT_VALUE, node, NULL);
+		node->struct_elem = elem;
+		node->type = elem->type;
+
+		return arrow_loop(node);
+	}
+	else
+		return (node);
+}
+
+static Node	*arrow(void)
 {
 	Node	*node;
+
+	node = primary();
+	return (arrow_loop(node));
+}
+
+static Node *unary(void)
+{
+	Node	*node;
+
 	if (consume("+"))
 	{
-		node = primary();
+		node = arrow();
 		if (is_pointer_type(node->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		return node;
 	}
 	else if (consume("-"))
 	{
-		node = new_node(ND_SUB, new_node_num(0), primary());
+		node = new_node(ND_SUB, new_node_num(0), arrow());
 		if (is_pointer_type(node->rhs->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		node->type = node->rhs->type;
@@ -246,7 +287,7 @@ static Node *unary()
 		node = new_node_num(type_size(node->type));
 		return node;
 	}
-	return primary();
+	return arrow();
 }
 
 static Node *mul()
@@ -567,6 +608,7 @@ static Node	*struct_block(Token *ident)
 		tmp = calloc(1, sizeof(StructMemberElem));
 		tmp->name = ident->str;
 		tmp->name_len = ident->len;
+		tmp->type = type;
 		tmp->next = def->members;
 
 		// 型のサイズを取得

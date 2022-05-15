@@ -174,6 +174,12 @@ static void	load(Type *type)
 	{
 		return ;
 	}
+	else if (type->ty == STRUCT)
+	{
+		// TODO とりあえず8byteまで
+		// mov(RAX, "[rax]");
+		return ;
+	}
 }
 
 // 変数のアドレスをraxに移動する
@@ -250,6 +256,31 @@ static void	primary(Node *node)
 	}
 }
 
+static void	arrow(Node *node, bool as_addr)
+{
+	switch (node->kind)
+	{
+		case ND_STRUCT_VALUE:
+			break;
+		default:
+			return primary(node);
+	}
+
+	switch(node->kind)
+	{
+		case ND_STRUCT_VALUE:
+			arrow(node->lhs, true);
+			// TODO raxにレジスタが入っている
+			printf("    add rax, %d\n", node->struct_elem->offset);
+			if (!as_addr)
+				// とりあえずloadしてみる
+				load(node->struct_elem->type);
+			break;
+		default:
+			break;
+	}
+}
+
 static void unary(Node *node)
 {
 	switch (node->kind)
@@ -258,7 +289,7 @@ static void unary(Node *node)
 		case ND_DEREF:
 			break;
 		default:
-			primary(node);
+			arrow(node, false);
 			return;
 	}
 	
@@ -446,6 +477,8 @@ static void	assign(Node *node)
 		load_global(node->lhs);
 	else if (node->lhs->kind == ND_DEREF)
 		expr(node->lhs->lhs);
+	else if (node->lhs->kind == ND_STRUCT_VALUE)
+		arrow(node->lhs, true);
 	else
 		error("代入の左辺値が識別子かアドレスではありません");
 
@@ -631,14 +664,9 @@ static void	funcdef(Node *node)
 
 static void globaldef(Node *node)
 {
-/*	printf("_%s:\n    .zero %d\n",
-		strndup(node->var_name, node->var_name_len),
-		type_size(node->type));
-*/
 	printf(".zerofill __DATA,__common,_%s,%d,2\n",
 		strndup(node->var_name, node->var_name_len),
 		type_size(node->type));
-
 }
 
 static void	filescope(Node *node)

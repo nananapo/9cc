@@ -11,15 +11,12 @@ _main:                                  ## @main
 	.cfi_offset rbp, -16
 	mov	rbp, rsp
 	.cfi_def_cfa_register rbp
-	xor	eax, eax
-	lea	rcx, [rip + L_.str]
-	mov	qword ptr [rbp - 8], rcx
+	mov	dword ptr [rbp - 4], 0
+	movsx	eax, byte ptr [rbp - 8]
+	movsx	ecx, byte ptr [rbp - 7]
+	add	eax, ecx
 	pop	rbp
 	ret
 	.cfi_endproc
                                         ## -- End function
-	.section	__TEXT,__cstring,cstring_literals
-L_.str:                                 ## @.str
-	.asciz	"HelloWorld!\n"
-
 .subsections_via_symbols

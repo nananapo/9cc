@@ -28,6 +28,7 @@ typedef struct LVar LVar;
 
 typedef struct Type	Type;
 typedef struct s_struct_definition StructDef;
+typedef struct s_struct_members StructMemberElem;
 
 typedef enum
 {
@@ -82,7 +83,8 @@ typedef enum
 	ND_GLOBAL,
  	ND_LVAR_GLOBAL,
 	ND_STR_LITERAL,
-	ND_STRUCT_DEF
+	ND_STRUCT_DEF,
+	ND_STRUCT_VALUE
 } NodeKind;
 
 typedef enum
@@ -151,6 +153,8 @@ struct Node
 
 	// general
 	Node		*next;
+
+	StructMemberElem	*struct_elem;
 };
 
 struct	LVar
@@ -172,14 +176,14 @@ typedef struct s_str_literal_elem
 	int							index;
 }	t_str_elem;
 
-typedef struct s_struct_members
+struct s_struct_members
 {
 	Type					*type;
 	char					*name;
 	int						name_len;
 	int						offset;
 	struct s_struct_members	*next;
-}	StructMemberElem;
+};
 
 struct s_struct_definition
 {
@@ -231,6 +235,7 @@ bool	can_assign(Type *l, Type *r);
 bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
+StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
 
 char	*get_str_literal_name(int index);
 
