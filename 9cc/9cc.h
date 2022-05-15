@@ -50,6 +50,7 @@ struct Token
 	int			val;
 	char		*str;
 	int			len;
+	int			strlen_actual;
 };
 
 typedef enum

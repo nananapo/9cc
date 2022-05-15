@@ -51,4 +51,6 @@ alphabet	= [a-zA-Z]
 number		= [1-9]
 symbol		= "_"
 
+escape		= "\\" ("a" | "b" | "f" | "n" | "r" | "t" | "v" | "0" | "\"")
+
 ``` 

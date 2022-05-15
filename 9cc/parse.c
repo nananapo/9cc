@@ -288,11 +288,36 @@ Token	*tokenize(char *p)
 		{
 			cur = new_token(TK_STR_LITERAL, cur, ++p);
 			cur->len = 0;
-			while (*p && *p != '"')
+			cur->strlen_actual = 0;
+			while (*p)
+			{
+				if (*p == '\\')
+				{
+					p++;
+					switch (*p)
+					{
+						case '"':
+						case 'a':
+						case 'b':
+						case 'f':
+						case 'n':
+						case 'r':
+						case 'v':
+						case '0':
+							break;
+						default:
+							error_at(p, "不明なエスケープシーケンスです");
+					}
+					cur->len++;
+				}
+				else if (*p == '"')
+					break;
+				cur->len++;
+				cur->strlen_actual++;
 				p++;
+			}
 			if (*p != '"')
 				error_at(p, "文字列が終了しませんでした");
-			cur->len = p - cur->str;
 			p++;
 			continue ;
 		}

@@ -1,4 +1,13 @@
 #!/bin/bash
+
+prefix="int pint(int i);
+int pspace(int n);
+int pline();
+int my_putstr(char *s, int n);
+int my_print(char *s);
+int *my_malloc_int(int n);
+"
+
 assert() {
   expected="$1"
   input="$2"
@@ -20,13 +29,7 @@ assert_out(){
 	echo "#-- Test----------------------------"
 
 	expected="$1"
-	input="int pint(int i);
-int pspace(int n);
-int pline();
-int my_putstr(char *s, int n);
-int my_print(char *s);
-int *my_malloc_int(int n);
-$2"
+	input="$prefix$2"
 	
 	./9cc "$input" > tmp.s
 	cc -o tmp tmp.s "test/print.c"
@@ -40,26 +43,38 @@ $2"
   	fi
 }
 
+assert_cat(){
+	echo "#-- Test----------------------------"
+
+	expected="$1"
+	input="$prefix $2"
+	
+	./9cc "$input" > tmp.s
+	cc -o tmp tmp.s "test/print.c"
+	actual=`./tmp | cat -e`
+
+  	if [ "$actual" = "$expected" ]; then
+  	  echo "$input => $actual"
+  	else
+  	  echo "$input => $expected expected, but got $actual"
+  	  exit 1
+  	fi
+}
+
 assert_gcc(){
 	echo "#-- Test----------------------------"
 
-	input="int pint(int i);
-int pspace(int n);
-int pline();
-int my_putstr(char *s, int n);
-int my_print(char *s);
-int *my_malloc_int(int n);
-`cat test/unit/$1`"
+	input="$prefix`cat test/unit/$1`"
 	
 	./9cc "$input" > tmp.s
 	cc -o tmp1 tmp.s "test/print.c"
 	./tmp1 > test/unit/actual.output
-	actual=`cat test/unit/actual.output`
+	actual=`cat -e test/unit/actual.output`
 
 	echo $input > test/unit/tmp.c
 	cc -o tmp2 test/unit/tmp.c test/print.c
 	./tmp2 > test/unit/expected.output
-	expected=`cat test/unit/expected.output`
+	expected=`cat -e test/unit/expected.output`
 
 	rm -rf test/unit/tmp.c tmp1 tmp2
 
@@ -450,6 +465,14 @@ assert_out "1" "int main()
 
 	n = -1;
 	pint(-n);
+}"
+
+assert_cat "Hello\$" "int printf(char *a);
+int main()
+{
+	char	*s;
+	s = \"Hello\\n\";
+	printf(s);
 }"
 
 assert_gcc "8queen.c"
