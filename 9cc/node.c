@@ -586,6 +586,7 @@ static Node	*struct_block(Token *ident)
 	StructMemberElem	*tmp;
 	int					i;
 	int					typesize;
+	int					maxsize;
 
 /*
 	ident = consume_ident();
@@ -629,25 +630,28 @@ static Node	*struct_block(Token *ident)
 		if (typesize == -1)
 			error_at(ident->str, "型のサイズが確定していません");
 
+		maxsize = max_type_size(type);
+
 		// offsetを設定
 		if (def->members ==  NULL)
 			tmp->offset = typesize;
 		else
 		{
 			i = def->members->offset;
-			if (typesize < 4)
+			if (maxsize < 4)
 			{
 				if (i % 4 + typesize > 4)
 					tmp->offset = ((i + 4) / 4 * 4) + typesize;
 				else
 					tmp->offset = i + typesize;
 			}
-			else if (typesize == 4)
+			else if (maxsize == 4)
 				tmp->offset = ((i + 3) / 4) * 4 + typesize;
 			else
 				tmp->offset = ((i + 7) / 8) * 8 + typesize;
 		}
-		// printf("# OFFSET = %d\n", tmp->offset);
+		printf("# OFFSET = %d\n", tmp->offset);
+ 
 		def->members = tmp;
 	}
 
@@ -656,12 +660,12 @@ static Node	*struct_block(Token *ident)
 		def->mem_size = 0;
 	else
 	{
-		if (def->members->offset < 4)
-			def->mem_size = def->members->offset;
-		else
-			def->mem_size = align_to(def->members->offset, 4);
+		maxsize = max_type_size(new_struct_type(def->name, def->name_len));
+		printf("# MAX_SIZE = %d\n", maxsize);
+		def->mem_size = align_to(def->members->offset, maxsize);
 	}
-	// printf("# MEMSIZE = %d\n", def->mem_size);
+	printf("# MEMSIZE = %d\n", def->mem_size);
+
 
 	if (!consume(";"))
 		error_at(token->str, ";が必要です");

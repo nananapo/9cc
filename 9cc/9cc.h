@@ -237,6 +237,8 @@ bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
+//void	determine_struct_size(StructDef **ptr);
+int	max_type_size(Type *type);
 
 char	*get_str_literal_name(int index);
 

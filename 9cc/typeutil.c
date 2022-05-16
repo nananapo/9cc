@@ -82,17 +82,9 @@ int	type_size(Type *type)
 	if (type->ty == PTR)
 		return (8);
 	if (type->ty == ARRAY)
-	{
-		/*
-		if (type->ptr_to-> == PTR || type->ptr_to->ty == ARRAY)
-			return (type_size(type->ptr_to) * type->array_size);
-		if (is_integer_type(type->ptr_to))
-			return (type_size(type->ptr_to) * type->array_size);
-		*/
 		return (type_size(type->ptr_to) * type->array_size);
-	}
 	if (type->ty == STRUCT)
-		return (align_to(type->strct->mem_size, 8));
+		return (type->strct->mem_size);
 	return -1;
 }
 
@@ -158,4 +150,25 @@ StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 			return (mem);
 	}
 	return (NULL);
+}
+
+int	max_type_size(Type *type)
+{
+	StructMemberElem	*tmp;
+	int					size;
+
+	if (type->ty == STRUCT)
+	{
+		size = 0;
+		for (tmp = type->strct->members; tmp; tmp = tmp->next)
+		{
+			size = max(size, max_type_size(tmp->type));
+		}
+		return (size);
+	}
+	else if (type->ty == ARRAY)
+	{
+		return (max_type_size(type->ptr_to));
+	}
+	return type_size(type);
 }
