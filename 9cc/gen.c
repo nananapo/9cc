@@ -375,13 +375,16 @@ static void	add(Node *node)
 			node->rhs = tmp;
 		}
 
-		// 右辺を掛け算に置き換える
-		Node *size_node = new_node(ND_NUM, NULL, NULL);
-		size_node->val = type_size(node->lhs->type->ptr_to);
-		size_node->type = new_primitive_type(INT);
-		node->rhs = new_node(ND_MUL, node->rhs, size_node);
-		node->rhs->type = node->lhs->type; // TODO
-		size_node->type = new_primitive_type(INT);
+		// 右辺が整数型なら掛け算に置き換える
+		if (is_integer_type(node->rhs->type))
+		{
+			Node *size_node = new_node(ND_NUM, NULL, NULL);
+			size_node->val = type_size(node->lhs->type->ptr_to);
+			size_node->type = new_primitive_type(INT);
+			node->rhs = new_node(ND_MUL, node->rhs, size_node);
+			node->rhs->type = node->lhs->type; // TODO
+			size_node->type = new_primitive_type(INT);
+		}
 	}
 
 	expr(node->rhs);

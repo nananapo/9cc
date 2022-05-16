@@ -348,10 +348,21 @@ static Node *add()
 			r = tmp;
 		}
 
-		// 両方がポインタならエラー
+		/* 両方がポインタでも使える (size_tなので)
 		if (is_pointer_type(l)
 		&& is_pointer_type(r))
 			error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
+		*/
+
+		// 両方ともポインタ
+		if (is_pointer_type(l)
+		&& is_pointer_type(r))
+		{
+			if (!type_equal(l, r))
+				error_at(token->str, "型の違うポインタ同士に+か-を適用できません");
+			node->type = l;
+			continue ;
+		}
 
 		// ポインタと整数の演算
 		if (is_pointer_type(l)
