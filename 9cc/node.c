@@ -781,7 +781,6 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 		func_defs[i] = node;
 		node->lhs = stmt();
 		node->locals = locals;
-		node->locals_len = get_locals_count();
 	}
 	
 	return node;

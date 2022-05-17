@@ -160,7 +160,6 @@ struct Node
 	Node		*args;
 	
 	// func
-	int			locals_len;
 	Type		*arg_type;
 	Type		*ret_type;
 	int			stack_size;

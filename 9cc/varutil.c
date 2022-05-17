@@ -72,15 +72,3 @@ int	create_local_var(char *name, int len, Type *type, bool is_arg)
 	locals = lvar;
 	return lvar->offset;
 }
-
-int	get_locals_count()
-{
-	int	i = 0;
-	LVar *tmp = locals;
-	while (tmp)
-	{
-		i++;
-		tmp = tmp->next;
-	}
-	return i;
-}
