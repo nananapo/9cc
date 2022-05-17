@@ -63,26 +63,31 @@ typedef enum
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
+
 	ND_ADD,
 	ND_SUB,
 	ND_MUL,
 	ND_DIV,
 	ND_EQUAL,
+
 	ND_NEQUAL,
 	ND_LESS,
 	ND_LESSEQ,
 	ND_ASSIGN,
 	ND_LVAR,
+
 	ND_RETURN,
 	ND_IF,
 	ND_WHILE,
 	ND_FOR,
 	ND_ADDR,
+
 	ND_DEREF,
 	ND_DEFVAR,
-	ND_GLOBAL,
+	ND_DEFVAR_GLOBAL,
  	ND_LVAR_GLOBAL,
 	ND_STR_LITERAL,
+
 	ND_STRUCT_DEF,
 	ND_STRUCT_VALUE,
 	ND_STRUCT_PTR_VALUE
@@ -156,6 +161,8 @@ struct Node
 	Node		*next;
 
 	StructMemberElem	*struct_elem;
+
+	bool		is_struct_address;
 };
 
 struct	LVar

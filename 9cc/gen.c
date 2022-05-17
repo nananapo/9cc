@@ -87,7 +87,7 @@ char	*get_str_literal_name(int index)
 {
 	char	*tmp;
 
-	tmp = malloc(sizeof(char) * 100);
+	tmp = calloc(100, sizeof(char));
 	sprintf(tmp, "L_STR_%d", index);
 	return (tmp);
 }
@@ -185,8 +185,9 @@ static void	load(Type *type)
 // 変数のアドレスをraxに移動する
 static void	lval(Node *node)
 {
-	if (node->kind != ND_LVAR && node->kind != ND_LVAR_GLOBAL)
-		error("代入の左辺値が変数ではありません %d", node->kind);
+	if (node->kind != ND_LVAR
+	&& node->kind != ND_LVAR_GLOBAL)
+		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
 	
 	mov(RAX, RBP);
 	printf("    sub %s, %d\n", RAX, node->offset);
@@ -294,23 +295,41 @@ static void unary(Node *node)
 	{
 		case ND_ADDR:
 		case ND_DEREF:
-			break;
+			break ;
 		default:
 			arrow(node, false);
-			return;
+			return ;
 	}
-	
+
 	switch(node->kind)
 	{
 		case ND_ADDR:
-			lval(node->lhs);
-			break;
+			switch(node->lhs->kind)
+			{
+				// 変数ならアドレスを取り出す
+				case ND_LVAR:
+				case ND_LVAR_GLOBAL:
+					lval(node->lhs);
+					break ;
+				// 構造体からのアクセスなら、アドレスなのでそのまま返す
+				case ND_STRUCT_VALUE:
+				case ND_STRUCT_PTR_VALUE:
+					break ;
+				// ND_DEREFならアドレスで止める
+				case ND_DEREF:
+					expr(node->lhs);//ここ！！
+					break ;
+				default:
+					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
+					break ;
+			}
+			break ;
 		case ND_DEREF:
-			expr(node->lhs);
+			expr(node->lhs);// ここと同じ！！！！！変えるときは注意！！！！！！
 			load(node->type);
-			break;
+			break ;
 		default:
-			break;
+			break ;
 	}
 }
 
@@ -340,7 +359,6 @@ static void	mul(Node *node)
 			{
 				printf("    imul eax, edi\n");	
 			}
-			else
 */
 			break;
 		case ND_DIV:
@@ -363,9 +381,10 @@ static void	add(Node *node)
 			mul(node);
 			return;
 	}
-
-	// ポインタ
-	if (node->type->ty == PTR || node->type->ty == ARRAY)
+	
+	// 結果がポインタ型なら
+	if (node->type->ty == PTR
+	|| node->type->ty == ARRAY)
 	{
 		// 左辺をポインタ型にする
 		if (node->rhs->type->ty == PTR || node->rhs->type->ty == ARRAY)
@@ -381,8 +400,10 @@ static void	add(Node *node)
 			Node *size_node = new_node(ND_NUM, NULL, NULL);
 			size_node->val = type_size(node->lhs->type->ptr_to);
 			size_node->type = new_primitive_type(INT);
+			// 掛け算
 			node->rhs = new_node(ND_MUL, node->rhs, size_node);
 			node->rhs->type = node->lhs->type; // TODO
+			// INT
 			size_node->type = new_primitive_type(INT);
 		}
 	}
@@ -685,7 +706,7 @@ static void	filescope(Node *node)
 {
 	if (node->kind == ND_FUNCDEF)
 		funcdef(node);
-	else if (node->kind == ND_GLOBAL)
+	else if (node->kind == ND_DEFVAR_GLOBAL)
 		globaldef(node);
 	else
 		stmt(node);

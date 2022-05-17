@@ -500,6 +500,8 @@ assert_gcc "structsize2.c"
 assert_gcc "structsize3.c"
 assert_gcc "structsize4.c"
 
+assert_gcc "struct2.c"
+
 assert "125" "struct t1 {char a;};
 int main()
 {

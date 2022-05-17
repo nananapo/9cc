@@ -39,7 +39,7 @@ static int	get_str_literal_index(char *str, int len)
 			return (tmp->index);
 		tmp = tmp->next;
 	}
-	tmp = malloc(sizeof(t_str_elem));
+	tmp = calloc(1, sizeof(t_str_elem));
 	tmp->str = str;
 	tmp->len = len;
 	if (str_literals == NULL)
@@ -227,7 +227,8 @@ static Node	*arrow_loop(Node *node)
 		
 		node = new_node(ND_STRUCT_PTR_VALUE, node, NULL);
 		node->struct_elem = elem;
-		node->type = elem->type;	
+		node->type = elem->type;
+
 		return arrow_loop(node);
 	}
 	else if (consume("."))
@@ -283,14 +284,24 @@ static Node *unary(void)
 	{
 		node = new_node(ND_DEREF, unary(), NULL);
 		if (!is_pointer_type(node->lhs->type))
-			error_at(token->str, "ポインタではない型(%d)に対してunary *を適用できません", node->lhs->type->ty);
+			error_at(token->str,
+					"ポインタではない型(%d)に対してunary *を適用できません",
+					node->lhs->type->ty);
 		node->type = node->lhs->type->ptr_to;	
 		return node;
 	}
 	else if (consume("&"))
 	{
 		node = new_node(ND_ADDR, unary(), NULL);
-		// TODO 左辺値かどうかのチェック
+
+		// 変数と構造体、ND_DEREFに対する&
+		if (node->lhs->kind != ND_LVAR
+		&& node->lhs->kind != ND_LVAR_GLOBAL
+		&& node->lhs->kind != ND_STRUCT_VALUE
+		&& node->lhs->kind != ND_STRUCT_PTR_VALUE
+		&& node->lhs->kind != ND_DEREF) // TODO 文字列リテラルは？
+			error_at(token->str, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
+
 		node->type = new_type_ptr_to(node->lhs->type);
 		return node;
 	}
@@ -300,6 +311,7 @@ static Node *unary(void)
 		node = new_node_num(type_size(node->type));
 		return node;
 	}
+
 	return arrow();
 }
 
@@ -348,19 +360,22 @@ static Node *add()
 			r = tmp;
 		}
 
-		/* 両方がポインタでも使える (size_tなので)
-		if (is_pointer_type(l)
-		&& is_pointer_type(r))
-			error_at(token->str, "ポインタ型とポインタ型に+か-を適用できません");
-		*/
-
 		// 両方ともポインタ
 		if (is_pointer_type(l)
 		&& is_pointer_type(r))
 		{
 			if (!type_equal(l, r))
-				error_at(token->str, "型の違うポインタ同士に+か-を適用できません");
-			node->type = l;
+				error_at(token->str, "型が一致しないポインタ型同士の加減算はできません");
+			node->type = new_primitive_type(INT);// TODO size_tにする
+
+			int size = type_size(l->ptr_to);
+			if (size == 0 || size > 1)
+			{
+				if (size == 0)
+					fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
+				node = new_node(ND_DIV, node, new_node_num(size));
+				node->type = new_primitive_type(INT);
+			}
 			continue ;
 		}
 
@@ -566,7 +581,7 @@ static Node	*global_var(Type *type, Token *ident)
 	// 後ろの型を読む
 	expect_type_after(&type);
 
-	node = new_node(ND_GLOBAL, NULL, NULL);
+	node = new_node(ND_DEFVAR_GLOBAL, NULL, NULL);
 	node->type = type;
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
