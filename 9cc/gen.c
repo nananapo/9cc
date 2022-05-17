@@ -7,6 +7,7 @@
 #define ARG_REG_COUNT 6
 
 static void	expr(Node *node);
+static void unary(Node *node);
 
 static int	jumpLabelCount = 0;
 static char	*arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
@@ -23,25 +24,27 @@ int	max(int a, int b)
 
 int	align_to(int n, int align)
 {
-	return (n + align - 1) / align * align;
+	if (align == 0)
+		return (n);
+	return ((n + align - 1) / align * align);
 }
 
 void	push()
 {
 	stack_count += 8;
-	printf("    %s %s # stack=%d\n", ASM_PUSH, RAX, stack_count);
+	printf("    %s %s # stack= %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
 }
 
 void	pushi(int data)
 {
 	stack_count += 8;
-	printf("    %s %d # stack=%d\n", ASM_PUSH, data, stack_count);
+	printf("    %s %d # stack= %d -> %d\n", ASM_PUSH, data, stack_count - 8, stack_count);
 }
 
 void	pop(char *reg)
 {
 	stack_count -= 8;
-	printf("    pop %s # stack=%d\n", reg, stack_count);
+	printf("    pop %s # stack= %d -> %d\n", reg, stack_count + 8, stack_count);
 }
 
 void	mov(char *dst, char *from)
@@ -130,8 +133,8 @@ void	init_stack_size(Node *node)
 			printf(" + %d(%d)", size, node->stack_size);
 		}
 	}
-	printf(" = %d\n", node->stack_size);
 	node->stack_size = align_to(node->stack_size, 16);
+	printf(" = %d\n", node->stack_size);
 }
 
 static void prologue()
@@ -251,6 +254,9 @@ static void	primary(Node *node)
 		case ND_PROTOTYPE:
 		case ND_DEFVAR:
 			return;
+		case ND_STRUCT_DEF:
+			error("おかしい");
+			return;
 		default:
 			error("不明なノード %d", node->kind);
 			break;
@@ -259,6 +265,8 @@ static void	primary(Node *node)
 
 static void	arrow(Node *node, bool as_addr)
 {
+	int offset;
+
 	switch (node->kind)
 	{
 		case ND_STRUCT_VALUE:
@@ -268,25 +276,23 @@ static void	arrow(Node *node, bool as_addr)
 			return primary(node);
 	}
 
-	switch(node->kind)
-	{
-		case ND_STRUCT_PTR_VALUE:
-			arrow(node->lhs, false);
-			printf("    add rax, %d\n", node->struct_elem->offset);
-			if (!as_addr)
-				load(node->struct_elem->type);
-			break ;
-		case ND_STRUCT_VALUE:
-			arrow(node->lhs, true);
-			// TODO raxにレジスタが入っている
-			printf("    add rax, %d\n", node->struct_elem->offset);
-			if (!as_addr)
-				// とりあえずloadしてみる
-				load(node->struct_elem->type);
-			break ;
-		default:
-			break ;
-	}
+	//printf("#ARROW %d->%d\n", node->kind, node->lhs->kind);
+
+	// arrowかその他の可能性がある
+	if (node->lhs->kind == ND_STRUCT_VALUE
+			|| node->lhs->kind == ND_STRUCT_PTR_VALUE)
+		arrow(node->lhs, node->kind == ND_STRUCT_VALUE);
+	else
+		expr(node->lhs);
+
+	// offset分ずらす => 最適化で消えるので消さなくてもいいかも
+	offset = node->struct_elem->offset;
+	if (offset != 0)
+		printf("    add rax, %d\n", offset);
+
+	// 値として欲しいなら値にする
+	if (!as_addr)
+		load(node->struct_elem->type);
 }
 
 static void unary(Node *node)
@@ -501,13 +507,15 @@ static void	assign(Node *node)
 		equality(node);
 		return;
 	}
+
+	//printf("#ASSIGN %d\n", node->lhs->kind);
 	
 	if (node->lhs->kind == ND_LVAR)
 		lval(node->lhs);
 	else if (node->lhs->kind == ND_LVAR_GLOBAL)
 		load_global(node->lhs);
 	else if (node->lhs->kind == ND_DEREF)
-		expr(node->lhs->lhs);
+		expr(node->lhs->lhs);// ここもDEREFと同じようにやってる！！！！！
 	else if (node->lhs->kind == ND_STRUCT_VALUE)
 		arrow(node->lhs, true);
 	else if (node->lhs->kind == ND_STRUCT_PTR_VALUE)

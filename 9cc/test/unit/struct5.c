@@ -18,12 +18,5 @@ int main()
 	struct t1 a;
 	struct t2 b;
 
-	pint(sizeof(a)); pline();
-	pint(sizeof(b)); pline();
-
-	a.b = &b;
-	a.b->a = 200;
-
-	pint(a.b->a); pline();
-	pint(b.a); pline();
+	a.a[2].a = 65535;
 }

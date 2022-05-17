@@ -55,6 +55,12 @@ struct t10
 	struct t9 a[5][11];
 };
 
+struct t11
+{
+	struct t9 a[5][11];
+	struct t8 b[3];
+};
+
 int main()
 {
 	struct t1 a;
@@ -67,6 +73,7 @@ int main()
 	struct t8 h;
 	struct t9 i;
 	struct t10 j;
+	struct t10 k;
 
 	pint(sizeof(a)); pline();
 	pint(sizeof(b)); pline();
@@ -78,4 +85,5 @@ int main()
 	pint(sizeof(h)); pline();
 	pint(sizeof(i)); pline();
 	pint(sizeof(j)); pline();
+	pint(sizeof(k)); pline();
 }

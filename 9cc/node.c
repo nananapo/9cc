@@ -229,6 +229,8 @@ static Node	*arrow_loop(Node *node)
 		node->struct_elem = elem;
 		node->type = elem->type;
 
+		node = read_deref_index(node);
+
 		return arrow_loop(node);
 	}
 	else if (consume("."))
@@ -246,6 +248,8 @@ static Node	*arrow_loop(Node *node)
 		node = new_node(ND_STRUCT_VALUE, node, NULL);
 		node->struct_elem = elem;
 		node->type = elem->type;
+
+		node = read_deref_index(node);
 
 		return arrow_loop(node);
 	}
@@ -568,7 +572,7 @@ static Node	*stmt()
 		}
 	}
 	if(!consume(";"))
-		error_at(token->str, ";ではないトークン(%d)です", token->kind);
+		error_at(token->str, ";ではないトークン(Kind : %d , %s)です", token->kind, strndup(token->str, token->len));
 
 	return node;
 }
@@ -625,16 +629,21 @@ static Node	*struct_block(Token *ident)
 
 	for (i = 0; struct_defs[i]; i++)
 		continue ;
+
 	def = calloc(1, sizeof(StructDef));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->mem_size = -1;
+	def->members = NULL;
 	struct_defs[i] = def;
+
+	printf("# READ STRUCT %s\n", strndup(ident->str, ident->len));
 
 	while (1)
 	{
 		if (consume("}"))
 			break;
+
 		type = consume_type_before();
 		if (type == NULL)
 			error_at(token->str, "型宣言が必要です");
@@ -658,7 +667,7 @@ static Node	*struct_block(Token *ident)
 
 		maxsize = max_type_size(type);
 
-		// offsetを設定
+		// offsetをoffset + typesizeに設定
 		if (def->members ==  NULL)
 			tmp->offset = typesize;
 		else
@@ -676,22 +685,27 @@ static Node	*struct_block(Token *ident)
 			else
 				tmp->offset = ((i + 7) / 8) * 8 + typesize;
 		}
-		printf("# OFFSET = %d\n", tmp->offset);
- 
+
+		printf("#  OFFSET OF %s : %d\n", strndup(ident->str, ident->len), tmp->offset);
 		def->members = tmp;
 	}
 
-	// サイズを決定
+	// メモリサイズを決定
 	if (def->members == NULL)
 		def->mem_size = 0;
 	else
 	{
 		maxsize = max_type_size(new_struct_type(def->name, def->name_len));
-		printf("# MAX_SIZE = %d\n", maxsize);
+		printf("#  MAX_SIZE = %d\n", maxsize);
 		def->mem_size = align_to(def->members->offset, maxsize);
 	}
-	printf("# MEMSIZE = %d\n", def->mem_size);
+	printf("#  MEMSIZE = %d\n", def->mem_size);
 
+	// offsetを修正
+	for (tmp = def->members; tmp != NULL; tmp = tmp->next)
+	{
+		tmp->offset -= type_size(tmp->type);
+	}
 
 	if (!consume(";"))
 		error_at(token->str, ";が必要です");
@@ -699,7 +713,7 @@ static Node	*struct_block(Token *ident)
 	return (new_node(ND_STRUCT_DEF, NULL, NULL));
 }
 
-// TODO ブロック抜けたらlocalsを戻す
+// TODO ブロックを抜けたらlocalsを戻す
 
 // (まで読んだところから読む
 static Node	*funcdef(Type *ret_type, Token *ident)

@@ -32,7 +32,10 @@ int main(int argc, char **argv)
 
 	user_input = argv[1];
 	token = tokenize(argv[1]);
+	printf("# Tokenized\n");
+
 	program();
+	printf("# Node constructed\n");
 
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");
