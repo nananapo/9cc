@@ -42,6 +42,12 @@ int	pint(int a)
 	return 0;
 }
 
+int pchar(char n)
+{
+	my_putchar(n);
+	return 0;
+}
+
 int	pspace(int count)
 {
 	int	i;

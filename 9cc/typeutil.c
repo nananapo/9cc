@@ -124,22 +124,6 @@ bool	can_assign(Type *l, Type *r)
 	return (false);
 }
 
-char	*type_regname(Type *type)
-{
-	// アドレスは8byte
-	if (type->ty == PTR || type->ty == ARRAY)
-		return RAX;
-	// INTは4byte
-	if (type->ty == INT)
-		return EAX;
-	// CHARは1byte
-	if (type->ty == CHAR)
-		return AL;
-	printf("不明な型 %d\n", type->ty);
-	exit(1);
-	return NULL;
-}
-
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 {
 	if (strct == NULL)

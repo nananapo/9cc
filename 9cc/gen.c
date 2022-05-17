@@ -243,7 +243,8 @@ static void	primary(Node *node)
 			load(node->type);
 			return;
 		case ND_STR_LITERAL:
-			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX, get_str_literal_name(node->str_index));
+			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX,
+					get_str_literal_name(node->str_index));
 			return;
 		case ND_CALL:
 			call(node);
@@ -500,8 +501,97 @@ static void	equality(Node *node)
 	}
 }
 
+// RAXからRDI(アドレス)に値をストアする
+static void	store_value(int size)
+{
+	if (size == 1)
+		mov("byte ptr [rdi]", AL);
+	else if (size == 2)
+		mov("word ptr [rdi]", EAX);
+	else if (size == 4)
+		mov("dword ptr [rdi]", EAX);
+	else if (size == 8)
+		mov("[rdi]", RAX);
+	else
+		error("store_valueに不正なサイズ(%d)の値を渡しています", size);
+}
+
+// TODO 構造体の比較
+
+// アドレス(RAX)の先の値をRDI(アドレス)にストアする
+static void store_ptr(int size)
+{
+	int	delta;
+
+	for (int i = 0; i < size; i += 8)
+	{
+		delta = size - i;
+		if (delta >= 8)
+		{
+			if (i != 0)
+			{
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, RSI, RAX, i);
+				printf("    %s [%s + %d], %s\n", ASM_MOV, RDI, i, RSI);
+			}
+			else
+			{
+				printf("    %s %s, [%s]\n", ASM_MOV, RSI, RAX);
+				printf("    %s [%s], %s\n", ASM_MOV, RDI, RSI);
+			}
+			continue ;
+		}
+		if (delta >= 4)
+		{
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, ESI, DWORD_PTR, RAX, i);
+				printf("    %s %s [%s + %d], %s\n", ASM_MOV, DWORD_PTR, RDI, i, ESI);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, ESI, DWORD_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, DWORD_PTR, RDI, ESI);
+			}
+			i += 4;
+			delta -= 4;
+		}
+		if (delta >= 2)
+		{
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, SI, WORD_PTR, RAX, i);
+				printf("    %s %s [%s + %d], %s\n", ASM_MOV, WORD_PTR, RDI, i, SI);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, SI, WORD_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, WORD_PTR, RDI, SI);
+			}
+			i += 2;
+			delta -= 2;
+		}
+		if (delta >= 1)
+		{
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, SIL, BYTE_PTR, RAX, i);
+				printf("    %s %s [%s + %d], %s\n", ASM_MOV, BYTE_PTR, RDI, i, SIL);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, SIL, BYTE_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, BYTE_PTR, RDI, SIL);
+			}
+			i += 1;
+			delta -= 1;
+		}
+	}
+}
+
 static void	assign(Node *node)
 {
+	int	size;
+
 	if (node->kind != ND_ASSIGN)
 	{
 		equality(node);
@@ -525,23 +615,17 @@ static void	assign(Node *node)
 
 	push();
 	expr(node->rhs);
-
-	// レジスタの左辺の型に合わせる
-	char *reg = type_regname(node->lhs->type);
 	pop("rdi");
 
-	if (node->type->ty == CHAR)
-	{
-		mov("byte ptr [rdi]", reg);
-	}
-	else if (node->type->ty == INT)
-	{
-		mov("dword ptr [rdi]", reg);
-	}
+	// storeする
+	if (node->type->ty == ARRAY)
+		// TODO これOKなの？
+		// ARRAYに対する代入がうまくいかない気がする
+		store_value(8);
+	else if(node->type->ty == STRUCT)
+		store_ptr(type_size(node->type));
 	else
-	{
-		mov("[rdi]", reg);
-	}
+		store_value(type_size(node->type));
 }
 
 static void	expr(Node *node)
@@ -671,8 +755,12 @@ static void stmt(Node *node)
 static void	funcdef(Node *node)
 {
 	int		i;
+	char	*funcname;
 
-	printf("_%s:\n", strndup(node->fname, node->flen));	
+	funcname = strndup(node->fname, node->flen);
+
+	printf(".globl _%s\n", funcname);
+	printf("_%s:\n", funcname);	
 	prologue();
 
 	init_stack_size(node);
@@ -705,8 +793,12 @@ static void	funcdef(Node *node)
 
 static void globaldef(Node *node)
 {
-	printf(".zerofill __DATA,__common,_%s,%d,2\n",
-		strndup(node->var_name, node->var_name_len),
+	char	*name;
+
+	name = strndup(node->var_name, node->var_name_len);
+	printf(".globl %s\n", name);
+	printf("    .zerofill __DATA,__common,_%s,%d,2\n",
+		name,
 		type_size(node->type));
 }
 

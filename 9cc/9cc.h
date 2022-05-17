@@ -7,16 +7,25 @@
 # define ASM_PUSH "push"
 # define ASM_LEA "lea"
 
+// 64
 # define RAX "rax"
 # define RDI "rdi"
+# define RSI "rsi"
 # define RBP "rbp"
 # define RSP "rsp"
 
+// 32
 # define EAX "eax"
 # define EDI "edi"
+# define ESI "esi"
 
+// 16
+# define SI "si"
+
+// 8
 # define AL "al"
 # define DIL "dil"
+# define SIL "sil"
 
 # define BYTE_PTR "byte ptr"
 # define WORD_PTR "word ptr"

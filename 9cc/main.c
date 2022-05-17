@@ -40,27 +40,6 @@ int main(int argc, char **argv)
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");
 
-	printf(".globl ");
-	// 関数
-	i = 0;
-	while (func_defs[i])
-	{
-		printf("_%s", func_defs[i]->fname);
-		if (func_defs[i + 1])
-			printf(", ");
-		i++;
-	}
-	// グローバル変数
-	i = 0;
-	while (global_vars[i])
-	{
-		if (func_defs[0] != NULL)
-			printf(",");
-		printf("_%s", global_vars[i]->var_name);
-		i++;
-	}
-	printf("\n");
-
 	// 文字列リテラルを生成する
 	lit = str_literals;
 	while (lit != NULL)

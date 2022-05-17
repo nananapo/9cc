@@ -1,0 +1,194 @@
+# Tokenized
+# READ STRUCT t1
+#  OFFSET OF a : 4
+#  MAX_SIZE = 4
+#  MEMSIZE = 4
+# READ STRUCT t2
+#  OFFSET OF a : 8
+#  OFFSET OF b : 12
+#  MAX_SIZE = 8
+#  MEMSIZE = 16
+# Node constructed
+.intel_syntax noprefix
+.p2align	4, 0x90
+.globl _main
+_main:
+    mov rax, rbp
+    push rax # stack= 0 -> 8
+    mov rbp, rsp
+    # lvar stack : + 16(16) + 8(24) + 4(28) + 4(32) = 32
+    sub rsp, 32
+    mov rax, rbp
+    sub rax, 4
+    push rax # stack= 40 -> 48
+    mov rax, 210
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 4
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 8
+    push rax # stack= 40 -> 48
+    mov rax, 818181
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 8
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 4
+    push rax # stack= 40 -> 48
+    mov rax, rbp
+    sub rax, 8
+    pop rdi # stack= 48 -> 40
+    mov [rdi], dword ptr[rax]
+    mov rax, rbp
+    sub rax, 8
+    mov eax, dword ptr [rax]
+    push rax # stack= 40 -> 48
+    mov rax, rbp
+    sub rax, 4
+    mov eax, dword ptr [rax]
+    pop rdi # stack= 48 -> 40
+    cmp eax, edi
+    sete al
+    movzx rax, al
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 4
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 4
+    push rax # stack= 40 -> 48
+    mov rax, 333
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 16
+    push rax # stack= 40 -> 48
+    mov rax, rbp
+    sub rax, 4
+    pop rdi # stack= 48 -> 40
+    mov [rdi], rax
+    mov rax, rbp
+    sub rax, 16
+    mov rax, [rax]
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 4
+    push rax # stack= 40 -> 48
+    mov rax, 789
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 16
+    mov rax, [rax]
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 32
+    add rax, 8
+    push rax # stack= 40 -> 48
+    mov rax, rbp
+    sub rax, 16
+    mov rax, [rax]
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], dword ptr [rax]
+    mov rax, rbp
+    sub rax, 32
+    push rax # stack= 40 -> 48
+    mov rax, rbp
+    sub rax, 8
+    pop rdi # stack= 48 -> 40
+    mov [rdi], rax
+    mov rax, rbp
+    sub rax, 32
+    mov rax, [rax]
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 32
+    add rax, 8
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 32
+    mov rax, [rax]
+    push rax # stack= 40 -> 48
+    mov rax, 999
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 8
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 16
+    mov rax, [rax]
+    push rax # stack= 40 -> 48
+    mov rax, 12345
+    pop rdi # stack= 48 -> 40
+    mov dword ptr [rdi], eax
+    mov rax, rbp
+    sub rax, 16
+    mov rax, [rax]
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rax, rbp
+    sub rax, 32
+    add rax, 8
+    mov eax, dword ptr [rax]
+    mov rdi, rax
+    #call stack count 40
+    call _pint
+    #call stack count 40
+    call _pline
+    mov rsp, rbp
+    pop rbp # stack= 40 -> 32
+    ret
+#count 0

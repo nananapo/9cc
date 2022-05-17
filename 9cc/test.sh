@@ -1,6 +1,7 @@
 #!/bin/bash
 
 prefix="int pint(int i);
+int pchar(char a);
 int pspace(int n);
 int pline();
 int my_putstr(char *s, int n);
@@ -67,12 +68,27 @@ assert_gcc(){
 	input="$prefix`cat test/unit/$1`"
 	
 	./9cc "$input" > tmp.s
+	if [ "$?" != "0" ]; then
+		echo "$1 => KO"
+		exit 1
+	fi
+	
 	cc -o tmp1 tmp.s "test/print.c"
+	if [ "$?" != "0" ]; then
+		echo "$1 => KO"
+		exit 1
+	fi
+
 	./tmp1 > test/unit/actual.output
 	actual=`cat -e test/unit/actual.output`
 
 	echo $input > test/unit/tmp.c
 	cc -o tmp2 test/unit/tmp.c test/print.c
+	if [ "$?" != "0" ]; then
+		echo "$1 => KO"
+		exit 1
+	fi
+
 	./tmp2 > test/unit/expected.output
 	expected=`cat -e test/unit/expected.output`
 
@@ -503,7 +519,10 @@ assert_gcc "structsize4.c"
 
 assert_gcc "struct2.c"
 assert_gcc "struct3.c"
+assert_gcc "struct4.c"
 assert_gcc "struct5.c"
+assert_gcc "struct6.c"
+assert_gcc "struct7.c"
 
 assert "125" "struct t1 {char a;};
 int main()
