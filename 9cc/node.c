@@ -365,7 +365,7 @@ static Node *add()
 		&& is_pointer_type(r))
 		{
 			if (!type_equal(l, r))
-				error_at(token->str, "型が一致しないポインタ型同士の加減算はできません");
+				error_at(token->str, "型が一致しないポインタ型どうしの加減算はできません");
 			node->type = new_primitive_type(INT);// TODO size_tにする
 
 			int size = type_size(l->ptr_to);

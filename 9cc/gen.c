@@ -317,7 +317,7 @@ static void unary(Node *node)
 					break ;
 				// ND_DEREFならアドレスで止める
 				case ND_DEREF:
-					expr(node->lhs);//ここ！！
+					expr(node->lhs->lhs);//ここ！！　↓
 					break ;
 				default:
 					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
