@@ -70,7 +70,6 @@ int	create_local_var(char *name, int len, Type *type, bool is_arg)
 		}
 	}
 	locals = lvar;
-
 	return lvar->offset;
 }
 

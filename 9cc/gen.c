@@ -100,43 +100,6 @@ void	comment(char *c)
 	printf("# %s\n", c);
 }
 
-void	init_stack_size(Node *node)
-{
-	int	i;
-	int	size;
-
-	i = -1;
-	node->stack_size = 0;
-	printf("    # lvar stack :");
-	for  (LVar *var = node->locals;var;var = var->next)
-	{
-		size = type_size(var->type);
-		// TODO struct
-		if (++i < node->argdef_count)
-		{
-			node->stack_size += max(8, size);
-			printf(" + %d", max(8, size));
-		}
-		else
-		{
-			if (size < 4)
-			{
-				if (node->stack_size % 4 + size <= 4)
-					node->stack_size += size;
-				else
-					node->stack_size = (node->stack_size + 3) / 4 * 4 + size;
-			}
-			else if (size == 4)
-				node->stack_size = (node->stack_size + 3) / 4 * 4 + size;
-			else
-				node->stack_size = (node->stack_size + 7) / 8 * 8 + size;
-			printf(" + %d(%d)", size, node->stack_size);
-		}
-	}
-	node->stack_size = align_to(node->stack_size, 16);
-	printf(" = %d\n", node->stack_size);
-}
-
 static void prologue()
 {
 	// prologue
@@ -763,8 +726,11 @@ static void	funcdef(Node *node)
 	printf("_%s:\n", funcname);	
 	prologue();
 
-	init_stack_size(node);
-	stack_count += node->stack_size; // pushを初期化
+	if (node->locals != NULL)
+		node->stack_size = align_to(node->locals->offset, 8);
+	else
+		node->stack_size = 0;
+	stack_count += node->stack_size; // stack_sizeを初期化
 
 	if (node->stack_size != 0)
 	{
