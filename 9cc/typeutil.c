@@ -156,3 +156,30 @@ int	max_type_size(Type *type)
 	}
 	return type_size(type);
 }
+
+static void	typename_loop(Type *type, char *str)
+{
+	if (type->ty == INT)
+		strcat(str, "int");
+	else if (type->ty == CHAR)
+		strcat(str, "char");
+	else if (type->ty == ARRAY)
+	{
+		typename_loop(type->ptr_to, str);
+		strcat(str, "[]");
+	}
+	else if (type->ty == PTR)
+	{
+		typename_loop(type->ptr_to, str);
+		strcat(str, "*");
+	}
+}
+
+char	*get_type_name(Type *type)
+{
+	char	*ret;
+
+	ret = calloc(1000, sizeof(char));
+	typename_loop(type, ret);
+	return ret;
+}

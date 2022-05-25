@@ -18,8 +18,15 @@ extern t_str_elem	*str_literals;
 int	max(int a, int b)
 {
 	if (a > b)
-		return a;
-	return b;
+		return (a);
+	return (b);
+}
+
+int	min(int a, int b)
+{
+	if (a < b)
+		return (a);
+	return (b);
 }
 
 int	align_to(int n, int align)
@@ -62,6 +69,7 @@ void	cmps(char *dst, char *from)
 	printf("    cmp %s, %s\n", dst, from);
 }
 
+// TODO 構造体の比較
 // rax, rdi
 void	cmp(Type *dst, Type *from)
 {
@@ -100,6 +108,104 @@ void	comment(char *c)
 	printf("# %s\n", c);
 }
 
+// RAXからR10(アドレス)に値をストアする
+static void	store_value(int size)
+{
+	if (size == 1)
+		mov("byte ptr [r10]", AL);
+	else if (size == 2)
+		mov("word ptr [r10]", EAX);
+	else if (size == 4)
+		mov("dword ptr [r10]", EAX);
+	else if (size == 8)
+		mov("[r10]", RAX);
+	else
+		error("store_valueに不正なサイズ(%d)の値を渡しています", size);
+}
+
+// アドレス(RAX)の先の値をR10(アドレス)にストアする
+static void store_ptr(int size, bool minus_step)
+{
+	int		delta;
+	char	*dest;
+	char	*from;
+	char	*op;
+
+	op = "+";
+	if (minus_step)
+		op = "-";
+
+	dest = R10;
+	
+	for (int i = 0; i < size; i += 8)
+	{
+		delta = size - i;
+		if (delta >= 8)
+		{
+			from = R11;
+			if (i != 0)
+			{
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, from, RAX, i);
+				printf("    %s [%s %s %d], %s\n", ASM_MOV, dest, op, i, from);
+			}
+			else
+			{
+				printf("    %s %s, [%s]\n", ASM_MOV, from, RAX);
+				printf("    %s [%s], %s\n", ASM_MOV, dest, from);
+			}
+			continue ;
+		}
+		if (delta >= 4)
+		{
+			from = R11D;
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, DWORD_PTR, RAX, i);
+				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, DWORD_PTR, dest, op,  i, from);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, from, DWORD_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, DWORD_PTR, dest, from);
+			}
+			i += 4;
+			delta -= 4;
+		}
+		if (delta >= 2)
+		{
+			from = R11W;
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, WORD_PTR, RAX, i);
+				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, WORD_PTR, dest, op, i, from);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, from, WORD_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, WORD_PTR, dest, from);
+			}
+			i += 2;
+			delta -= 2;
+		}
+		if (delta >= 1)
+		{
+			from = R11B;
+			if (i != 0)
+			{
+				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, BYTE_PTR, RAX, i);
+				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, BYTE_PTR, dest, op, i, from);
+			}
+			else
+			{
+				printf("    %s %s, %s [%s]\n", ASM_MOV, from, BYTE_PTR, RAX);
+				printf("    %s %s [%s], %s\n", ASM_MOV, BYTE_PTR, dest, from);
+			}
+			i += 1;
+			delta -= 1;
+		}
+	}
+}
+
 static void prologue()
 {
 	// prologue
@@ -116,6 +222,7 @@ static void	epilogue()
 	printf("    ret\n");
 }
 
+// raxをraxに読み込む
 static void	load(Type *type)
 {
 	
@@ -156,37 +263,155 @@ static void	lval(Node *node)
 		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
 	
 	mov(RAX, RBP);
-	printf("    sub %s, %d\n", RAX, node->offset);
+	if (node->offset > 0)
+		printf("    sub %s, %d\n", RAX, node->offset);
+	else if (node->offset < 0)
+		printf("    add %s, %d\n", RAX, - node->offset);
 }
 
 static void	call(Node *node)
 {
-	Node	*tmp = node->args;
-	int		i;
-	
-	i = 0;
-	while (tmp != NULL && i < ARG_REG_COUNT)
+	int		size;
+	int 	rbp_offset;
+	int		arg_count = 0;
+	int		push_count = 0;
+	bool	is_aligned;
+
+	for (Node *tmp = node->args; tmp; tmp = tmp->next)
 	{
+		arg_count++;
+
+		size = type_size(tmp->type);
+		printf("# PUSH ARG %s (%d)\n",
+			strndup(tmp->locals->name, tmp->locals->len),
+			size);
+
 		expr(tmp);
-		mov(arg_regs[node->argdef_count - i - 1], RAX);
-		tmp = tmp->next;
-		i++;
+
+		// TODO long doubleで動かなくなります....
+		if (tmp->locals->arg_regindex != -1)
+		{
+			if (size <= 8)
+			{
+				push();
+				push_count++;
+				continue ;
+			}
+			// size > 8なものは必ずstructであると願います( ;∀;)
+			// RAXにアドレスが入っていると想定
+			mov(RDI, RAX);
+			for (int i = 0; i < size; i += 8)
+			{
+				if (i == 0)
+					printf("    %s %s, [%s]\n",
+						ASM_MOV, RAX, RDI);
+				else
+					printf("    %s %s, [%s + %d]\n",
+						ASM_MOV, RAX, RDI, i);
+				push();
+				push_count++;
+			}
+		}
+		else
+		{
+			push();
+			push_count++;
+		}
 	}
-	
-	bool	aligned = stack_count % 16 != 0;
-	if (!aligned)
+
+	// 16 byteアラインチェック
+	rbp_offset = 0;
+	for (Node *tmp = node->args; tmp; tmp = tmp->next)
 	{
-		comment("allign");
-		printf("# stack = %d\n", stack_count);
-		pushi(1);
+		if (tmp->locals->arg_regindex != -1)
+			continue ;
+		rbp_offset = min(rbp_offset,
+						tmp->locals->offset - align_to(type_size(tmp->locals->type), 8) + 8);
 	}
 
-	printf("    #call stack count %d\n", stack_count);
+	// マイナスなのでプラスにする
+	rbp_offset = - rbp_offset;
 
+	is_aligned = (stack_count + rbp_offset + 8) % 16 == 0;
+	if (!is_aligned)
+		rbp_offset += 8;
+
+	printf("# RBP_OFFSET %d (is_aligned : %d)\n", rbp_offset, is_aligned);
+
+	int	pop_count = 0;
+	// 後ろから格納していく
+	for (int i = arg_count; i > 0; i--)
+	{
+		// i番目のtmpを求める
+		Node *tmp = node->args;
+		for (int j = 1; j < i; j++)
+			tmp = tmp->next;
+
+		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
+	
+		size = type_size(tmp->type);
+
+		// レジスタに入れる
+		if (tmp->locals->arg_regindex != -1)
+		{
+			if (size <= 8)
+			{
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
+				mov(arg_regs[tmp->locals->arg_regindex], RAX);
+				continue ;
+			}
+			// size > 8なものは必ずstructであると願います( ;∀;)
+			// RAXにアドレスが入っていると想定
+			for (int i = size - 8; i >= 0; i -= 8)
+			{
+				printf("    %s %s, [%s + %d]\n", ASM_MOV,
+					arg_regs[tmp->locals->arg_regindex - i / 8],
+					 RSP, pop_count++ * 8);
+			}
+			continue ;
+		}
+
+		printf("# OFFSET %d\n", tmp->locals->offset);
+
+		// スタックに積む
+		// 必ず8byteアラインなので楽々実装
+		size = align_to(size, 8);
+
+		printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
+		mov(R10, RSP);
+
+		printf("    sub %s, %d\n", R10,
+				(tmp->locals->offset + 16) + rbp_offset);
+
+		// ptr先を渡すのはSTRUCTだけ
+		if (tmp->type->ty != STRUCT)
+			store_value(size);
+		else
+			store_ptr(size, false);
+	}
+
+	// rspを移動する
+	if (rbp_offset != 0)
+	{
+		if (!is_aligned)
+			comment("aligned + 8");
+		printf("    sub rsp, %d # rbp_offset\n", rbp_offset);
+	}
+
+	// call
+	printf("# CALL RBP_OFFSET: %d\n", rbp_offset);
 	printf("    call _%s\n", strndup(node->fname, node->flen));
 
-	if (!aligned)
-		pop("rdi");
+	// rspを元に戻す
+	if (rbp_offset != 0)
+	{
+		printf("    add rsp, %d # rbp_offset\n", rbp_offset);
+	}
+
+	// stack_countをあわせる
+	printf("    add rsp, %d # pop_count\n", pop_count * 8);
+	printf("# POP ALL %d -> %d\n", stack_count, stack_count - pop_count * 8);
+	stack_count -= pop_count * 8;
 
 	return;
 }
@@ -464,93 +689,6 @@ static void	equality(Node *node)
 	}
 }
 
-// RAXからRDI(アドレス)に値をストアする
-static void	store_value(int size)
-{
-	if (size == 1)
-		mov("byte ptr [rdi]", AL);
-	else if (size == 2)
-		mov("word ptr [rdi]", EAX);
-	else if (size == 4)
-		mov("dword ptr [rdi]", EAX);
-	else if (size == 8)
-		mov("[rdi]", RAX);
-	else
-		error("store_valueに不正なサイズ(%d)の値を渡しています", size);
-}
-
-// TODO 構造体の比較
-
-// アドレス(RAX)の先の値をRDI(アドレス)にストアする
-static void store_ptr(int size)
-{
-	int	delta;
-
-	for (int i = 0; i < size; i += 8)
-	{
-		delta = size - i;
-		if (delta >= 8)
-		{
-			if (i != 0)
-			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV, RSI, RAX, i);
-				printf("    %s [%s + %d], %s\n", ASM_MOV, RDI, i, RSI);
-			}
-			else
-			{
-				printf("    %s %s, [%s]\n", ASM_MOV, RSI, RAX);
-				printf("    %s [%s], %s\n", ASM_MOV, RDI, RSI);
-			}
-			continue ;
-		}
-		if (delta >= 4)
-		{
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, ESI, DWORD_PTR, RAX, i);
-				printf("    %s %s [%s + %d], %s\n", ASM_MOV, DWORD_PTR, RDI, i, ESI);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, ESI, DWORD_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, DWORD_PTR, RDI, ESI);
-			}
-			i += 4;
-			delta -= 4;
-		}
-		if (delta >= 2)
-		{
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, SI, WORD_PTR, RAX, i);
-				printf("    %s %s [%s + %d], %s\n", ASM_MOV, WORD_PTR, RDI, i, SI);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, SI, WORD_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, WORD_PTR, RDI, SI);
-			}
-			i += 2;
-			delta -= 2;
-		}
-		if (delta >= 1)
-		{
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, SIL, BYTE_PTR, RAX, i);
-				printf("    %s %s [%s + %d], %s\n", ASM_MOV, BYTE_PTR, RDI, i, SIL);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, SIL, BYTE_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, BYTE_PTR, RDI, SIL);
-			}
-			i += 1;
-			delta -= 1;
-		}
-	}
-}
-
 static void	assign(Node *node)
 {
 	int	size;
@@ -578,7 +716,7 @@ static void	assign(Node *node)
 
 	push();
 	expr(node->rhs);
-	pop("rdi");
+	pop("r10");
 
 	// storeする
 	if (node->type->ty == ARRAY)
@@ -586,7 +724,7 @@ static void	assign(Node *node)
 		// ARRAYに対する代入がうまくいかない気がする
 		store_value(8);
 	else if(node->type->ty == STRUCT)
-		store_ptr(type_size(node->type));
+		store_ptr(type_size(node->type), false);
 	else
 		store_value(type_size(node->type));
 }
@@ -717,34 +855,61 @@ static void stmt(Node *node)
 
 static void	funcdef(Node *node)
 {
-	int		i;
 	char	*funcname;
 
 	funcname = strndup(node->fname, node->flen);
+	stack_count = 0;
 
 	printf(".globl _%s\n", funcname);
 	printf("_%s:\n", funcname);	
 	prologue();
 
 	if (node->locals != NULL)
-		node->stack_size = align_to(node->locals->offset, 8);
+	{
+		int maxoff = 0;
+		for (LVar *tmp = node->locals; tmp; tmp = tmp->next)
+		{
+			printf("# VAR %s %d\n", strndup(tmp->name, tmp->len), tmp->offset);
+			maxoff = max(maxoff, tmp->offset);
+		}
+		node->stack_size = align_to(maxoff, 8);
+	}
 	else
 		node->stack_size = 0;
+
 	stack_count += node->stack_size; // stack_sizeを初期化
+
+	printf("# STACKSIZE : %d\n", node->stack_size);
 
 	if (node->stack_size != 0)
 	{
 		printf("    sub rsp, %d\n", node->stack_size);// stack_size
-		if (node->argdef_count != 0)
-			mov(RAX, RBP);
-		i = 0;
-		LVar *tmp = node->locals;
-		while (i < node->argdef_count && i < ARG_REG_COUNT)
+
+		for (LVar *tmp = node->locals; tmp; tmp = tmp->next)
 		{
-			printf("    sub rax, 8\n");
-			mov("[rax]", arg_regs[i++]);
-			tmp = tmp->next;
+			if (!tmp->is_arg)
+				continue ;
+			printf("# ARG %s\n", strndup(tmp->name, tmp->len));
+			if (tmp->arg_regindex != -1)
+			{
+				int index = tmp->arg_regindex;
+				int size = align_to(type_size(tmp->type), 8);
+
+				mov(R10, RBP);
+				printf("    sub %s, %d\n", R10, tmp->offset);
+
+				// とりあえず、かならず8byte境界になっている
+				while (size >= 8)
+				{
+					mov(RAX, arg_regs[index--]);
+					store_value(8);
+					size -= 8;
+					if (size != 0)
+						printf("    add %s, 8\n", R10);
+				}
+			}
 		}
+		printf("# ARG_END\n");
 	}
 
 	stmt(node->lhs);

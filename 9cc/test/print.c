@@ -42,6 +42,15 @@ int	pint(int a)
 	return 0;
 }
 
+int dint(int a)
+{
+	if (a < 0)
+		my_putchar('-');
+	recpint(a);
+	my_putchar('\n');
+	return 0;
+}
+
 int pchar(char n)
 {
 	my_putchar(n);

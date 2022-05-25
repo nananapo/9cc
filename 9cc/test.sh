@@ -1,6 +1,7 @@
 #!/bin/bash
 
 prefix="int pint(int i);
+int dint(int i);
 int pchar(char a);
 int pspace(int n);
 int pline();
@@ -14,7 +15,17 @@ assert() {
   input="$2"
 
   ./9cc "$input" > tmp.s
+  if [ "$?" != "0" ]; then
+	echo "$input => FAILED TO COMPILE"
+	exit 1
+  fi
+
   cc -o tmp tmp.s
+  if [ "$?" != "0" ]; then
+	echo "$input => GCC FAIL"
+	exit 1
+  fi
+
   ./tmp
   actual="$?"
 
@@ -62,20 +73,57 @@ assert_cat(){
   	fi
 }
 
-assert_gcc(){
-	echo "#-- Test----------------------------"
 
-	input="$prefix`cat test/unit/$1`"
+assert_ret(){
+	input="`cat test/unit/$1`"
 	
 	./9cc "$input" > tmp.s
 	if [ "$?" != "0" ]; then
-		echo "$1 => KO"
+		echo "$1 => 9cc KO"
 		exit 1
 	fi
 	
 	cc -o tmp1 tmp.s "test/print.c"
 	if [ "$?" != "0" ]; then
-		echo "$1 => KO"
+		echo "$1 => 9cc gcc compile KO"
+		exit 1
+	fi
+
+	./tmp1
+	actual=`echo $?`
+
+	echo $input > test/unit/tmp.c
+	cc -o tmp2 test/unit/tmp.c test/print.c
+	if [ "$?" != "0" ]; then
+		echo "$1 => gcc segv KO"
+		exit 1
+	fi
+
+	./tmp2
+	expected=`echo $?`
+
+	rm -rf test/unit/tmp.c tmp1 tmp2
+
+  	if [ "$actual" = "$expected" ]; then
+  	  echo "$1 => OK act:$actual , exp:$expected"
+  	else
+  	  echo "$1 => KO act:$actual , exp:$expected"
+  	  exit 1
+  	fi
+}
+
+assert_gcc(){
+	input="$prefix`cat test/unit/$1`"
+	
+	./9cc "$input" > tmp.s
+	if [ "$?" != "0" ]; then
+		echo "$1 => 9cc KO"
+		exit 1
+	fi
+	
+	cc -o tmp1 tmp.s "test/print.c"
+	if [ "$?" != "0" ]; then
+		echo "$1 => 9cc gcc compile KO"
 		exit 1
 	fi
 
@@ -85,7 +133,7 @@ assert_gcc(){
 	echo $input > test/unit/tmp.c
 	cc -o tmp2 test/unit/tmp.c test/print.c
 	if [ "$?" != "0" ]; then
-		echo "$1 => KO"
+		echo "$1 => gcc segv KO"
 		exit 1
 	fi
 
@@ -101,7 +149,6 @@ assert_gcc(){
   	  exit 1
   	fi
 }
-
 
 assert 0 "int main(){0;}"
 assert 42 "int main(){42;}"
@@ -169,24 +216,13 @@ assert 55 "int main(){int a;int s;a = 1; s = 0;for (;;) { s = s + a; a = a + 1; 
 assert_out "1" "int main(){int i;pint(1);}"
 assert_out "1" "int main(){pint(1);}"
 
-assert_out "1 1 2 3 5 8 13 21 34 55 " "int fib(int x)
-{
-	if (x == 0)
-		return 1;
-	if (x == 1)
-		return 1;
-	return fib(x-2) + fib(x-1);
-}
-int main(){
-	int i;
-	for(i=0;i<10;i=i+1)
-	{
-		int x;
-		x = fib(i);
-		pint(x);
-		pspace(1);
-	}
-}"
+assert_out "22" "int called(int a) { pint(a); }
+int main(){ called(22); }"
+
+assert_out "123" "int called(int a, int b) { pint(a + b); }
+int main(){ called(22, 101); }"
+
+assert_gcc "fib.c"
 
 assert 10 "int main()
 {
@@ -197,12 +233,12 @@ assert 10 "int main()
 	return *addr;
 }"
 
-assert 10 "int main()
+assert 15 "int main()
 {
 	int test;
 	int *addr;
 	int **addr_ptr;
-	test = 10;
+	test = 15;
 	addr = &test;
 	addr_ptr = &addr;
 	return **addr_ptr;
@@ -217,15 +253,9 @@ int main()
 	return add(4,6);
 }"
 
-assert 51 "int add6(int a, int b, int c, int d , int e, int f) return a + b + c + d + e + f;
-int main()
-	return add6(1,2,3,4,5,add6(1,2,3,4,5,add6(1,2,3,4,5,6)));
-"
-
-assert 12 "int add3(int a, int b, int c) return a + b + c;
-int main()
-	return add3(1,2,add3(1,2,add3(1,2,3)));
-"
+assert_gcc "add6_1.c"
+#assert_gcc "add6_2.c"
+#assert_gcc "add6_3.c"
 
 assert 0 "int main(){int a; int *aa;int **aaa;return 0;}"
 assert 0 "int main(){return 0;}int *sub(){}int *sub2(int *a,int **b){}"
@@ -523,6 +553,15 @@ assert_gcc "struct4.c"
 assert_gcc "struct5.c"
 assert_gcc "struct6.c"
 assert_gcc "struct7.c"
+
+assert_gcc "arg1.c"
+assert_gcc "arg2.c"
+assert_gcc "arg3.c"
+assert_gcc "arg4.c"
+assert_gcc "arg5.c"
+assert_gcc "arg6.c"
+assert_gcc "arg7.c"
+assert_gcc "arg8.c"
 
 assert "125" "struct t1 {char a;};
 int main()

@@ -31,7 +31,7 @@ unary		= ("+" | "-") arrow
 			| "sizeof" unary
 			| arrow
 
-arrow		= primary (("->" | ".") ident deref?)?*
+arrow		= primary (("->" | ".") ident derefs?)?*
 
 primary		= ("(" expr ")"
 			| ident ("(" call-params ")")?

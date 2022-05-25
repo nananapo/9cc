@@ -24,8 +24,7 @@ Node		*new_node_num(int val);
 
 // LVar
 LVar		*find_lvar(char *str, int len);
-int			create_local_var(char *name, int len, Type *type, bool is_arg);
-int			get_locals_count();
+LVar		*create_local_var(char *name, int len, Type *type, bool is_arg);
 
 // リテラルを探す
 static int	get_str_literal_index(char *str, int len)
@@ -74,37 +73,55 @@ static Node *call(Token *tok)
 				error_at(token->str, "トークンが,ではありません");
 			
 			arg = expr();
-			arg->next = node->args;
-			node->args = arg;
+			arg->next = NULL;
+			if (node->args == NULL)
+				node->args = arg;
+			else
+			{
+				for (Node *tmp = node->args; tmp; tmp = tmp->next)
+				{
+					if (tmp->next == NULL)
+					{
+						tmp->next = arg;
+						break ;
+					}
+				}
+			}
 			node->argdef_count += 1;
 		}
 	}
-	
-	// TODO これは違うパスでいいかも
-	Node *refunc = get_function_by_name(node->fname, node->flen);
 
-	// 関数定義が見つからない場合
+	Node *refunc = get_function_by_name(node->fname, node->flen);
+	// 関数定義が見つからない場合エラー
 	if (refunc == NULL)
 		error_at(token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
-	else
+
+	// 引数の数を確認
+	if (node->argdef_count != refunc->argdef_count)
+		error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
+
+	// 引数の型を比べる
+	LVar *def = refunc->locals;
+	Node *use = node->args;
+
+	for (int i = 0; i < node->argdef_count; i++)
 	{
-		// 引数の数を確認
-		if (node->argdef_count != refunc->argdef_count)
-			error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
-
-		Type *def = refunc->arg_type;
-		Node *use = node->args;
-		while (def != NULL)
-		{
-			if (!type_equal(def, use->type))
-				error_at(token->str, "関数%sの引数の型が一致しません", strndup(node->fname, node->flen));
-			def = def->next;
-			use = use->next;
-		}
-
-		// 型を返り値の型に設定
-		node->type = refunc->ret_type;
+		if (!type_equal(def->type, use->type))
+			error_at(token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
+					strndup(node->fname, node->flen),
+					strndup(def->name, def->len),
+					get_type_name(def->type),
+					get_type_name(use->type));
+		// きっとuse->localsは使われないので使ってしまう
+		use->locals = def;
+		// 進める
+		def = def->next;
+		use = use->next;
 	}
+
+	// 型を返り値の型に設定
+	node->type = refunc->ret_type;
+
 	return node;
 }
 
@@ -564,7 +581,8 @@ static Node	*stmt()
 			expect_type_after(&type);
 
 			node = new_node(ND_DEFVAR, NULL, NULL);
-			node->offset = create_local_var(tok->str, tok->len, type, false);
+			LVar *created = create_local_var(tok->str, tok->len, type, false);
+			node->offset = created->offset;
 		}
 		else
 		{
@@ -743,9 +761,10 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 			Token *arg = consume_ident();
 			if (arg == NULL)
 				error_at(token->str, ")ではないトークンです");
-			create_local_var(arg->str, arg->len, type, true);
 
-			// arrayかどうかを確かめる
+			// LVarを作成
+			LVar *created = create_local_var(arg->str, arg->len, type, true);
+			// arrayを読む
 			expect_type_after(&type);
 
 			// 型情報を保存
@@ -761,8 +780,11 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 		}
 	}
 
+	printf("# READ ARGS\n");
+
 	// func_defsに代入
 	// TODO 関数名被り
+	// TODO プロトタイプ宣言後の関数定義
 	if (consume(";"))
 	{
 		node->kind = ND_PROTOTYPE;
@@ -771,18 +793,21 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 		while (func_protos[i])
 			i += 1;
 		func_protos[i] = node;
+		node->locals = locals;
 	}
 	else
 	{
-		
 		int i = 0;
 		while (func_defs[i])
 			i += 1;
 		func_defs[i] = node;
+		node->locals = locals;
 		node->lhs = stmt();
 		node->locals = locals;
 	}
 	
+	printf("# CREATED FUNC %s\n", strndup(node->fname, node->flen));
+
 	return node;
 }
 

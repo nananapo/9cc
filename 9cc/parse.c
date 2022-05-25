@@ -10,8 +10,6 @@ extern Token	*token;
 
 extern char		*user_input;
 
-extern LVar		*locals;
-
 static char *reserved_words[] = {
 	"->", ".",
 	">=", "<=", "==", "!=",

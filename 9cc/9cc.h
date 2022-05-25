@@ -13,23 +13,30 @@
 # define RSI "rsi"
 # define RBP "rbp"
 # define RSP "rsp"
+# define R10 "r10"
+# define R11 "r11"
 
 // 32
 # define EAX "eax"
 # define EDI "edi"
 # define ESI "esi"
+# define R11D "r11d"
 
 // 16
 # define SI "si"
+# define R11W "r11w"
 
 // 8
 # define AL "al"
 # define DIL "dil"
 # define SIL "sil"
+# define R11B "r11b"
 
 # define BYTE_PTR "byte ptr"
 # define WORD_PTR "word ptr"
 # define DWORD_PTR "dword ptr"
+
+# define ARGREG_SIZE 6
 
 typedef struct Token Token;
 typedef struct Node Node;
@@ -181,6 +188,9 @@ struct	LVar
 	int		len;
 	int		offset;
 
+	bool	is_arg;
+	int		arg_regindex;
+
 	Type	*type;
 };
 
@@ -254,6 +264,7 @@ char	*type_regname(Type *type);
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
 //void	determine_struct_size(StructDef **ptr);
 int	max_type_size(Type *type);
+char	*get_type_name(Type *type);
 
 char	*get_str_literal_name(int index);
 

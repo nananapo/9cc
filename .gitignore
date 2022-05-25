@@ -9,3 +9,4 @@ a.c
 a
 *.swp
 *.output
+9cc/test/gcc/*
