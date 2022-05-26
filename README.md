@@ -15,7 +15,7 @@ https://www.sigbus.info/compilerbook
 
 https://github.com/nananapo/9cc/blob/master/9cc/test/unit/8queen.c
 
-voidを実装中...!
+void\*とキャストを実装中...!
 
 テスト( 9cc/test.sh )
 
