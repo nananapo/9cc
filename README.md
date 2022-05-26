@@ -15,7 +15,7 @@ https://www.sigbus.info/compilerbook
 
 https://github.com/nananapo/9cc/blob/master/9cc/test/unit/8queen.c
 
-構造体を実装中...!
+voidを実装中...!
 
 テスト( 9cc/test.sh )
 
