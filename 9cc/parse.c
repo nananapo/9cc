@@ -111,6 +111,16 @@ Token	*consume_str_literal()
 	return ret;
 }
 
+Token	*consume_char_literal()
+{
+	Token	*ret;
+	if (token->kind != TK_CHAR_LITERAL)
+		return NULL;
+	ret = token;
+	token = token->next;
+	return ret;
+}
+
 void	consume_type_ptr(Type **type)
 {
 	Type	*tmp;
@@ -316,20 +326,8 @@ Token	*tokenize(char *p)
 				if (*p == '\\')
 				{
 					p++;
-					switch (*p)
-					{
-						case '"':
-						case 'a':
-						case 'b':
-						case 'f':
-						case 'n':
-						case 'r':
-						case 'v':
-						case '0':
-							break;
-						default:
-							error_at(p, "不明なエスケープシーケンスです");
-					}
+					if (!is_escapedchar(*p))
+						error_at(p, "不明なエスケープシーケンスです");
 					cur->len++;
 				}
 				else if (*p == '"')
@@ -340,6 +338,24 @@ Token	*tokenize(char *p)
 			}
 			if (*p != '"')
 				error_at(p, "文字列が終了しませんでした");
+			p++;
+			continue ;
+		}
+		if (*p == '\'')
+		{
+			cur = new_token(TK_CHAR_LITERAL, cur, ++p);
+			cur->len = 1;
+			cur->strlen_actual = 1;
+			if (*p == '\\')
+			{
+				p++;
+				cur->strlen_actual++;
+				if (!is_escapedchar(*p))
+					error_at(p, "不明なエスケープシーケンスです");
+			}
+			p++;
+			if (*p != '\'')
+				error_at(p, "文字が終了しませんでした : %c", *p);
 			p++;
 			continue ;
 		}

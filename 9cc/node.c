@@ -215,6 +215,15 @@ static Node *primary()
 		return read_deref_index(node);
 	}
 
+	// char
+	tok = consume_char_literal();
+	if (tok)
+	{
+		node = new_node_num(get_char_to_int(tok->str, tok->strlen_actual));
+		node->type = new_primitive_type(CHAR);
+		return read_deref_index(node); // charの後ろに[]はおかしいけれど、とりあえず許容
+	}
+
 	// 数
 	int number;
 	if (!consume_number(&number))

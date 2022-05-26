@@ -563,6 +563,8 @@ assert_gcc "arg6.c"
 assert_gcc "arg7.c"
 assert_gcc "arg8.c"
 
+assert_gcc "str1.c"
+
 assert "125" "struct t1 {char a;};
 int main()
 {

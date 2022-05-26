@@ -57,6 +57,7 @@ typedef enum
 	TK_WHILE,
 	TK_FOR,
 	TK_STR_LITERAL,
+	TK_CHAR_LITERAL,
 	TK_EOF,
 	TK_SIZEOF,
 	TK_STRUCT
@@ -223,6 +224,8 @@ int	align_to(int a, int to);
 
 int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
+int	is_escapedchar(char c);
+int get_char_to_int(char *p, int len);
 
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
@@ -232,6 +235,7 @@ bool	consume_with_type(TokenKind kind);
 Token	*consume_ident();
 Token	*consume_ident_str(char *p);
 Token	*consume_str_literal();
+Token	*consume_char_literal();
 void	expect(char *op);
 int		expect_number();
 bool	 consume_number(int *result);

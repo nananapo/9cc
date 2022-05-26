@@ -45,7 +45,19 @@ int main(int argc, char **argv)
 	while (lit != NULL)
 	{
 		printf("%s:\n", get_str_literal_name(lit->index));
-		printf("    .string \"%s\"\n", strndup(lit->str, lit->len));
+		printf("    .string \"");
+		i = -1;
+		while (++i < lit->len)
+		{
+			if (lit->str[i] == '\\')
+			{
+				i++;
+				if (lit->str[i] != '\'')
+					printf("\\");
+			}
+			printf("%c", lit->str[i]);
+		}
+		printf("\"\n");
 		lit = lit->next;
 	}
 
