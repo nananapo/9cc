@@ -144,6 +144,8 @@ Type	*consume_type_before()
 		type = new_primitive_type(INT);
 	else if (consume_ident_str("char"))
 		type = new_primitive_type(CHAR);
+	else if (consume_ident_str("void"))
+		type = new_primitive_type(VOID);
 	else if (consume_with_type(TK_STRUCT))
 	{
 		ident = consume_ident();

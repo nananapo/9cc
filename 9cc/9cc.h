@@ -116,7 +116,8 @@ typedef enum
 	CHAR,
 	PTR,
 	ARRAY,
-	STRUCT
+	STRUCT,
+	VOID
 } PrimitiveType;
 
 struct Type
@@ -261,6 +262,7 @@ Type	*new_type_array(Type *ptr_to);
 Type	*new_struct_type(char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
+bool	is_declarable_type(Type *type);
 bool	can_assign(Type *l, Type *r);
 bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);

@@ -85,6 +85,8 @@ int	type_size(Type *type)
 		return (type_size(type->ptr_to) * type->array_size);
 	if (type->ty == STRUCT)
 		return (type->strct->mem_size);
+	if (type->ty == VOID)
+		return 0;
 	return -1;
 }
 
@@ -105,6 +107,8 @@ bool	is_pointer_type(Type *type)
 // 比較可能か調べる
 bool	can_compared(Type *l, Type *r)
 {
+	if (l->ty == VOID || r->ty == VOID)
+		return (false);
 	if (type_equal(l, r))
 		return (true);
 	if (is_integer_type(l) && is_integer_type(r))
@@ -117,10 +121,15 @@ bool	can_compared(Type *l, Type *r)
 // lにrを代入可能か確かめる
 bool	can_assign(Type *l, Type *r)
 {
+	if (l->ty == VOID || r->ty == VOID)
+		return (false);
+
 	if (type_equal(l, r))
 		return (true);
+
 	if (is_integer_type(l) && is_integer_type(r))
 		return (true);
+
 	return (false);
 }
 
@@ -163,6 +172,10 @@ static void	typename_loop(Type *type, char *str)
 		strcat(str, "int");
 	else if (type->ty == CHAR)
 		strcat(str, "char");
+	else if (type->ty == VOID)
+		strcat(str, "void");
+	else if (type->ty == STRUCT)
+		strcat(str, "struct"); // TODO struct name
 	else if (type->ty == ARRAY)
 	{
 		typename_loop(type->ptr_to, str);
@@ -173,6 +186,13 @@ static void	typename_loop(Type *type, char *str)
 		typename_loop(type->ptr_to, str);
 		strcat(str, "*");
 	}
+}
+
+// 宣言可能な型かを確かめる
+// Voidか確かめるだけ
+bool	is_declarable_type(Type *type)
+{
+	return (type->ty != VOID);
 }
 
 char	*get_type_name(Type *type)

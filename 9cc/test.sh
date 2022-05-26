@@ -635,7 +635,7 @@ int main()
 	p->a = 65435;
 	p->b = 12;
 	return p->c - p->a + p->b;
-}"
+}" 
 
 assert "115" "struct t1 {int a; char b; int c;};
 int main()
@@ -648,5 +648,7 @@ int main()
 	p->b = 15;
 	return p->c - p->a + p->b;
 }"
+
+assert_gcc "void1.c"
 
 echo OK

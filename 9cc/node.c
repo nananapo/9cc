@@ -491,9 +491,13 @@ static Node	*assign()
 	if (consume("="))
 	{
 		node = new_node(ND_ASSIGN, node, assign());
+
+		// 代入可能な型かどうか確かめる。
 		if (!can_assign(node->lhs->type, node->rhs->type))
-			error_at(token->str, "左辺(%d)と右辺(%d)の型が一致しません",
-					node->lhs->type->ty, node->rhs->type->ty);
+			error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
+					get_type_name(node->lhs->type),
+					get_type_name(node->rhs->type));
+
 		node->type = node->lhs->type;
 	}
 	return node;
@@ -589,6 +593,10 @@ static Node	*stmt()
 
 			expect_type_after(&type);
 
+			// TODO Voidチェックは違うパスでやりたい....
+			if (!is_declarable_type(type))
+				error_at(token->str, "宣言できない型の変数です");
+
 			node = new_node(ND_DEFVAR, NULL, NULL);
 			LVar *created = create_local_var(tok->str, tok->len, type, false);
 			node->offset = created->offset;
@@ -617,13 +625,12 @@ static Node	*global_var(Type *type, Token *ident)
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
 
-	// 代入文
-	/*
-	if (consume("="))
-	{
-		// TODO
-	}
-	*/
+	// TODO Voidチェックは違うパスでやりたい....
+	if (!is_declarable_type(type))
+		error_at(token->str, "宣言できない型の変数です");
+	
+
+	// TODO 代入文
 
 	if (!consume(";"))
 		error_at(token->str, ";が必要です。");
@@ -644,15 +651,6 @@ static Node	*struct_block(Token *ident)
 	int					i;
 	int					typesize;
 	int					maxsize;
-
-/*
-	ident = consume_ident();
-	if (ident == NULL)
-		error_at(token->str, "識別子が必要です");
-
-	if (!consume("{"))
-		error_at(token->str, "{が必要です");
-*/
 
 	for (i = 0; struct_defs[i]; i++)
 		continue ;
@@ -741,7 +739,7 @@ static Node	*struct_block(Token *ident)
 }
 
 // TODO ブロックを抜けたらlocalsを戻す
-
+// TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
 static Node	*funcdef(Type *ret_type, Token *ident)
 {
@@ -759,33 +757,45 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	// args
 	if (!consume(")"))
 	{
-		for (;;)
+		if (consume_ident_str("void"))
 		{
-			// 型宣言の確認
-			Type *type = consume_type_before();
-			if (type == NULL)
-				error_at(token->str,"型宣言が必要です");
+			if (!consume(")"))
+				error_at(token->str, ")が見つかりませんでした。");
+		}
+		else
+		{
+			for (;;)
+			{
+				// 型宣言の確認
+				Type *type = consume_type_before();
+				if (type == NULL)
+					error_at(token->str,"型宣言が必要です");
+	
+				// 仮引数名
+				Token *arg = consume_ident();
+				if (arg == NULL)
+					error_at(token->str, "仮引数が必要です");
+	
+				// LVarを作成
+				LVar *created = create_local_var(arg->str, arg->len, type, true);
+				// arrayを読む
+				expect_type_after(&type);
 
-			// 仮引数名
-			Token *arg = consume_ident();
-			if (arg == NULL)
-				error_at(token->str, ")ではないトークンです");
+				// TODO Voidチェックは違うパスでやりたい....
+				if (!is_declarable_type(type))
+					error_at(token->str, "宣言できない型の変数です");
 
-			// LVarを作成
-			LVar *created = create_local_var(arg->str, arg->len, type, true);
-			// arrayを読む
-			expect_type_after(&type);
-
-			// 型情報を保存
-			type->next = node->arg_type;
-			node->arg_type = type;
-			node->argdef_count++;
-			
-			// )か,
-			if (consume(")"))
-				break;
-			if (!consume(","))
-				error_at(token->str, ",が必要です");
+				// 型情報を保存
+				type->next = node->arg_type;
+				node->arg_type = type;
+				node->argdef_count++;
+				
+				// )か,
+				if (consume(")"))
+					break;
+				if (!consume(","))
+					error_at(token->str, ",が必要です");
+			}
 		}
 	}
 
@@ -856,7 +866,7 @@ static Node	*filescope()
 			return global_var(ret_type, ident);
 	}
 
-	error_at(token->str, "パースに失敗しました[filescope]");
+	error_at(token->str, "構文解析に失敗しました[filescope]");
 	return (NULL);
 }
 
