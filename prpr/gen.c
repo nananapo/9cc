@@ -4,6 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 
+t_define	*define_data;
+
 static char	*read_str_literal(char *p, bool is_str)
 {
 	if (is_str)
@@ -68,7 +70,7 @@ static char	*read_directive(char *p)
 	return p;
 }
 
-int	process(char *p)
+void	process(char *p)
 {
 	bool	can_use_directive;
 
@@ -100,5 +102,4 @@ int	process(char *p)
 		}
 		// TODO directives
 	}
-	return (0);
 }
