@@ -4,7 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 
-t_define	*define_data;
+t_define	*g_define_data;
+int			g_if_count = 0;
 
 static char	*read_str_literal(char *p, bool is_str)
 {
@@ -63,11 +64,14 @@ static char	*read_directive(char *p)
 		p = read_ifdef_directive(p + 5, true);
 	else if (start_with(p, "ifndef"))
 		p = read_ifdef_directive(p + 6, false);
-	else if (start_with(p, "end"))
+	else if (start_with(p, "endif"))
 	{
-		// TODO ?
+		if (g_if_count == 0)
+			error_at(p, "endifに対応するifがありません");
+		g_if_count--;
+		return (p + 5);
 	}
-	return p;
+	return (p);
 }
 
 void	process(char *p)
