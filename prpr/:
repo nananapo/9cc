@@ -43,8 +43,14 @@ bool	tokenize_reserved_word(TokenizeEnv *env)
 
 bool	tokenize_new_line(TokenizeEnv *env)
 {
-	if (
+	if (env->str != '\n')
+		return (false);
+	env->str += 1;
+	env->can_define_dir = true;
+	return (true);
 }
+
+
 
 Token	*tokenize(char *str)
 {
