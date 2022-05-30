@@ -3,60 +3,88 @@
 
 # include <stdbool.h>
 
-typedef enum
+// 識別子、予約語、単語
+// 数字
+// 文字列リテラル
+// 文字リテラル
+// 記号
+// End Of Directive
+// EOF
+typedef enum e_token_kind
 {
-	TK_IDENT,		// 識別子、単語
-	TK_NUM,			// 数字
-	TK_STR_LIT,		// 文字列リテラル
-	TK_CHAR_LIT,	// 文字リテラル
-	TK_RESERVED,	// 記号
-	TK_DIRECTIVE,	// ディレクティブの宣言
-	TK_DIR_WORD,	// その他のディレクティブ内のワード
+	TK_IDENT,
+	TK_NUM,
+	TK_STR_LIT,
+	TK_CHAR_LIT,
+	TK_RESERVED,
+	TK_EOD,
 	TK_EOF
-} TokenKind;
+}	TokenKind;
 
 typedef struct s_token
 {
 	TokenKind		kind;
 	char			*str;
 	int				len;
+	bool			is_directive;
+	bool			is_dq;
 	struct s_token	*next;
 }	Token;
 
-typedef struct s_define
-{
-	char			*name;
-	int				name_len;
-	char			*replace;
-	int				replace_len;
-	struct s_define	*next;
-}	t_define;
-
-typedef struct s_parse_env
+typedef struct s_tokenize_env
 {
 	char	*str;
 	Token	*token;
 	bool	can_define_dir;
+}	TokenizeEnv;
+
+typedef enum e_node
+{
+	ND_CODES,
+	ND_INCLUDE,
+	ND_DEFINE_NAME,
+	ND_DEFINE_MACRO,
+	ND_IFDEF,
+	ND_IFNDEF
+} NodeKind;
+
+typedef struct s_node
+{
+	NodeKind		kind;
+	Token			*codes;
+	int				codes_len;
+	char			*filename;
+	bool			is_std_include;
+	char			*name;
+	struct s_node	*elif;
+	struct s_node	*next;
+}	Node;
+
+typedef struct s_parse_env
+{
+	Token	*token;
+	Node	*node;
 }	ParseEnv;
 
-void	include_file(char *filename, int len);
-
 char	*read_file(char *name);
-void	process(char *str);
 
 int		start_with(char *haystack, char *needle);
 char	*skip_space(char *p);
-char	*strchr_line(char *p, char needle);
-char	*read_token(char *p);
 char	*read_line(char *p);
-
-char	*read_include_directive(char *p);
-char	*read_define_directive(char *p);
-char	*read_ifdef_directive(char *p, bool is_ifdef);
 
 void	error(char *fmt, ...);
 void	error_at(char *at, char *fmt, ...);
 
-Token	*parse(char *str);
+bool	is_ident_prefix(char str);
+char	*read_ident(char *str);
+char	*read_number(char *str);
+int		is_reserved_word(char *str);
+
+bool	is_number(char str);
+bool	is_alnum(char str);
+bool	is_symbol(char str);
+
+Token	*tokenize(char *str);
+Node	*parse(Token *tok);
 
 #endif

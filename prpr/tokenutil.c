@@ -1,12 +1,15 @@
 #include "prlib.h"
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
-static char *reserved_words[] = {
+static char	*g_reserved_words[] = {
 	"//", "/*", "*/"
 	"->", ".",
 	">=", "<=", "==", "!=",
+	"||", "&&",
 	">", "<", "=",
-	"+", "-", "*", "/", "&",
+	"+", "-", "*", "/", "&", "!",
 	"(", ")", "{", "}", "[", "]",
 	",", ";",
 	NULL
@@ -21,11 +24,11 @@ int	is_reserved_word(char *str)
 	int	len;
 
 	i = -1;
-	while (reserved_words[++i] != NULL)
+	while (g_reserved_words[++i] != NULL)
 	{
-		len = strlen(reserved_words[i]);
-		if (strncmp(str, reserved_words[i], len) == 0)
-			return	(len);
+		len = strlen(g_reserved_words[i]);
+		if (strncmp(str, g_reserved_words[i], len) == 0)
+			return (len);
 	}
 	return (0);
 }
@@ -34,7 +37,9 @@ bool	is_ident_prefix(char str)
 {
 	if ('a' <= str && str <= 'z')
 		return (true);
-	if ('a' <= str && str <= 'z')
+	if ('A' <= str && str <= 'Z')
+		return (true);
+	if (is_symbol(str))
 		return (true);
 	return (false);
 }

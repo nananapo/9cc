@@ -137,6 +137,6 @@ Node	*parse(Token *tok)
 		|| parse_ifdef(env)
 		|| parse_ifndef(env))
 			continue ;*/
-		error_at(env.token->str, "構文解析に失敗しました(parse)");
+		error_at(env.str, "構文解析に失敗しました(parse)");
 	}
 }
