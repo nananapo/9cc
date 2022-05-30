@@ -42,21 +42,34 @@ typedef enum e_node
 {
 	ND_CODES,
 	ND_INCLUDE,
-	ND_DEFINE_NAME,
 	ND_DEFINE_MACRO,
 	ND_IFDEF,
 	ND_IFNDEF
 } NodeKind;
 
+typedef struct s_str_elem
+{
+	char				*str;
+	struct s_str_elem	*next;
+}	StrElem;
+
 typedef struct s_node
 {
 	NodeKind		kind;
-	Token			*codes;
+
+// codes用
+	Token			*codes; // defineと共有
 	int				codes_len;
-	char			*filename;
+// include用
+	char			*file_name;
 	bool			is_std_include;
-	char			*name;
+// define用
+	char			*macro_name; // ifdefと共有
+	StrElem			*params;
+// ifdef
 	struct s_node	*elif;
+	struct s_node	*els;
+
 	struct s_node	*next;
 }	Node;
 
@@ -81,6 +94,7 @@ int		is_reserved_word(char *str);
 bool	is_number(char str);
 bool	is_alnum(char str);
 bool	is_symbol(char str);
+void	add_str_elem(StrElem **list, char *str);
 
 Token	*tokenize(char *str);
 Node	*parse(Token *tok);

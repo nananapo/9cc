@@ -20,8 +20,8 @@ Token	*add_token(TokenizeEnv *env, TokenKind kind, char *str, int len)
 {
 	Token	*tok;
 
-	printf("Tok %d\n", kind);
 	tok = (Token *)malloc(sizeof(Token));
+	tok->kind = kind;
 	tok->str = str;
 	tok->len = len;
 	tok->is_directive = false;
@@ -114,17 +114,17 @@ static bool	tokenize_char_literal(TokenizeEnv *env)
 	tok = add_token(env, TK_CHAR_LIT, ++env->str, 1);
 	if (*env->str == '\\')
 	{
-		env->str += 1;
+		env->str += 2;
 		tok->len += 1;
 	}
 	else
 	{
 		if (*env->str == '\0')
-			error_at(env->str - 1, "文字リテラルが終了しませんでした");
+			error_at(env->str - 1, "文字リテラルが終了しませんでした(in)");
 		env->str += 1;
 	}
 	if (*env->str != '\'')
-		error_at(tok->str - 1, "文字リテラルが終了しませんでした");
+		error_at(tok->str - 1, "文字リテラルが終了しませんでした(end)");
 	env->str += 1;
 	return (true);
 }
@@ -134,12 +134,17 @@ static bool	tokenize_str_literal(TokenizeEnv *env, bool is_inc)
 	bool	is_dq;
 	Token	*tok;
 
-	if (*env->str != '\"' && !(is_inc && *env->str == '<'))
+	if (*env->str != '\"'
+	&& (!is_inc || *env->str != '<'))
 		return (false);
+
 	is_dq = *env->str == '\"';
 	tok = add_token(env, TK_STR_LIT, ++env->str, 0);
-	while (*env->str != '\0' && *env->str != '\n'
-		&& ((is_dq && *env->str != '\"') || (!is_dq && *env->str != '>')))
+
+	while (*env->str != '\0'
+		&& *env->str != '\n'
+		&& ((is_dq && *env->str != '\"')
+		|| (!is_dq && *env->str != '>')))
 	{
 		if (*env->str == '\\')
 		{
@@ -182,15 +187,15 @@ static bool	tokenize_directive(TokenizeEnv *env)
 	wc = 0;
 	last = NULL;
 	env->str += 1;
-	while (env->str != NULL && *env->str == '\0' && *env->str == '\n')
+	while (env->str != NULL && *env->str != '\0' && *env->str != '\n')
 	{
 		wc += 1;
 		env->str = skip_space(env->str);
-		if (tokenize_reserved_word(env)
-			|| tokenize_ident(env)
+		if (tokenize_ident(env)
 			|| tokenize_number(env)
 			|| tokenize_str_literal(env, get_is_include(wc, last))
-			|| tokenize_char_literal(env))
+			|| tokenize_char_literal(env)
+			|| tokenize_reserved_word(env))
 		{
 			last = get_last_token(env);
 			last->is_directive = true;
@@ -199,7 +204,10 @@ static bool	tokenize_directive(TokenizeEnv *env)
 		error_at(env->str, "字句解析に失敗しました(directive)");
 	}
 	if (wc != 0)
+	{
 		add_token(env, TK_EOD, env->str, 0);
+		get_last_token(env)->is_directive = true;
+	}
 	return (true);
 }
 
@@ -216,12 +224,12 @@ Token	*tokenize(char *str)
 	{
 		env.str = skip_space(env.str);
 		if (tokenize_new_line(&env)
-			|| tokenize_reserved_word(&env)
 			|| tokenize_ident(&env)
-			|| tokenize_number(&env)
-			|| tokenize_directive(&env)
 			|| tokenize_str_literal(&env, false)
-			|| tokenize_char_literal(&env))
+			|| tokenize_char_literal(&env)
+			|| tokenize_reserved_word(&env)
+			|| tokenize_number(&env)
+			|| tokenize_directive(&env))
 			continue ;
 		error_at(env.str, "字句解析に失敗しました(tokenize)");
 	}
