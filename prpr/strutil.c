@@ -21,13 +21,6 @@ char	*skip_space(char *p)
 	return (p);
 }
 
-char	*read_line(char *p)
-{
-	while (*p && *p != '\n')
-		p++;
-	return (p);
-}
-
 bool	is_number(char str)
 {
 	return ('0' <= str && str <= '9');

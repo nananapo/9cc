@@ -70,7 +70,6 @@ char	*read_file(char *name);
 
 int		start_with(char *haystack, char *needle);
 char	*skip_space(char *p);
-char	*read_line(char *p);
 
 void	error(char *fmt, ...);
 void	error_at(char *at, char *fmt, ...);
