@@ -124,12 +124,15 @@ Node	*parse(Token *tok)
 
 	env.token = tok;
 	env.node = NULL;
-	while (env.token != NULL || env.token->kind != TK_EOF)
+	while (env.token != NULL && env.token->kind != TK_EOF)
 	{
+		printf("%d\n", env.token->kind);
+
 		if ((node = parse_codes(&env)) != NULL
 		|| (node = parse_include(&env)) != NULL)
 		{
 			add_node(&env.node, node);
+			printf("%p\n", env.token);
 			continue ;
 		}
 		/*
@@ -139,4 +142,5 @@ Node	*parse(Token *tok)
 			continue ;*/
 		error_at(env.token->str, "構文解析に失敗しました(parse)");
 	}
+	return (env.node);
 }

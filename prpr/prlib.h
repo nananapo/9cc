@@ -75,7 +75,6 @@ char	*read_line(char *p);
 void	error(char *fmt, ...);
 void	error_at(char *at, char *fmt, ...);
 
-bool	is_ident_prefix(char str);
 char	*read_ident(char *str);
 char	*read_number(char *str);
 int		is_reserved_word(char *str);
