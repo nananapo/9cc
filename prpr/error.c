@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+# define ENV_DEV
+
 void	error(char *fmt, ...)
 {
 	va_list	ap;
@@ -29,4 +31,16 @@ void	error_at(char *at, char *fmt, ...)
 	else
 		fprintf(stderr, "%s", strndup(at, ret - at));
 	exit(1);
+}
+
+void	debug(char *fmt, ...)
+{
+#ifdef ENV_DEV
+	va_list	ap;
+
+	va_start(ap, fmt);
+	fprintf(stdout, "DEBUG: ");
+	fprintf(stdout, fmt, ap);
+	fprintf(stdout, "\n");
+#endif
 }

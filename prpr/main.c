@@ -18,5 +18,5 @@ int	main(int argc, char **argv)
 	if (str == NULL)
 		return (0);
 	tok = tokenize(str);
-	node = parse(tok);
+	node = parse(&tok, 0);
 }

@@ -54,7 +54,16 @@ static bool	consume_eod(ParseEnv *env)
 static void	expect_eod(ParseEnv *env)
 {
 	if (!consume_eod(env))
-		error_at(env->token->str, "構文解析に失敗しました(include)");
+		error_at(env->token->str, "構文解析に失敗しました(eod)");
+}
+
+static bool	consume_eof(ParseEnv *env)
+{
+	if (env->token == NULL
+	|| env->token->kind != TK_EOF)
+		return (false);
+	env->token = env->token->next;
+	return (true);
 }
 
 static bool	consume_ident(ParseEnv *env, char *str, bool is_dir)
@@ -66,6 +75,17 @@ static bool	consume_ident(ParseEnv *env, char *str, bool is_dir)
 	|| strncmp(env->token->str, str, strlen(str)) != 0)
 		return (false);
 	env->token = env->token->next;
+	return (true);
+}
+
+static bool	check_ident(Token *token, char *str, bool is_dir)
+{
+	if (token == NULL
+	|| token->kind != TK_IDENT
+	|| token->is_directive != is_dir
+	|| token->len != strlen(str)
+	|| strncmp(token->str, str, strlen(str)) != 0)
+		return (false);
 	return (true);
 }
 
@@ -108,6 +128,17 @@ static Token	*consume_keyword(ParseEnv *env, char *str, bool is_dir)
 	tmp = env->token;
 	env->token = env->token->next;
 	return (tmp);
+}
+
+static bool	check_keyword(Token *token, char *str, bool is_dir)
+{
+	if (token == NULL
+	|| token->kind != TK_RESERVED
+	|| token->is_directive != is_dir
+	|| token->len != strlen(str)
+	|| strncmp(token->str, str, strlen(str)) != 0)
+		return (false);
+	return (true);
 }
 
 static Token	*consume_code(ParseEnv *env, bool is_dir)
@@ -207,35 +238,123 @@ static Node	*parse_define(ParseEnv *env)
 	return (node);
 }
 
-static Node	*parse_ifdef(ParseEnv *env)
+static Node	*parse_if(ParseEnv *env)
 {
+	// TODO
+	return (NULL);
+}
+
+static Node	*parse_else(ParseEnv *env, int nest)
+{
+	Node	*node;
+	Token	*hist;
+
+	hist = env->token;
+	if (!consume_ident(env, "else", true))
+		return (NULL);
+	expect_eod(env);
+	node = parse(&env->token, nest + 1);
+	if (!consume_ident(env, "endif", true))
+		error_at(hist->str, "elseに対応するendifが見つかりませんでした");
+	expect_eod(env);
+	return (node);
+}
+
+static Node	*parse_elif(ParseEnv *env, int nest)
+{
+	// TODO
+	return (NULL);
+}
+
+static Node	*parse_ifdef(ParseEnv *env, int nest)
+{
+	Node	*node;
+	Token	*tmp;
+	Node	*ntmp;
+
+	if (!consume_ident(env, "ifdef", true))
+	{
+		if (!consume_ident(env, "ifndef", true))
+			return (NULL);
+		node = create_node(ND_IFNDEF);
+	}
+	else
+		node = create_node(ND_IFDEF);
+
+	// 識別子を設定
+	tmp = consume_name(env, true);
+	if (tmp == NULL)
+		error_at(env->token->str, "識別子が必要です");
+	node->macro_name = strndup(tmp->str, tmp->len);
+	expect_eod(env);
+
+	// endif
+	node->stmt = parse(&env->token, nest + 1);
+	
+	if (consume_ident(env, "endif", true))
+	{
+		expect_eod(env);
+		return (node);
+	}
+	// else
+	ntmp = parse_else(env, nest);
+	if (ntmp != NULL)
+	{
+		node->els = ntmp;
+		return (node);
+	}
+	// elif
+	ntmp = parse_elif(env, nest);
+	if (ntmp != NULL)
+	{
+		node->elif = ntmp;
+		return (node);
+	}
+	error_at(env->token->str, "ifdefに対応するディレクティブが見つかりませんでした");
 	return NULL;
 }
 
-static Node	*parse_ifndef(ParseEnv *env)
+static bool	is_enddir(ParseEnv *env)
 {
-	return NULL;
+	if (check_ident(env->token, "endif", true)
+	|| check_ident(env->token, "else", true)
+	|| check_ident(env->token, "elif", true))
+		return (true);
+	return (false);
 }
 
-Node	*parse(Token *tok)
+Node	*parse(Token **tok, int nest_if)
 {
 	ParseEnv	env;
 	Node		*node;
 
-	env.token = tok;
-	env.node = NULL;
-	while (env.token != NULL && env.token->kind != TK_EOF)
+	env.token = *tok;
+	env.node = create_node(ND_INIT);
+	while (env.token != NULL && !consume_eof(&env))
 	{
 		if ((node = parse_codes(&env)) != NULL
 		|| (node = parse_include(&env)) != NULL
 		|| (node = parse_define(&env)) != NULL
-		|| (node = parse_ifdef(&env)) != NULL
-		|| (node = parse_ifndef(&env)) != NULL)
+		|| (node = parse_ifdef(&env, nest_if)) != NULL)
 		{
 			add_node(&env.node, node);
+			while (*tok != env.token)
+				*tok = (*tok)->next;
+			//printf("CONTINUE PARSE %d\n", node->kind);
 			continue ;
 		}
-		error_at(env.token->str, "構文解析に失敗しました(parse)");
+		if (is_enddir(&env))
+		{
+			while (*tok != env.token)
+				*tok = (*tok)->next;
+			if (nest_if == 0)
+				error_at(env.token->str, "不正なディレクティブです");
+			//printf("DETECT ENDDIR %s \n", strndup(env.token->str, env.token->len));
+			return (env.node);
+		}
+		error_at(env.token->str, "構文解析に失敗しました(parse) (%p:%d)", env.token, env.token->kind);
 	}
+	while (*tok != env.token)
+		*tok = (*tok)->next;
 	return (env.node);
 }

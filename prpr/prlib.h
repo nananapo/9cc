@@ -40,6 +40,7 @@ typedef struct s_tokenize_env
 
 typedef enum e_node
 {
+	ND_INIT,
 	ND_CODES,
 	ND_INCLUDE,
 	ND_DEFINE_MACRO,
@@ -64,9 +65,10 @@ typedef struct s_node
 	char			*file_name;
 	bool			is_std_include;
 // define用
-	char			*macro_name; // ifdefと共有
+	char			*macro_name; // ifと共有
 	StrElem			*params;
-// ifdef
+	struct s_node	*stmt;
+// if
 	struct s_node	*elif;
 	struct s_node	*els;
 
@@ -78,6 +80,8 @@ typedef struct s_parse_env
 	Token	*token;
 	Node	*node;
 }	ParseEnv;
+
+char	*debug(char *fmt, ...);
 
 char	*read_file(char *name);
 
@@ -97,6 +101,6 @@ bool	is_symbol(char str);
 void	add_str_elem(StrElem **list, char *str);
 
 Token	*tokenize(char *str);
-Node	*parse(Token *tok);
+Node	*parse(Token **tok, int nest);
 
 #endif
