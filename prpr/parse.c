@@ -228,11 +228,11 @@ static Node	*parse_define(ParseEnv *env)
 
 	// 置き換えする単語たちをまとめる
 	node->codes = env->token;
-	while (consume_eod(env))
+	while (!consume_eod(env))
 	{
 		tmp = consume_code(env, true);
 		if (tmp == NULL)
-			error_at(env->token->str, "不明なトークンです(parse_define)");
+			error_at(env->token->str, "不明なトークンです(parse_define : kind:%d)", env->token->kind);
 		node->codes_len += 1;
 	}
 	return (node);

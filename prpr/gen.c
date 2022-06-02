@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 extern GenEnv	gen_env;
 
@@ -24,6 +25,7 @@ static void	codes(Node *node)
 		}
 		else
 		{
+			// TODO define置き換え
 			printf("%s ", strndup(code->str, code->len));
 		}
 		code = code->next;
@@ -68,17 +70,40 @@ static void	add_macro(char *name, StrElem *params, Token *codes, int codes_len)
 	tmp->codes_len = codes_len;
 	tmp->next = gen_env.macros;
 	gen_env.macros = tmp;
-	return (tmp);
+}
+
+static Macro	*get_macro(char *name)
+{
+	Macro	*tmp;
+
+	tmp = gen_env.macros;
+	while (tmp != NULL)
+	{
+		if (strcmp(tmp->name, name) == 0)
+			return (tmp);
+		tmp = tmp->next;
+	}
+	return (NULL);
 }
 
 static void	define_macro(Node *node)
 {
-	add_macro(strndup(node->macro_name, node->params, node->codes, node->codes_len);
+	add_macro(node->macro_name, node->params, node->codes, node->codes_len);
 }
 
 static void ifdef(Node *node, bool is_ifdef)
 {
-	// TODO
+	Macro	*macro;
+
+	macro = get_macro(node->macro_name);
+	if ((macro != NULL) != is_ifdef)
+	{
+		if (node->els != NULL)
+			gen(node->els);
+		// TODO elif
+		return ;
+	}
+	gen(node->stmt);
 }	
 
 void	gen(Node *node)
@@ -102,7 +127,6 @@ void	gen(Node *node)
 			case ND_IFNDEF:
 				ifdef(node, node->kind == ND_IFDEF);
 				break;
-			
 		}
 		node = node->next;
 	}
