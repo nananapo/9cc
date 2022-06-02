@@ -60,3 +60,51 @@ void	add_str_elem(StrElem **list, char *str)
 		tmp->next = elem;
 	}
 }
+
+char	*strlit_to_str(char *str, int len)
+{
+	int		i;
+	int		bi;
+	char	*buf;
+	char	c;
+
+	i = -1;
+	bi = 0;
+	buf = calloc(len + 1, sizeof(char));
+	while (++i < len)
+	{
+		if (str[i] == '\\')
+		{
+			switch (str[++i])
+			{		
+				case '"':
+				case '\'':
+					c = str[i];
+				case 'a':
+					c = '\a';
+				case 'b':
+					c = '\b';
+				case 'f':
+					c =  '\f';
+				case 'n':
+					c =  '\n';
+				case 'r':
+					c = '\r';
+				case 'v':
+					c = '\v';
+				case '0':
+					c = '\0';
+				case '\\':
+					c = '\\';
+				default:
+					error("不明なエスケープシーケンスです %c", str[i]);
+			}
+		}
+		else
+		{
+			c = str[i];
+		}
+		buf[bi++] = c;
+	}
+	return (buf);
+}

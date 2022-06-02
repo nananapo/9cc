@@ -81,6 +81,23 @@ typedef struct s_parse_env
 	Node	*node;
 }	ParseEnv;
 
+typedef struct s_macro
+{
+	char			*name;
+
+	StrElem			*params;
+	Token			*codes;
+	int				codes_len;
+
+	struct s_macro	*next;
+}	Macro;
+
+typedef struct s_gen_env
+{
+	Macro	*macros;
+	
+}	GenEnv;
+
 char	*debug(char *fmt, ...);
 
 char	*read_file(char *name);
@@ -102,5 +119,8 @@ void	add_str_elem(StrElem **list, char *str);
 
 Token	*tokenize(char *str);
 Node	*parse(Token **tok, int nest);
+void	gen(Node *node);
+
+char	*strlit_to_str(char *str, int len);
 
 #endif

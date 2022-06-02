@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+GenEnv	*gen_env;
+
 int	main(int argc, char **argv)
 {
 	char	*str;
@@ -19,4 +21,5 @@ int	main(int argc, char **argv)
 		return (0);
 	tok = tokenize(str);
 	node = parse(&tok, 0);
+	gen(node);
 }
