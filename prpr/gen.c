@@ -6,59 +6,6 @@
 
 extern GenEnv	gen_env;
 
-static void	codes(Node *node)
-{
-	int		i;
-	Token	*code;
-
-	i = -1;
-	code = node->codes;
-	while (++i < node->codes_len)
-	{
-		if (code->kind == TK_STR_LIT)
-		{
-			printf("\"%s\"", strndup(code->str, code->len));
-		}
-		else if (code->kind == TK_CHAR_LIT)
-		{
-			printf("'%s'", strndup(code->str, code->len));
-		}
-		else
-		{
-			// TODO define置き換え
-			printf("%s ", strndup(code->str, code->len));
-		}
-		code = code->next;
-	}
-}
-
-static void	load(char *file_name)
-{
-	char	*str;
-	Token	*tok;
-	Node	*node;
-
-	str = read_file(file_name);
-	if (str == NULL)
-		error("ファイル%sが見つかりせん", file_name);
-	tok = tokenize(str);
-	node = parse(&tok, 0);
-	gen(node);
-}
-
-static void	include(Node *node)
-{
-	char	*file_name;
-
-	file_name = strlit_to_str(node->file_name, strlen(node->file_name));
-	if (node->is_std_include)
-	{
-		// TODO
-		return ;
-	}
-	load(file_name);
-}
-
 static void	add_macro(char *name, StrElem *params, Token *codes, int codes_len)
 {
 	Macro	*tmp;
@@ -86,8 +33,141 @@ static Macro	*get_macro(char *name)
 	return (NULL);
 }
 
+static void	apply_macro(Macro *macro, Token **tok)
+{
+	Node	*node;
+
+	// TODO 関数の置き換え
+	// TODO さらに置き換え
+	//名前をスキップ
+	*tok = (*tok)->next;
+	// TODO  置き換える
+	node = create_node(ND_CODES);
+	node->codes = macro->codes;
+	node->codes_len = macro->codes_len;
+	gen(node);
+}
+
+static bool	consume_reserved(Token *tok, char *str)
+{
+	int	len;
+
+	len = strlen(str);
+	if (tok->kind != TK_RESERVED
+	|| tok->len != len
+	|| strncmp(tok->str, str, len) != 0)
+		return (false);
+	return (true);
+}
+
+static void	print_line(void)
+{
+	int	i;
+
+	printf("\n");
+	i = -1;
+	while (++i < gen_env.nest_count)
+		printf("  ");
+	gen_env.print_count = 0;
+}
+
+static void	codes(Node *node)
+{
+	int		i;
+	Token	*code;
+	Macro	*mactmp;	
+
+	i = -1;
+	code = node->codes;
+	while (++i < node->codes_len)
+	{
+		if (code->kind == TK_STR_LIT)
+		{
+			printf("\"%s\"", strndup(code->str, code->len));
+		}
+		else if (code->kind == TK_CHAR_LIT)
+		{
+			printf("'%s'", strndup(code->str, code->len));
+		}
+		else if (code->kind == TK_IDENT)
+		{
+			mactmp = get_macro(strndup(code->str, code->len));
+			if (mactmp == NULL)
+			{
+				printf("%s ", strndup(code->str, code->len));
+			}
+			else
+			{
+				apply_macro(mactmp, &code);
+				continue ;
+			}
+		}
+		else if (code->kind == TK_RESERVED)
+		{
+			if (consume_reserved(code, "{"))
+			{
+				print_line();
+				printf("{");
+				gen_env.nest_count += 1;
+				print_line();
+			}
+			else if (consume_reserved(code, "}"))
+			{
+				gen_env.nest_count -= 1;
+				print_line();
+				printf("}");
+				print_line();
+			}
+			else if (consume_reserved(code, ";"))
+			{
+				printf(";");
+				print_line();
+			}
+			else
+			{
+				printf("%s", strndup(code->str, code->len));
+			}
+		}
+		else
+		{
+			printf("%s", strndup(code->str, code->len));
+		}
+		
+		code = code->next;
+	}
+}
+
+static void	load(char *file_name)
+{
+	char	*str;
+	Token	*tok;
+	Node	*node;
+
+	str = read_file(file_name);
+	if (str == NULL)
+		error("ファイル%sが見つかりせん", file_name);
+	tok = tokenize(str);
+	node = parse(&tok, 0);
+	gen(node);
+}
+
+static void	include(Node *node)
+{
+	char	*file_name;
+
+	file_name = strlit_to_str(node->file_name, strlen(node->file_name));
+	//fprintf(stderr, "%d %s\n", node->is_std_include, node->file_name);
+	if (node->is_std_include)
+	{
+		// TODO
+		return ;
+	}
+	load(file_name);
+}
+
 static void	define_macro(Node *node)
 {
+	// TODO 被り
 	add_macro(node->macro_name, node->params, node->codes, node->codes_len);
 }
 

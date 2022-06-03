@@ -49,7 +49,7 @@ char	*read_ident(char *str)
 	if (!is_ident_prefix(*str))
 		return (str);
 	str++;
-	while (*str && is_alnum(*str))
+	while (*str && (is_alnum(*str) || is_symbol(*str)))
 		str++;
 	return (str);
 }

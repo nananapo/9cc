@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-static Node	*create_node(NodeKind kind)
+Node	*create_node(NodeKind kind)
 {
 	Node	*node;
 
@@ -183,7 +183,7 @@ static Node	*parse_include(ParseEnv *env)
 	lit = consume_strlit(env, true);
 	if (lit == NULL)
 		error_at(env->token->str, "ファイル名が必要です(%p %d)", env->token, env->token->kind);
-	node->is_std_include = lit->is_dq;
+	node->is_std_include = !lit->is_dq;
 	node->file_name = strndup(lit->str, lit->len);
 	expect_eod(env);
 	return (node);

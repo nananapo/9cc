@@ -3,6 +3,8 @@
 
 # include <stdbool.h>
 
+# define DEBUG
+
 // 識別子、予約語、単語
 // 数字
 // 文字列リテラル
@@ -95,10 +97,11 @@ typedef struct s_macro
 typedef struct s_gen_env
 {
 	Macro	*macros;
-	
+	int		print_count;
+	int		nest_count;
 }	GenEnv;
 
-char	*debug(char *fmt, ...);
+void	debug(char *fmt, ...);
 
 char	*read_file(char *name);
 
@@ -120,6 +123,8 @@ void	add_str_elem(StrElem **list, char *str);
 Token	*tokenize(char *str);
 Node	*parse(Token **tok, int nest);
 void	gen(Node *node);
+
+Node	*create_node(NodeKind kind);
 
 char	*strlit_to_str(char *str, int len);
 

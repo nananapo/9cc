@@ -1,9 +1,8 @@
+#include "prlib.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-
-# define ENV_DEV
 
 void	error(char *fmt, ...)
 {
@@ -35,12 +34,10 @@ void	error_at(char *at, char *fmt, ...)
 
 void	debug(char *fmt, ...)
 {
-#ifdef ENV_DEV
+#ifdef DEBUG
 	va_list	ap;
 
 	va_start(ap, fmt);
-	fprintf(stdout, "DEBUG: ");
-	fprintf(stdout, fmt, ap);
-	fprintf(stdout, "\n");
+	fprintf(stderr, fmt, ap);
 #endif
 }
