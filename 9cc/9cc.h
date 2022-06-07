@@ -247,7 +247,6 @@ void	expect_type_after(Type **type);
 void	consume_type_ptr(Type **type);
 
 Token	*tokenize(char *p);
-Token 	*new_token(TokenKind kind, Token *cur, char *str);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 
