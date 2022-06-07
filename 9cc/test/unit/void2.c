@@ -1,0 +1,1 @@
+int dint(int a);

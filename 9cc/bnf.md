@@ -33,17 +33,19 @@ unary		= ("+" | "-") arrow
 
 arrow		= primary (("->" | ".") ident derefs?)?*
 
-primary		= ("(" expr ")"
+primary		= cast? ("(" expr ")"
 			| ident ("(" call-params ")")?
 			| strliteral
 			| integer) derefs
+
+cast		= "(" typep ")"
 
 call-params	= expr ("," call-params)? | expr?
 
 deref		= "[" expr "]"
 derefs		= deref derefs | deref?
 
-typep		= ("struct" ident | ("int" | "char")) ptrs
+typep		= ("struct" ident | ("int" | "char" | "void")) ptrs
 types		= ("[" integer "]")?
 
 ptr			= "*"
