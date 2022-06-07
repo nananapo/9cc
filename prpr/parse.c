@@ -238,6 +238,24 @@ static Node	*parse_define(ParseEnv *env)
 	return (node);
 }
 
+static Node	*parse_undef(ParseEnv *env)
+{
+	Node	*node;
+	Token	*tmp;
+
+	if (!consume_ident(env, "undef", true))
+		return (NULL);
+	node = create_node(ND_UNDEF);
+
+	tmp = consume_name(env, true);
+	if (tmp == NULL)
+		error_at(env->token->str, "名前が見つかりません");
+	node->macro_name = strndup(tmp->str, tmp->len);
+
+	expect_eod(env);
+	return (node);
+}
+
 static Node	*parse_if(ParseEnv *env)
 {
 	// TODO
@@ -335,6 +353,7 @@ Node	*parse(Token **tok, int nest_if)
 		if ((node = parse_codes(&env)) != NULL
 		|| (node = parse_include(&env)) != NULL
 		|| (node = parse_define(&env)) != NULL
+		|| (node = parse_undef(&env)) != NULL
 		|| (node = parse_ifdef(&env, nest_if)) != NULL)
 		{
 			add_node(&env.node, node);

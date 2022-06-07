@@ -171,6 +171,30 @@ static void	define_macro(Node *node)
 	add_macro(node->macro_name, node->params, node->codes, node->codes_len);
 }
 
+static void	undef_macro(Node *node)
+{
+	Macro	*tmp;
+	Macro	*last;
+
+	last = NULL;
+	tmp = gen_env.macros;
+	while (tmp != NULL)
+	{
+		if (strlen(node->macro_name) != strlen(tmp->name)
+		|| strncmp(node->macro_name, tmp->name, strlen(node->macro_name)) != 0)
+		{
+			last = tmp;
+			tmp = tmp->next;
+			continue ;
+		}
+		if (last == NULL)
+			gen_env.macros = tmp->next;
+		else
+			last->next = tmp->next;
+		break ;
+	}
+}
+
 static void ifdef(Node *node, bool is_ifdef)
 {
 	Macro	*macro;
@@ -203,10 +227,13 @@ void	gen(Node *node)
 			case ND_DEFINE_MACRO:
 				define_macro(node);
 				break ;
+			case ND_UNDEF:
+				undef_macro(node);
+				break ;
 			case ND_IFDEF:
 			case ND_IFNDEF:
 				ifdef(node, node->kind == ND_IFDEF);
-				break;
+				break ;
 		}
 		node = node->next;
 	}

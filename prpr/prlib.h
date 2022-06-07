@@ -46,6 +46,7 @@ typedef enum e_node
 	ND_CODES,
 	ND_INCLUDE,
 	ND_DEFINE_MACRO,
+	ND_UNDEF,
 	ND_IFDEF,
 	ND_IFNDEF
 } NodeKind;

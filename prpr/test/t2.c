@@ -11,5 +11,6 @@ bool	is_even(int x)
 
 int	main(void)
 {
-	
+	#undef false
+	return false;
 }
