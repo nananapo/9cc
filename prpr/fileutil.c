@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BUF_SIZE 1024
 
@@ -12,11 +13,18 @@ char	*read_file(char	*name)
 	int		fd;
 	char	*p;
 
-	fd = open(name, O_RDONLY);
-	if (fd == -1)
+	if (strcmp(name, "-") == 0)
 	{
-		perror("error");
-		return (NULL);
+		fd = 0;
+	}
+	else
+	{
+		fd = open(name, O_RDONLY);
+		if (fd == -1)
+		{
+			perror("error");
+			return (NULL);
+		}
 	}
 	p = read_all(fd);
 	close(fd);
