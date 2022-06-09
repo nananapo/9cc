@@ -4,6 +4,7 @@ int pline();
 int N;
 int pos[10];
 
+// 絶対値を返す
 int abs(int n)
 {
 	if (n < 0)
@@ -11,6 +12,7 @@ int abs(int n)
 	return n;
 }
 
+// (x, y) : (i, y)にqueenを置けるかどうかを返す
 int can_put(int i, int y)
 {
 	int j;

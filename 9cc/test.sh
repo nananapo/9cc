@@ -14,7 +14,7 @@ assert() {
   expected="$1"
   input="$2"
 
-  ./9cc "$input" > tmp.s
+  ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
   if [ "$?" != "0" ]; then
 	echo "$input => FAILED TO COMPILE"
 	exit 1
@@ -40,15 +40,17 @@ assert() {
 assert_out(){
 	echo "#-- Test----------------------------"
 
+	arg2="$2"
+
 	expected="$1"
 	input="$prefix$2"
 	
-	./9cc "$input" > tmp.s
+    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp`
 
   	if [ "$actual" = "$expected" ]; then
-  	  echo "$input => $actual"
+  	  echo "$arg2 => $actual"
   	else
   	  echo "$input => $expected expected, but got $actual"
   	  exit 1
@@ -58,15 +60,17 @@ assert_out(){
 assert_cat(){
 	echo "#-- Test----------------------------"
 
+	arg2="$2"
+
 	expected="$1"
 	input="$prefix $2"
 	
-	./9cc "$input" > tmp.s
+    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp | cat -e`
 
   	if [ "$actual" = "$expected" ]; then
-  	  echo "$input => $actual"
+  	  echo "$arg2 => $actual"
   	else
   	  echo "$input => $expected expected, but got $actual"
   	  exit 1
@@ -77,7 +81,7 @@ assert_cat(){
 assert_ret(){
 	input="`cat test/unit/$1`"
 	
-	./9cc "$input" > tmp.s
+    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
@@ -92,7 +96,7 @@ assert_ret(){
 	./tmp1
 	actual=`echo $?`
 
-	echo $input > test/unit/tmp.c
+	echo "$input" > test/unit/tmp.c
 	cc -o tmp2 test/unit/tmp.c test/print.c
 	if [ "$?" != "0" ]; then
 		echo "$1 => gcc segv KO"
@@ -115,7 +119,7 @@ assert_ret(){
 assert_gcc(){
 	input="$prefix`cat test/unit/$1`"
 	
-	./9cc "$input" > tmp.s
+    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
@@ -130,7 +134,7 @@ assert_gcc(){
 	./tmp1 > test/unit/actual.output
 	actual=`cat -e test/unit/actual.output`
 
-	echo $input > test/unit/tmp.c
+	echo "$input" > test/unit/tmp.c
 	cc -o tmp2 test/unit/tmp.c test/print.c
 	if [ "$?" != "0" ]; then
 		echo "$1 => gcc segv KO"
