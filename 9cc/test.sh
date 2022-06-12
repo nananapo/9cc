@@ -656,8 +656,8 @@ int main()
 assert_gcc "void1.c"
 assert_gcc "void2.c"
 
+assert_gcc "cast0.c"
 assert_gcc "cast1.c"
 assert_gcc "cast2.c"
-assert_gcc "cast3.c"
 
 echo OK

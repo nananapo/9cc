@@ -466,11 +466,11 @@ static void	cast(Type *from, Type *to)
 		if (size1 < size2)
 		{
 			if (size1 == 1)
-				printf("    movsxd %s, %s\n", RAX, AL);
+				printf("    movsx %s, %s\n", RAX, AL);
 			else if (size1 == 2)
-				printf("    movsxd %s, %s\n", RAX, AX);
+				printf("    movsx %s, %s\n", RAX, AX);
 			else if (size1 == 4)
-				printf("    movsxd %s, %s\n", RAX, EAX);
+				printf("    movsx %s, %s\n", RAX, EAX);
 			else
 				error("8byte -> 8byteのキャストは無い");
 		}

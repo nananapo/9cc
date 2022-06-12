@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define LL long long
+
 int	my_putchar(char c)
 {
 	write(1, &c, 1);
@@ -18,6 +20,28 @@ int my_print(char *c)
 {
 	printf("%s", c);
 	return 0;
+}
+
+static void	recpll(LL a)
+{
+	if (-9 <= a && a <= 9)
+	{
+		if (a < 0)
+			a = -a;
+		my_putchar('0' + a);
+		return;
+	}
+	recpll(a / 10);
+	recpll(a % 10);
+	return;
+}
+
+void	pll(LL a)
+{
+	if (a < 0)
+		my_putchar('-');
+	recpll(a);
+	return;
 }
 
 static int	recpint(int a)
@@ -85,6 +109,11 @@ int pptrc(char *ptr)
 	printf("ptrc	: %p\n", ptr);
 	printf("value	: %d\n", *ptr);
 	return 0;
+}
+
+void	pptrv(void *ptr)
+{
+	pll((LL)ptr);
 }
 
 int	ptr42(int *ptr)
