@@ -195,6 +195,17 @@ bool	is_declarable_type(Type *type)
 	return (type->ty != VOID);
 }
 
+bool	type_can_cast(Type *from, Type *to)
+{
+	if (type_equal(from, to))
+		return (true);
+	if (from->ty == STRUCT
+	|| to->ty == STRUCT)
+		return (false);
+	// どちらも数字？
+	return (true);
+}
+
 char	*get_type_name(Type *type)
 {
 	char	*ret;

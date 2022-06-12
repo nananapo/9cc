@@ -23,6 +23,7 @@
 # define R11D "r11d"
 
 // 16
+# define AX "ax"
 # define SI "si"
 # define R11W "r11w"
 
@@ -107,7 +108,9 @@ typedef enum
 
 	ND_STRUCT_DEF,
 	ND_STRUCT_VALUE,
-	ND_STRUCT_PTR_VALUE
+	ND_STRUCT_PTR_VALUE,
+
+	ND_CAST
 } NodeKind;
 
 typedef enum
@@ -270,6 +273,7 @@ StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
 //void	determine_struct_size(StructDef **ptr);
 int	max_type_size(Type *type);
 char	*get_type_name(Type *type);
+bool	type_can_cast(Type *from, Type *to);
 
 char	*get_str_literal_name(int index);
 

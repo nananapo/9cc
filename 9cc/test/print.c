@@ -94,6 +94,21 @@ int	ptr42(int *ptr)
 	return 0;
 }
 
+void put_charptrv(void *ptr)
+{
+	printf("%c\n", *(char *)ptr);
+}
+
+void put_strptrv(void *ptr)
+{
+	printf("%s\n", *(char **)ptr);
+}
+
+void put_intptrv(void *ptr)
+{
+	printf("%d\n", *(int *)ptr);
+}
+
 int *my_malloc_int(int size)
 {
 	write(2, "called malloc\n", 14);

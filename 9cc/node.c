@@ -17,7 +17,8 @@ extern StructDef	*struct_defs[];
 LVar				*locals;
 
 // Node
-static Node	*expr();
+static Node	*expr(void);
+static Node *unary(void);
 
 Node		*get_function_by_name(char *name, int len);
 Node		*new_node_num(int val);
@@ -160,13 +161,30 @@ static Node *primary()
 {
 	Token	*tok;
 	Node	*node;
+	Type	*type_cast;
 
 	// 括弧
 	if (consume("("))
 	{
-		node = expr();
+		// 型を読む
+		tok = token;
+		type_cast = consume_type_before();
+		
+		// 括弧の中身が型ではないなら優先順位を上げる括弧
+		if (type_cast == NULL)
+		{
+			node = expr();
+			expect(")");
+			return node;
+		}
+
+		// 明示的なキャスト
 		expect(")");
-		return node;
+		node = new_node(ND_CAST, unary(), NULL);
+		if (!type_can_cast(node->lhs->type, type_cast))
+			error_at(token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
+		node->type = type_cast;
+		return (node);
 	}
 	
 	// identかcall
@@ -757,45 +775,45 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	// args
 	if (!consume(")"))
 	{
-		if (consume_ident_str("void"))
+		for (;;)
 		{
-			if (!consume(")"))
-				error_at(token->str, ")が見つかりませんでした。");
-		}
-		else
-		{
-			for (;;)
+			// 型宣言の確認
+			Type *type = consume_type_before();
+			if (type == NULL)
+				error_at(token->str,"型宣言が必要です");
+
+			// 仮引数名
+			Token *arg = consume_ident();
+			if (arg == NULL)
 			{
-				// 型宣言の確認
-				Type *type = consume_type_before();
-				if (type == NULL)
-					error_at(token->str,"型宣言が必要です");
-	
-				// 仮引数名
-				Token *arg = consume_ident();
-				if (arg == NULL)
-					error_at(token->str, "仮引数が必要です");
-	
-				// LVarを作成
-				LVar *created = create_local_var(arg->str, arg->len, type, true);
-				// arrayを読む
-				expect_type_after(&type);
-
-				// TODO Voidチェックは違うパスでやりたい....
-				if (!is_declarable_type(type))
-					error_at(token->str, "宣言できない型の変数です");
-
-				// 型情報を保存
-				type->next = node->arg_type;
-				node->arg_type = type;
-				node->argdef_count++;
-				
-				// )か,
-				if (consume(")"))
-					break;
-				if (!consume(","))
-					error_at(token->str, ",が必要です");
+				// voidなら引数0個
+				if (type->ty == VOID && node->argdef_count == 0)
+				{
+					if (!consume(")"))
+						error_at(token->str, ")が見つかりませんでした。");
+					break ;
+				}
+				error_at(token->str, "仮引数が必要です");
 			}
+			// LVarを作成
+			LVar *created = create_local_var(arg->str, arg->len, type, true);
+			// arrayを読む
+			expect_type_after(&type);
+
+			// TODO Voidチェックは違うパスでやりたい....
+			if (!is_declarable_type(type))
+				error_at(token->str, "宣言できない型の変数です");
+
+			// 型情報を保存
+			type->next = node->arg_type;
+			node->arg_type = type;
+			node->argdef_count++;
+			
+			// )か,
+			if (consume(")"))
+				break;
+			if (!consume(","))
+				error_at(token->str, ",が必要です");
 		}
 	}
 

@@ -416,12 +416,80 @@ static void	call(Node *node)
 	return;
 }
 
+// raxに入っている型fromをtoに変換する
+static void	cast(Type *from, Type *to)
+{
+	int	size1;
+	int	size2;
+
+	// 型が同じなら何もしない
+	if (type_equal(from, to))
+		return ;
+
+	// ポインタからポインタのキャストは何もしない
+	if (is_pointer_type(from)
+	&& is_pointer_type(to))
+		return ;
+	
+	size1 = type_size(from);
+	size2 = type_size(to);
+
+	// ポインタから整数へのキャストは情報を落とす
+	if (is_pointer_type(from)
+	&& is_integer_type(to))
+	{
+		pushi(0);
+		mov(R10, RSP);
+		store_value(size2);
+		pop(RAX);
+		return ;
+	}
+
+	// 整数からポインタは0埋めで拡張
+	// (ポインタはunsinged long long intなので)
+	if (is_integer_type(from)
+	&& is_pointer_type(to))
+	{
+		pushi(0);
+		mov(R10, RSP);
+		store_value(size1);
+		pop(RAX);
+		return ;
+	}
+
+	// 整数から整数は符号を考えながらキャスト
+	if (is_integer_type(from)
+	&& is_integer_type(to))
+	{
+		// TODO unsigned
+		// 符号拡張する
+		if (size1 < size2)
+		{
+			if (size1 == 1)
+				printf("    movsxd %s, %s\n", RAX, AL);
+			else if (size1 == 2)
+				printf("    movsxd %s, %s\n", RAX, AX);
+			else if (size1 == 4)
+				printf("    movsxd %s, %s\n", RAX, EAX);
+			else
+				error("8byte -> 8byteのキャストは無い");
+		}
+		return ;
+	}
+
+	error("%sから%sへのキャストが定義されていません", get_type_name(from), get_type_name(to));
+}
+
 static void	primary(Node *node)
 {
 	char *ch;
 
 	switch (node->kind)
 	{
+		case ND_CAST:
+			unary(node->lhs);
+			cast(node->lhs->type, node->type);
+			return;
 		case ND_LVAR:
 			lval(node);
 			load(node->type);

@@ -33,10 +33,11 @@ unary		= ("+" | "-") arrow
 
 arrow		= primary (("->" | ".") ident derefs?)?*
 
-primary		= cast? ("(" expr ")"
-			| ident ("(" call-params ")")?
-			| strliteral
-			| integer) derefs
+primary		= cast unary
+			| ("(" expr ")"
+			  | ident ("(" call-params ")")?
+			  | strliteral
+			  | integer) derefs
 
 cast		= "(" typep ")"
 
@@ -60,7 +61,7 @@ str			= alphabet | number | symbol
 strs		= str strs | str?
 
 alphabet	= [a-zA-Z]
-number		= [1-9]
+number		= [0-9]
 symbol		= "_"
 
 escape		= "\\" ("a" | "b" | "f" | "n" | "r" | "t" | "v" | "0" | "\"")
