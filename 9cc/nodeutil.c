@@ -54,7 +54,11 @@ Node *new_node_num(int val)
 {
 	Node *node = new_node(ND_NUM, NULL, NULL);
 	node->val = val;
-	node->type = new_primitive_type(INT);
+
+	//if (val < 127 && val > -128)
+	//	node->type = new_primitive_type(CHAR);
+	//else
+		node->type = new_primitive_type(INT);
 	return node;
 }
 

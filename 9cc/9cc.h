@@ -265,7 +265,6 @@ Type	*new_struct_type(char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
-bool	can_assign(Type *l, Type *r);
 bool	can_compared(Type *l, Type *r);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
@@ -273,7 +272,7 @@ StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
 //void	determine_struct_size(StructDef **ptr);
 int	max_type_size(Type *type);
 char	*get_type_name(Type *type);
-bool	type_can_cast(Type *from, Type *to);
+bool	type_can_cast(Type *from, Type *to, bool is_explicit);
 
 char	*get_str_literal_name(int index);
 

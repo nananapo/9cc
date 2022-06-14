@@ -118,21 +118,6 @@ bool	can_compared(Type *l, Type *r)
 	return (false);
 }
 
-// lにrを代入可能か確かめる
-bool	can_assign(Type *l, Type *r)
-{
-	if (l->ty == VOID || r->ty == VOID)
-		return (false);
-
-	if (type_equal(l, r))
-		return (true);
-
-	if (is_integer_type(l) && is_integer_type(r))
-		return (true);
-
-	return (false);
-}
-
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 {
 	if (strct == NULL)
@@ -195,14 +180,31 @@ bool	is_declarable_type(Type *type)
 	return (type->ty != VOID);
 }
 
-bool	type_can_cast(Type *from, Type *to)
+bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 {
+	int	size1;
+	int	size2;
+
 	if (type_equal(from, to))
 		return (true);
-	if (from->ty == STRUCT
-	|| to->ty == STRUCT)
+
+	// structはダメ
+	if (from->ty == STRUCT || to->ty == STRUCT)
 		return (false);
+
+	// どちらもポインタ
+	if (is_pointer_type(from) && is_pointer_type(to))
+		return (is_explicit);
+
+	// どちらかがポインタ
+	if (is_pointer_type(from) != is_pointer_type(to))
+		return (is_explicit);
+
 	// どちらも数字？
+	size1 = type_size(from);
+	size2 = type_size(to);
+	//if (size1 > size2)
+	//	return (is_explicit);
 	return (true);
 }
 

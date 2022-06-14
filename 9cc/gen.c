@@ -457,6 +457,8 @@ static void	cast(Type *from, Type *to)
 		return ;
 	}
 
+	printf("#CASTCAST\n");
+
 	// 整数から整数は符号を考えながらキャスト
 	if (is_integer_type(from)
 	&& is_integer_type(to))
@@ -466,11 +468,13 @@ static void	cast(Type *from, Type *to)
 		if (size1 < size2)
 		{
 			if (size1 == 1)
-				printf("    movsx %s, %s\n", RAX, AL);
-			else if (size1 == 2)
-				printf("    movsx %s, %s\n", RAX, AX);
+			{
+				printf("    movsx %s, %s # cast %d -> %d\n", RAX, AL, size1, size2);
+			}
 			else if (size1 == 4)
-				printf("    movsx %s, %s\n", RAX, EAX);
+			{
+				printf("    movsx %s, %s # cast %d -> %d\n", RAX, EAX, size1, size2);
+			}
 			else
 				error("8byte -> 8byteのキャストは無い");
 		}
@@ -487,7 +491,7 @@ static void	primary(Node *node)
 	switch (node->kind)
 	{
 		case ND_CAST:
-			unary(node->lhs);
+			expr(node->lhs);
 			cast(node->lhs->type, node->type);
 			return;
 		case ND_LVAR:
@@ -515,7 +519,7 @@ static void	primary(Node *node)
 			error("おかしい");
 			return;
 		default:
-			error("不明なノード %d", node->kind);
+			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
 			break;
 	}
 }

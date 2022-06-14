@@ -53,17 +53,21 @@ static int	get_str_literal_index(char *str, int len)
 
 static Node *call(Token *tok)
 {
-	Node	*node = new_node(ND_CALL, NULL, NULL);
+	Node	*node;
+	Node	*args;
 
+	node  = new_node(ND_CALL, NULL, NULL);
 	node->fname = tok->str;
 	node->flen = tok->len;
 	node->args = NULL;
 	node->argdef_count = 0;
 
+	args = NULL;
+
 	if (!consume(")"))
 	{
 		Node *arg = expr();
-		node->args = arg;
+		args = arg;
 		node->argdef_count = 1;
 
 		for (;;)
@@ -75,11 +79,11 @@ static Node *call(Token *tok)
 			
 			arg = expr();
 			arg->next = NULL;
-			if (node->args == NULL)
-				node->args = arg;
+			if (args == NULL)
+				args = arg;
 			else
 			{
-				for (Node *tmp = node->args; tmp; tmp = tmp->next)
+				for (Node *tmp = args; tmp; tmp = tmp->next)
 				{
 					if (tmp->next == NULL)
 					{
@@ -103,21 +107,43 @@ static Node *call(Token *tok)
 
 	// 引数の型を比べる
 	LVar *def = refunc->locals;
-	Node *use = node->args;
 
 	for (int i = 0; i < node->argdef_count; i++)
 	{
-		if (!type_equal(def->type, use->type))
-			error_at(token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-					strndup(node->fname, node->flen),
-					strndup(def->name, def->len),
-					get_type_name(def->type),
-					get_type_name(use->type));
+		// 型の確認
+		if (!type_equal(def->type, args->type))
+		{
+			// 暗黙的なキャストの確認
+			if (!type_can_cast(args->type, def->type, false))
+				error_at(token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
+						strndup(node->fname, node->flen),
+						strndup(def->name, def->len),
+						get_type_name(def->type),
+						get_type_name(args->type));
+
+			Node *cast = new_node(ND_CAST, args, NULL);
+			cast->type = def->type;
+			cast->next = args->next;
+			args = cast;
+		}
+
 		// きっとuse->localsは使われないので使ってしまう
-		use->locals = def;
+		args->locals = def;
+
+		// 格納
+		if (node->args == NULL)
+			node->args = args;
+		else
+		{
+			Node *tmp = node->args;
+			for (int j = 0; j < i - 1; j++)
+				tmp = tmp->next;
+			tmp->next = args;
+		}
+
 		// 進める
 		def = def->next;
-		use = use->next;
+		args = args->next;
 	}
 
 	// 型を返り値の型に設定
@@ -181,7 +207,7 @@ static Node *primary()
 		// 明示的なキャスト
 		expect(")");
 		node = new_node(ND_CAST, unary(), NULL);
-		if (!type_can_cast(node->lhs->type, type_cast))
+		if (!type_can_cast(node->lhs->type, type_cast, true))
 			error_at(token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
 		node->type = type_cast;
 		return (node);
@@ -511,11 +537,26 @@ static Node	*assign()
 		node = new_node(ND_ASSIGN, node, assign());
 
 		// 代入可能な型かどうか確かめる。
-		if (!can_assign(node->lhs->type, node->rhs->type))
-			error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
-					get_type_name(node->lhs->type),
-					get_type_name(node->rhs->type));
+		if (node->lhs->type->ty == VOID || node->rhs->type->ty == VOID)
+			error_at(token->str, "voidを宣言、代入できません");
 
+		if (!type_equal(node->rhs->type, node->lhs->type))
+		{
+			if (type_can_cast(node->rhs->type, node->lhs->type, false))
+			{
+				printf("#assign (%s) <- (%s)\n",
+						get_type_name(node->lhs->type),
+						get_type_name(node->rhs->type));
+				node->rhs = new_node(ND_CAST, node->rhs, NULL);
+				node->rhs->type = node->lhs->type;
+			}
+			else
+			{
+				error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
+						get_type_name(node->lhs->type),
+						get_type_name(node->rhs->type));
+			}
+		}
 		node->type = node->lhs->type;
 	}
 	return node;
