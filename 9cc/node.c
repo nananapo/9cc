@@ -35,10 +35,11 @@ static int	get_str_literal_index(char *str, int len)
 	tmp = str_literals;
 	while (tmp != NULL)
 	{
-		if (len == tmp->len && strncmp(tmp->str, str, len))
+		if (len == tmp->len && strncmp(tmp->str, str, len) == 0)
 			return (tmp->index);
 		tmp = tmp->next;
 	}
+
 	tmp = calloc(1, sizeof(t_str_elem));
 	tmp->str = str;
 	tmp->len = len;
@@ -46,8 +47,10 @@ static int	get_str_literal_index(char *str, int len)
 		tmp->index = 0;
 	else
 		tmp->index = str_literals->index + 1;
+
 	tmp->next = str_literals;
 	str_literals = tmp;
+
 	return (tmp->index);
 }
 
@@ -103,7 +106,7 @@ static Node *call(Token *tok)
 
 	// 引数の数を確認
 	if (node->argdef_count != refunc->argdef_count)
-		error_at(token->str, "関数%sの引数の数が一致しません", strndup(node->fname, node->flen));
+		error_at(token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
 
 	// 引数の型を比べる
 	LVar *def = refunc->locals;
@@ -199,7 +202,8 @@ static Node *primary()
 		// 括弧の中身が型ではないなら優先順位を上げる括弧
 		if (type_cast == NULL)
 		{
-			node = expr();
+			node = new_node(ND_PARENTHESES, expr(), NULL);
+			node->type = node->lhs->type;
 			expect(")");
 			return node;
 		}

@@ -504,6 +504,16 @@ int main()
 	printf(s);
 }"
 
+assert_out "HelloWorld" "int printf(char *a);
+char *s;
+int main()
+{
+	s = \"Hello\";
+	printf(s);
+	s = \"World\";
+	printf(s);
+}"
+
 assert_out "1" "int main()
 {
 	pint(-(-1));
@@ -661,5 +671,9 @@ assert_gcc "cast2.c"
 assert_gcc "implicit_cast0.c"
 
 assert_gcc "cond1.c"
+
+
+
+assert_gcc "std/ctype.c"
 
 echo OK
