@@ -113,7 +113,8 @@ typedef enum
 	ND_STRUCT_VALUE,
 	ND_STRUCT_PTR_VALUE,
 
-	ND_CAST
+	ND_CAST,
+	ND_PARENTHESES
 } NodeKind;
 
 typedef enum
