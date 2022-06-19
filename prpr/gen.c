@@ -154,15 +154,19 @@ static void	load(char *file_name)
 static void	include(Node *node)
 {
 	char	*file_name;
+	char	str[10000];
 
 	file_name = strlit_to_str(node->file_name, strlen(node->file_name));
-	//fprintf(stderr, "%d %s\n", node->is_std_include, node->file_name);
 	if (node->is_std_include)
 	{
-		// TODO
-		return ;
+		strcat(str, "/Users/kanapo/Documents/cc/std/");
+		strcat(str, file_name);
+		load(str);
 	}
-	load(file_name);
+	else
+	{
+		load(file_name);
+	}
 }
 
 static void	define_macro(Node *node)
