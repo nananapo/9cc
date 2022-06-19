@@ -529,15 +529,43 @@ static Node *equality()
 	}
 }
 
+static Node	*conditional(void)
+{
+	Node	*node;
+
+	node = equality();
+	if (consume("&&"))
+	{
+		node = new_node(ND_COND_AND, node, conditional());
+		node->type = new_primitive_type(INT);
+
+		// TODO 型チェック
+		//if (!is_integer_type(node->lhs)
+		//|| !is_integer_type(node->rhs))
+		//	error_at(token->str, "左辺か右辺の型が整数型ではありません (&&)");
+	}
+	else if (consume("||"))
+	{
+		node = new_node(ND_COND_OR, node, conditional());
+		node->type = new_primitive_type(INT);
+
+		//if (!is_integer_type(node->lhs)
+		//|| !is_integer_type(node->rhs))
+		//	error_at(token->str, "左辺か右辺の型が整数型ではありません (||)");
+	}
+	return (node);
+}
+
 static Node	*assign()
 {
-	Node	*node = equality();
+	Node	*node = conditional();
 	if (consume("="))
 	{
 		node = new_node(ND_ASSIGN, node, assign());
 
 		// 代入可能な型かどうか確かめる。
-		if (node->lhs->type->ty == VOID || node->rhs->type->ty == VOID)
+		if (node->lhs->type->ty == VOID
+		|| node->rhs->type->ty == VOID)
 			error_at(token->str, "voidを宣言、代入できません");
 
 		if (!type_equal(node->rhs->type, node->lhs->type))
@@ -567,6 +595,7 @@ static Node	*expr()
 	return assign();
 }
 
+// TODO 条件の中身がintegerか確認する
 static Node	*stmt()
 {
 	Node	*node;

@@ -94,6 +94,9 @@ typedef enum
 	ND_ASSIGN,
 	ND_LVAR,
 
+	ND_COND_AND,
+	ND_COND_OR,
+
 	ND_RETURN,
 	ND_IF,
 	ND_WHILE,

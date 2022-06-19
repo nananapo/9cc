@@ -257,9 +257,7 @@ int main()
 	return add(4,6);
 }"
 
-assert_gcc "add6_1.c"
-#assert_gcc "add6_2.c"
-#assert_gcc "add6_3.c"
+assert_gcc "add6.c"
 
 assert 0 "int main(){int a; int *aa;int **aaa;return 0;}"
 assert 0 "int main(){return 0;}int *sub(){}int *sub2(int *a,int **b){}"
@@ -661,5 +659,7 @@ assert_gcc "cast1.c"
 assert_gcc "cast2.c"
 
 assert_gcc "implicit_cast0.c"
+
+assert_gcc "cond1.c"
 
 echo OK

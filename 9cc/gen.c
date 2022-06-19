@@ -761,13 +761,76 @@ static void	equality(Node *node)
 	}
 }
 
+static void	conditional(Node *node)
+{
+	int	lend;
+
+	if (node->kind != ND_COND_AND && node->kind != ND_COND_OR)
+	{
+		equality(node);
+		return ;
+	}
+
+	if (node->kind == ND_COND_AND)
+	{
+		lend = jumpLabelCount++;
+
+		// 左辺を評価
+		equality(node->lhs);
+		mov(RDI, "0");
+		cmp(node->lhs->type, new_primitive_type(INT));
+		printf("    setne al\n"); // 0と等しくないかをalに格納
+		printf("    je .Lcond%d\n", lend); // 0ならスキップ
+
+		push();
+
+		// 右辺を評価
+		conditional(node->rhs);
+		mov(RDI, "0");
+		cmp(node->rhs->type, new_primitive_type(INT));
+		printf("    setne al\n"); // 0と等しくないかをalに格納
+
+		pop(RDI);
+		printf("    add %s, %s\n", RAX, RDI);
+		printf("    movzx rax, al\n"); // alをゼロ拡張
+
+		// 最後の比較
+		printf(".Lcond%d:\n", lend);
+		mov(RDI, "2");
+		cmp(new_primitive_type(INT), new_primitive_type(INT));
+		printf("    sete al\n"); // 2と等しいかをalに格納
+		printf("    movzx rax, al\n"); // alをゼロ拡張
+	}
+	else if (node->kind == ND_COND_OR)
+	{
+		lend = jumpLabelCount++;
+
+		// 左辺を評価
+		equality(node->lhs);
+		mov(RDI, "0");
+		cmp(node->lhs->type, new_primitive_type(INT));
+		printf("    setne al\n"); // 0と等しくないかをalに格納
+		printf("    movzx rax, al\n"); // alをゼロ拡張
+		printf("    jne .Lcond%d\n", lend); // 0以外ならスキップ
+
+		// 右辺を評価
+		conditional(node->rhs);
+		mov(RDI, "0");
+		cmp(node->rhs->type, new_primitive_type(INT));
+		printf("    setne al\n"); // 0と等しくないかをalに格納
+		printf("    movzx rax, al\n"); // alをゼロ拡張
+
+		printf(".Lcond%d:\n", lend);
+	}
+}
+
 static void	assign(Node *node)
 {
 	int	size;
 
 	if (node->kind != ND_ASSIGN)
 	{
-		equality(node);
+		conditional(node);
 		return;
 	}
 

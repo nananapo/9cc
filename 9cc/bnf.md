@@ -21,7 +21,10 @@ for-stmt	= "for" "(" expr? ";" expr? ";" expr ")" stmt
 def-var		= typep ident types
 
 expr		= assign
-assign		= equality ("=" assign)?
+assign		= conditional ("=" assign)?
+
+conditional	= equality (("||" | "&&") conditional)?
+
 equality	= relational (("==" | "!=" ) relational)?
 relational	= add (("<" | "<=" | ">" | ">=") add)?
 add			= mul (("+" | "-") mul)?
