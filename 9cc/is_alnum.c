@@ -33,7 +33,7 @@ int	is_alnum(char c)
 int	is_escapedchar(char c)
 {
 	return (c == '"' || c == 'a' || c == 'b' || c == 'f' || c == 'n'
-		|| c == 'r' || c == 'v' || c == '0' || c == '\'' || c == '\\');
+		|| c == 'r' || c == 't' || c == 'v' || c == '0' || c == '\'' || c == '\\');
 }
 
 int get_char_to_int(char *p, int len)
@@ -56,6 +56,8 @@ int get_char_to_int(char *p, int len)
 			return '\n';
 		case 'r':
 			return '\r';
+		case 't':
+			return '\t';
 		case 'v':
 			return '\v';
 		case '0':
