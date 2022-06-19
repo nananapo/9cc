@@ -16,9 +16,18 @@ int my_putstr(char *c, int n)
 	return 0;
 }
 
+static int	my_strlen(char *c)
+{
+	int i;
+	i = 0;
+	while (c[i] != '\0')
+		i++;
+	return (i);
+}
+
 int my_print(char *c)
 {
-	printf("%s", c);
+	write(1, c, my_strlen(c));
 	return 0;
 }
 

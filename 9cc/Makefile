@@ -11,7 +11,7 @@ $(NAME): $(OBJS)
 	$(CC) -g -o $(NAME) $(OBJS) $(LDFLAGS)
 
 test: $(NAME)
-	./$(TEST_SCRIPT)
+	env LC_ALL="C" ./$(TEST_SCRIPT)
 
 clean:
 	rm -rf $(OBJS) *~ tmp* *dSYM a.out
