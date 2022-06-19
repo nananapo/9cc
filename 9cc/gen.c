@@ -515,6 +515,9 @@ static void	primary(Node *node)
 		case ND_PROTOTYPE:
 		case ND_DEFVAR:
 			return;
+		case ND_PARENTHESES:
+			expr(node->lhs);
+			break;
 		case ND_STRUCT_DEF:
 			error("おかしい");
 			return;
@@ -765,11 +768,14 @@ static void	conditional(Node *node)
 {
 	int	lend;
 
-	if (node->kind != ND_COND_AND && node->kind != ND_COND_OR)
+	if (node->kind != ND_COND_AND
+		&& node->kind != ND_COND_OR)
 	{
 		equality(node);
 		return ;
 	}
+
+	//printf("condand : %d, %d:%d\n", node->kind == ND_COND_AND, node->lhs->kind, node->rhs->kind);
 
 	if (node->kind == ND_COND_AND)
 	{
