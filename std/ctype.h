@@ -45,7 +45,7 @@ int	isdigit(int c)
 
 int	isgraph(int c)
 {
-	return (iscntrl(c) != 0 && c != ' ');
+	return (isprint(c) != 0 && c != ' ');
 }
 
 int	islower(int c)
@@ -55,12 +55,12 @@ int	islower(int c)
 
 int	isprint(int c)
 {
-	return (iscntrl(c) == 0);
+	return (32 <= c && c <= 126);
 }
 
 int	ispunct(int c)
 {
-	return (isspace(c) == 0 && isalpha(c) == 0);
+	return (isprint(c) && isspace(c) == 0 && isalnum(c) == 0);
 }
 
 int	isspace(int c)
@@ -77,7 +77,8 @@ int	isupper(int c)
 int	isxdigit(int c)
 {
 	return (('0' <= c && c <= '9')
-		|| ('a' <= c && c <= 'f') || ('A' <= c && c <= 'Z'));
+		|| ('a' <= c && c <= 'f')
+		|| ('A' <= c && c <= 'F'));
 }
 
 int	tolower(int c)
