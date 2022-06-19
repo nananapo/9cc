@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 extern char	*user_input;
 
@@ -14,13 +15,42 @@ void	error(char *fmt, ...)
 	exit(1);
 }
 
+static int	count_line(char *start, char *end)
+{
+	int	i;
+
+	i = 1;
+	while (start != end)
+	{
+		if (*start == '\n')
+			i++;
+		start++;
+	}
+	return (i);
+}
+
 void	error_at(char *loc, char *fmt, ...)
 {
 	va_list ap;
+	char	*mystart;
+	char	*ret;
+
 	va_start(ap, fmt);
 
-	int pos = loc - user_input;
-	fprintf(stderr, "%s\n", user_input);
+	mystart = loc;
+	while (mystart != user_input && *(mystart - 1) != '\n')
+		mystart--;
+
+	int pos = loc - mystart;
+
+	fprintf(stderr, "%d:%d:\n", count_line(user_input, loc), pos);
+
+	ret = strchr(mystart, '\n');
+	if (ret == NULL)
+		fprintf(stderr, "%s\n", mystart);
+	else
+		fprintf(stderr, "%s\n", strndup(mystart, ret - mystart));
+
 	fprintf(stderr, "%*s", pos, " ");
 	fprintf(stderr, "^ ");
 	vfprintf(stderr, fmt, ap);
