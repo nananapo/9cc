@@ -46,7 +46,7 @@ static bool	tokenize_comment(TokenizeEnv *env, int len)
 	if (len == 2 && strncmp(env->str, "/*", 2) == 0)
 	{
 		tmp = env->str;
-		env->str = strstr(env->str, "*/");
+		env->str = strstr(env->str, "*/") + 2;
 		if (env->str == NULL)
 			error_at(tmp, "/*に対応する*/が見つかりませんでした");
 		return (true);

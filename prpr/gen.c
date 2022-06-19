@@ -145,7 +145,7 @@ static void	load(char *file_name)
 
 	str = read_file(file_name);
 	if (str == NULL)
-		error("ファイル%sが見つかりせん", file_name);
+		error("ファイル %s が見つかりせん", file_name);
 	tok = tokenize(str);
 	node = parse(&tok, 0);
 	gen(node);
@@ -159,6 +159,7 @@ static void	include(Node *node)
 	file_name = strlit_to_str(node->file_name, strlen(node->file_name));
 	if (node->is_std_include)
 	{
+		str[0] = '\0';
 		strcat(str, "/Users/kanapo/Documents/cc/std/");
 		strcat(str, file_name);
 		load(str);
