@@ -125,7 +125,7 @@ static void	codes(Node *node)
 			}
 			else
 			{
-				printf("%s", strndup(code->str, code->len));
+				printf("%s ", strndup(code->str, code->len));
 			}
 		}
 		else
