@@ -228,6 +228,8 @@ struct s_struct_definition
 	StructMemberElem	*members;
 };
 
+char	*read_file(char	*name);
+
 int	align_to(int a, int to);
 
 int	is_alnum(char c);

@@ -24,14 +24,17 @@ int main(int argc, char **argv)
 	int			i;
 	t_str_elem	*lit;
 
-	if (argc != 2)
+	if (argc == 1)
+		user_input = read_file("-");
+	else if (argc == 2)
+		user_input = argv[1];
+	else
 	{
 		fprintf(stderr, "引数の個数が正しくありません");
 		return (1);
 	}
 
-	user_input = argv[1];
-	token = tokenize(argv[1]);
+	token = tokenize(user_input);
 	printf("# Tokenized\n");
 
 	program();
