@@ -281,7 +281,8 @@ static void	call(Node *node)
 	{
 		arg_count++;
 
-		size = type_size(tmp->type);
+		// TODO int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
+		size = type_size(tmp->locals->type);
 		printf("# PUSH ARG %s (%d)\n",
 			strndup(tmp->locals->name, tmp->locals->len),
 			size);
@@ -349,7 +350,8 @@ static void	call(Node *node)
 
 		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
 	
-		size = type_size(tmp->type);
+		// TODO int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
+		size = type_size(tmp->locals->type);
 
 		// レジスタに入れる
 		if (tmp->locals->arg_regindex != -1)

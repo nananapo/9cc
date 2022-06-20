@@ -681,4 +681,6 @@ assert_gcc "increments4.c"
 
 assert_gcc "not.c"
 
+assert_gcc "k_r_strcpy.c"
+
 echo OK
