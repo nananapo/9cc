@@ -686,7 +686,7 @@ static Node	*stmt(void)
 			node->els = stmt();
 		return node;
 	}
-	else if(consume_with_type(TK_WHILE))
+	else if (consume_with_type(TK_WHILE))
 	{
 		if (!consume("("))
 			error_at(token->str, "(ではないトークンです");
@@ -696,7 +696,23 @@ static Node	*stmt(void)
 		node->rhs = stmt();
 		return node;
 	}
-	else if(consume_with_type(TK_FOR))
+	else if (consume_with_type(TK_DO))
+	{
+		node = new_node(ND_DOWHILE, stmt(), NULL);
+
+		if (!consume_with_type(TK_WHILE))
+			error_at(token->str, "whileが必要です");
+
+		if (!consume("("))
+			error_at(token->str, "(ではないトークンです");
+		node->rhs = expr();
+		if (!consume(")"))
+			error_at(token->str, ")ではないトークンです");
+		if (!consume(";"))
+			error_at(token->str, ";が必要です");
+		return (node);
+	}
+	else if (consume_with_type(TK_FOR))
 	{
 		if (!consume("("))
 			error_at(token->str, ")ではないトークンです");

@@ -887,6 +887,7 @@ static void stmt(Node *node)
 		case ND_RETURN:
 		case ND_IF:
 		case ND_WHILE:
+		case ND_DOWHILE:
 		case ND_FOR:
 		case ND_BLOCK:
 			break;
@@ -950,6 +951,21 @@ static void stmt(Node *node)
 			
 			// end
 			printf(".Lend%d:\n", lend);
+			return;
+		case ND_DOWHILE:
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			printf(".Lbegin%d:\n", lbegin);
+
+			// while block
+			stmt(node->lhs);
+
+			// if
+			expr(node->rhs);
+			mov(RDI, "0");
+			cmp(node->rhs->type, new_primitive_type(INT));
+			printf("    jne .Lbegin%d\n", lbegin);
 			return;
 		case ND_FOR:
 			lbegin = jumpLabelCount++;

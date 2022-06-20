@@ -81,7 +81,7 @@ Token	*tokenize(char *p)
 		if (isspace(*p))
 		{
 			p++;
-			continue;
+			continue ;
 		}
 		res_result = match_reserved_word(p);
 		if (res_result != NULL)
@@ -89,69 +89,76 @@ Token	*tokenize(char *p)
 			cur = new_token(TK_RESERVED, cur, p);
 			cur->len = strlen(res_result);
 			p += cur->len;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "return"))
 		{
 			cur = new_token(TK_RETURN, cur, p);
 			cur->len = 6;
 			p += 6;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "if"))
 		{
 			cur = new_token(TK_IF, cur, p);
 			cur->len = 2;
 			p += 2;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "else"))
 		{
 			cur = new_token(TK_ELSE, cur, p);
 			cur->len = 4;
 			p += 4;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "while"))
 		{
 			cur = new_token(TK_WHILE, cur, p);
 			cur->len = 5;
 			p += 5;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "for"))
 		{
 			cur = new_token(TK_FOR, cur, p);
 			cur->len = 3;
 			p += 3;
-			continue;
+			continue ;
+		}
+		if (match_word(p, "do"))
+		{
+			cur = new_token(TK_DO, cur, p);
+			cur->len = 2;
+			p += 2;
+			continue ;
 		}
 		if (match_word(p, "sizeof"))
 		{
 			cur = new_token(TK_SIZEOF, cur, p);
 			cur->len = 6;
 			p += 6;
-			continue;
+			continue ;
 		}
 		if (match_word(p, "struct"))
 		{
 			cur = new_token(TK_STRUCT, cur, p);
 			cur->len = 6;
 			p += 6;
-			continue;
+			continue ;
 		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);
 			cur->len = read_var_name(p);
 			p += cur->len;
-			continue;
+			continue ;
 		}
 		if (isdigit(*p))
 		{
 			cur = new_token(TK_NUM, cur, p);
 			cur->val = strtol(p, &p, 10);
-			continue;
+			continue ;
 		}
 		if (*p == '"')
 		{

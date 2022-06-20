@@ -56,6 +56,7 @@ typedef enum
 	TK_IF,
 	TK_ELSE,
 	TK_WHILE,
+	TK_DO,
 	TK_FOR,
 	TK_STR_LITERAL,
 	TK_CHAR_LITERAL,
@@ -100,6 +101,7 @@ typedef enum
 	ND_RETURN,
 	ND_IF,
 	ND_WHILE,
+	ND_DOWHILE,
 	ND_FOR,
 	ND_ADDR,
 
