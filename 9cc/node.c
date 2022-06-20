@@ -672,7 +672,13 @@ static Node	*stmt(void)
 	if (consume_with_type(TK_RETURN))
 	{
 		// TODO 型チェック
-		node = new_node(ND_RETURN, expr(), NULL);
+		if (consume(";"))
+		{
+			node = new_node(ND_RETURN, NULL, NULL);
+			return (node);
+		}
+		else
+			node = new_node(ND_RETURN, expr(), NULL);
 	}
 	else if (consume_with_type(TK_IF))
 	{
@@ -708,9 +714,6 @@ static Node	*stmt(void)
 		node->rhs = expr();
 		if (!consume(")"))
 			error_at(token->str, ")ではないトークンです");
-		if (!consume(";"))
-			error_at(token->str, ";が必要です");
-		return (node);
 	}
 	else if (consume_with_type(TK_FOR))
 	{

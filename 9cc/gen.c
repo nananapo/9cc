@@ -899,7 +899,8 @@ static void stmt(Node *node)
 	switch (node->kind)
 	{
 		case ND_RETURN:
-			expr(node->lhs);
+			if (node->lhs != NULL)
+				expr(node->lhs);
 			epilogue();
 			stack_count += 8; // rbpをpopしたけれど、epilogueでもpopするので+8
 			return;
