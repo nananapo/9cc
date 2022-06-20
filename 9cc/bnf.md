@@ -40,7 +40,10 @@ primary		= cast unary
 			| ("(" expr ")"
 			  | ident ("(" call-params ")")?
 			  | strliteral
-			  | integer) derefs
+			  | integer) (derefs | increment | decrement)?
+
+increment	= "++"
+decrement	= "--"
 
 cast		= "(" typep ")"
 

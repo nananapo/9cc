@@ -672,8 +672,8 @@ assert_gcc "implicit_cast0.c"
 
 assert_gcc "cond1.c"
 
-
-
 assert_gcc "std/ctype.c"
+
+assert_gcc "increments.c"
 
 echo OK

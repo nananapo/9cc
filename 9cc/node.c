@@ -155,6 +155,38 @@ static Node *call(Token *tok)
 	return node;
 }
 
+// 後置インクリメント, デクリメント
+static Node	*read_suffix_increment(Node *node)
+{
+	if (consume("++"))
+	{
+		// TODO 型チェック
+		node = new_node(ND_ASSIGN,
+						node,
+						new_node(ND_ADD, node, new_node_num(1)));
+		node->rhs->type = node->rhs->lhs->type; // とりあえず左辺の型にしておく
+		node->type = node->lhs->type;
+
+		// 1を引く
+		node = new_node(ND_SUB, node, new_node_num(1));
+		node->type = node->lhs->type;
+	}
+	else if (consume("--"))
+	{
+		// TODO 型チェック
+		node = new_node(ND_ASSIGN,
+						node,
+						new_node(ND_SUB, node, new_node_num(1)));
+		node->rhs->type = node->rhs->lhs->type; // とりあえず左辺の型にしておく
+		node->type = node->lhs->type;
+
+		// 1を足す
+		node = new_node(ND_ADD, node, new_node_num(1));
+		node->type = node->lhs->type;
+	}
+	return (node);
+}
+
 // 添字によるDEREF
 static Node	*read_deref_index(Node *node)
 {
@@ -183,7 +215,7 @@ static Node	*read_deref_index(Node *node)
 		if (!consume("]"))
 			error_at(token->str, "%s");
 	}
-	return (node);
+	return read_suffix_increment(node);
 }
 
 static Node *primary()
@@ -205,16 +237,17 @@ static Node *primary()
 			node = new_node(ND_PARENTHESES, expr(), NULL);
 			node->type = node->lhs->type;
 			expect(")");
-			return node;
+			return read_deref_index(node);
 		}
 
 		// 明示的なキャスト
+		// TODO キャストの優先順位が違う
 		expect(")");
 		node = new_node(ND_CAST, unary(), NULL);
 		if (!type_can_cast(node->lhs->type, type_cast, true))
 			error_at(token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
 		node->type = type_cast;
-		return (node);
+		return read_deref_index(node);
 	}
 	
 	// identかcall
