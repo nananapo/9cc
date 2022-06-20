@@ -1,3 +1,6 @@
+#ifndef CTYPE_H
+# define CTYPE_H
+
 /*
  * C11のctype.h実装
  * Cロケールのみ対応 
@@ -94,3 +97,5 @@ int	toupper(int c)
 		return (c - 'a' + 'A');
 	return (c);
 }
+
+#endif
