@@ -164,7 +164,7 @@ static Node	*read_suffix_increment(Node *node)
 		node = new_node(ND_ASSIGN,
 						node,
 						new_node(ND_ADD, node, new_node_num(1)));
-		node->rhs->type = node->rhs->lhs->type; // とりあえず左辺の型にしておく
+		node->rhs->type = node->lhs->type; // とりあえず左辺の型にしておく
 		node->type = node->lhs->type;
 
 		// 1を引く
@@ -177,7 +177,7 @@ static Node	*read_suffix_increment(Node *node)
 		node = new_node(ND_ASSIGN,
 						node,
 						new_node(ND_SUB, node, new_node_num(1)));
-		node->rhs->type = node->rhs->lhs->type; // とりあえず左辺の型にしておく
+		node->rhs->type = node->lhs->type; // とりあえず左辺の型にしておく
 		node->type = node->lhs->type;
 
 		// 1を足す
@@ -378,14 +378,14 @@ static Node *unary(void)
 
 	if (consume("+"))
 	{
-		node = arrow();
+		node = unary();
 		if (is_pointer_type(node->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		return node;
 	}
 	else if (consume("-"))
 	{
-		node = new_node(ND_SUB, new_node_num(0), arrow());
+		node = new_node(ND_SUB, new_node_num(0), unary());
 		if (is_pointer_type(node->rhs->type))
 			error_at(token->str, "ポインタ型に対してunary -を適用できません");
 		node->type = node->rhs->type;
@@ -416,6 +416,30 @@ static Node *unary(void)
 		node->type = new_type_ptr_to(node->lhs->type);
 		return node;
 	}
+	else if (consume("++"))
+	{
+		node = unary();
+
+		// TODO 左辺値かの検証はしていない
+		node = new_node(ND_ASSIGN,
+						node,
+						new_node(ND_ADD, node, new_node_num(1)));
+		node->rhs->type = node->lhs->type;
+		node->type = node->lhs->type;
+		return (node);
+	}
+	else if (consume("--"))
+	{
+		node = unary();
+
+		// TODO 左辺値かの検証はしていない
+		node = new_node(ND_ASSIGN,
+						node,
+						new_node(ND_SUB, node, new_node_num(1)));
+		node->rhs->type = node->lhs->type;
+		node->type = node->lhs->type;
+		return (node);
+	}
 	else if (consume_with_type(TK_SIZEOF))
 	{
 		node = unary();
@@ -426,7 +450,7 @@ static Node *unary(void)
 	return arrow();
 }
 
-static Node *mul()
+static Node *mul(void)
 {
 	Node *node = unary();
 	for (;;)
@@ -445,7 +469,7 @@ static Node *mul()
 	}
 }
 
-static Node *add()
+static Node *add(void)
 {
 	Node *node = mul();
 	for (;;)
@@ -520,7 +544,7 @@ static Node *add()
 	}
 }
 
-static Node *relational()
+static Node *relational(void)
 {
 	Node *node = add();
 	for (;;)
@@ -545,7 +569,7 @@ static Node *relational()
 	}
 }
 
-static Node *equality()
+static Node *equality(void)
 {
 	Node *node = relational();
 	for (;;)
@@ -593,7 +617,7 @@ static Node	*conditional(void)
 	return (node);
 }
 
-static Node	*assign()
+static Node	*assign(void)
 {
 	Node	*node = conditional();
 	if (consume("="))
@@ -627,13 +651,13 @@ static Node	*assign()
 	return node;
 }
 
-static Node	*expr()
+static Node	*expr(void)
 {
 	return assign();
 }
 
 // TODO 条件の中身がintegerか確認する
-static Node	*stmt()
+static Node	*stmt(void)
 {
 	Node	*node;
 
@@ -955,7 +979,7 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	return node;
 }
 
-static Node	*filescope()
+static Node	*filescope(void)
 {
 	Token	*ident;
 	Type	*ret_type;
@@ -995,7 +1019,7 @@ static Node	*filescope()
 	return (NULL);
 }
 
-void	program()
+void	program(void)
 {
 	int	i;
 

@@ -29,8 +29,9 @@ equality	= relational (("==" | "!=" ) relational)?
 relational	= add (("<" | "<=" | ">" | ">=") add)?
 add			= mul (("+" | "-") mul)?
 mul			= unary (("*" | "/") unary)?
-unary		= ("+" | "-") arrow
+unary		= ("+" | "-") unary
 			| ("*" | "&") unary
+			| (increment | decrement) unary
 			| "sizeof" unary
 			| arrow
 

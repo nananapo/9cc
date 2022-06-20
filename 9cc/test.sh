@@ -674,6 +674,9 @@ assert_gcc "cond1.c"
 
 assert_gcc "std/ctype.c"
 
-assert_gcc "increments.c"
+assert_gcc "increments1.c"
+assert_gcc "increments2.c"
+assert_gcc "increments3.c"
+assert_gcc "increments4.c"
 
 echo OK
