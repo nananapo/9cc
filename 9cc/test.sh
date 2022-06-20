@@ -679,4 +679,6 @@ assert_gcc "increments2.c"
 assert_gcc "increments3.c"
 assert_gcc "increments4.c"
 
+assert_gcc "not.c"
+
 echo OK

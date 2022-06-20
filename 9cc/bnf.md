@@ -32,6 +32,7 @@ mul			= unary (("*" | "/") unary)?
 unary		= ("+" | "-") unary
 			| ("*" | "&") unary
 			| (increment | decrement) unary
+			| "!" unary
 			| "sizeof" unary
 			| arrow
 

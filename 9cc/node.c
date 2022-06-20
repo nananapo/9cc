@@ -440,6 +440,14 @@ static Node *unary(void)
 		node->type = node->lhs->type;
 		return (node);
 	}
+	else if (consume("!"))
+	{
+		// TODO 生成する関数を作る
+		node = unary();
+		node = new_node(ND_EQUAL, node, new_node_num(0));
+		node->type = new_primitive_type(INT);
+		return (node);
+	}
 	else if (consume_with_type(TK_SIZEOF))
 	{
 		node = unary();
