@@ -700,4 +700,7 @@ assert_gcc "compound_assignment1.c"
 
 assert_gcc "mod.c"
 
+
+assert_gcc "declare_assign.c"
+
 echo OK

@@ -878,13 +878,24 @@ static Node	*stmt(void)
 
 			expect_type_after(&type);
 
-			// TODO Voidチェックは違うパスでやりたい....
+			// TODO voidチェックは違うパスでやりたい....
 			if (!is_declarable_type(type))
 				error_at(token->str, "宣言できない型の変数です");
 
-			node = new_node(ND_DEFVAR, NULL, NULL);
 			LVar *created = create_local_var(tok->str, tok->len, type, false);
+
+			node = new_node(ND_DEFVAR, NULL, NULL);
+			node->type = type;
 			node->offset = created->offset;
+
+			// 宣言と同時に代入
+			if (consume("="))
+			{
+				node = new_node(ND_LVAR, NULL, NULL);
+				node->offset = created->offset;
+				node->type = created->type;
+				node = create_assign(node, expr());
+			}
 		}
 		else
 		{
@@ -915,7 +926,7 @@ static Node	*global_var(Type *type, Token *ident)
 		error_at(token->str, "宣言できない型の変数です");
 	
 
-	// TODO 代入文
+	// TODO 代入文 , 定数じゃないとだめ
 
 	if (!consume(";"))
 		error_at(token->str, ";が必要です。");

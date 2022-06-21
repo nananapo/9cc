@@ -19,7 +19,7 @@ while-stmt	= "while" "(" expr ")" stmt
 dowhile-stmt= "do" stmt "while" "(" expr ")" ";"
 for-stmt	= "for" "(" expr? ";" expr? ";" expr ")" stmt
 
-def-var		= typep ident types
+def-var		= typep ident types ("=" assign)?
 
 expr		= assign
 assign		= conditional (("=" | "+=" | "-=" | "*=") assign)?
