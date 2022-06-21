@@ -172,7 +172,7 @@ char	*strchr(char *s, int c)
 
 	c2 = (char) c;
 	i = 0;
-	while (i < n)
+	while (s[i] != '\0')
 	{
 		if (s[i] == c2)
 			return (s + i);

@@ -607,8 +607,8 @@ static Node *relational(void)
 
 		if (!can_compared(node->lhs->type, node->rhs->type))
 			error_at(token->str,
-					"%dと%dを比較することはできません",
-					node->lhs->type->ty, node->rhs->type->ty);
+					"%sと%sを比較することはできません",
+					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 	}
 }
 
@@ -628,8 +628,8 @@ static Node *equality(void)
 
 		if (!can_compared(node->lhs->type, node->rhs->type))
 			error_at(token->str,
-					"%dと%dを比較することはできません",
-					node->lhs->type->ty, node->rhs->type->ty);
+					"%sと%sを比較することはできません",
+					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 	}
 }
 

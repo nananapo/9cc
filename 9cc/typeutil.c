@@ -115,6 +115,10 @@ bool	can_compared(Type *l, Type *r)
 		return (true);
 	if (is_pointer_type(l) && is_pointer_type(r))
 		return (true);
+	// TODO これいいの？
+	if ((is_pointer_type(l) && is_integer_type(r))
+	|| (is_integer_type(l) && is_pointer_type(r)))
+		return (true);
 	return (false);
 }
 
