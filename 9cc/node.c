@@ -460,14 +460,22 @@ static Node *unary(void)
 	return arrow();
 }
 
-static Node	*create_mul(bool ismul, Node *lhs, Node *rhs)
+/*
+ * type:
+ * 0 : *
+ * 1 : /
+ * 2 : %
+ */
+static Node	*create_mul(int type, Node *lhs, Node *rhs)
 {
 	Node	*node;
 
-	if (ismul)
+	if (type == 0)
 		node = new_node(ND_MUL, lhs, rhs);
-	else
+	else if (type == 1)
 		node = new_node(ND_DIV, lhs, rhs);
+	else
+		node = new_node(ND_MOD, lhs, rhs);
 
 	if (!is_integer_type(node->lhs->type)
 	|| !is_integer_type(node->rhs->type))
@@ -483,9 +491,11 @@ static Node *mul(void)
 	for (;;)
 	{
 		if (consume("*"))
-			node = create_mul(true, node, unary());
+			node = create_mul(0, node, unary());
 		else if (consume("/"))
-			node = create_mul(false, node, unary());
+			node = create_mul(1, node, unary());
+		else if (consume("%"))
+			node = create_mul(2, node, unary());
 		else
 			return node;
 	}
@@ -695,10 +705,11 @@ static Node	*assign(void)
 	else if (consume("-="))
 		node = create_assign(node, create_add(false, node, assign()));
 	else if (consume("*="))
-		node = create_assign(node, create_mul(true, node, assign()));
+		node = create_assign(node, create_mul(0, node, assign()));
 	else if (consume("/="))
-		node = create_assign(node, create_mul(false, node, assign()));
-	
+		node = create_assign(node, create_mul(1, node, assign()));
+	else if (consume("%="))
+		node = create_assign(node, create_mul(2, node, assign()));
 	return (node);
 }
 

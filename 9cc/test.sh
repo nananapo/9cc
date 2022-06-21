@@ -698,4 +698,6 @@ assert_gcc "nostmt1.c"
 
 assert_gcc "compound_assignment1.c"
 
+assert_gcc "mod.c"
+
 echo OK

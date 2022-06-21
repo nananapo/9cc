@@ -615,6 +615,7 @@ static void	mul(Node *node)
 	{
 		case ND_MUL:
 		case ND_DIV:
+		case ND_MOD:
 			break;
 		default:
 			unary(node);
@@ -626,6 +627,7 @@ static void	mul(Node *node)
 	expr(node->lhs);
 	pop("rdi");
 
+// TODO 型に対応
 	switch (node->kind)
 	{
 		case ND_MUL:
@@ -636,13 +638,18 @@ static void	mul(Node *node)
 				printf("    imul eax, edi\n");	
 			}
 */
-			break;
+			break ;
 		case ND_DIV:
-			printf("    cqo\n");
-			printf("    idiv rdi\n");
-			break;
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+			break ;
+		case ND_MOD:
+			printf("    cdq\n"); // d -> q -> o
+			printf("    idiv edi\n");
+			mov(RAX, RDX);
+			break ;
 		default:
-			break;
+			break ;
 	}
 }
 

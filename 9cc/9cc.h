@@ -15,6 +15,7 @@
 # define RSP "rsp"
 # define R10 "r10"
 # define R11 "r11"
+# define RDX "rdx"
 
 // 32
 # define EAX "eax"
@@ -92,25 +93,27 @@ typedef enum
 	ND_SUB,
 	ND_MUL,
 	ND_DIV,
-	ND_EQUAL,
+	ND_MOD,
 
+	ND_EQUAL,
 	ND_NEQUAL,
 	ND_LESS,
 	ND_LESSEQ,
 	ND_ASSIGN,
+
 	ND_LVAR,
 
 	ND_COND_AND,
 	ND_COND_OR,
-
 	ND_RETURN,
+
 	ND_IF,
 	ND_WHILE,
 	ND_DOWHILE,
 	ND_FOR,
 	ND_ADDR,
-
 	ND_DEREF,
+
 	ND_DEFVAR,
 	ND_DEFVAR_GLOBAL,
  	ND_LVAR_GLOBAL,

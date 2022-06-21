@@ -14,4 +14,6 @@ int	main(void)
 	dint(i /= 25);
 	dint(i += 3);
 	dint(i += i);
+	i += 100;
+	dint(i %= 7);
 }
