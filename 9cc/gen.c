@@ -954,7 +954,8 @@ static void stmt(Node *node)
 			
 			// while block
 			sb_forwhile_start(lbegin, lend);
-			stmt(node->rhs);
+			if (node->rhs != NULL)
+				stmt(node->rhs);
 			sb_end();
 			
 			// next
@@ -972,7 +973,8 @@ static void stmt(Node *node)
 
 			// while block
 			sb_forwhile_start(lbegin2, lend);
-			stmt(node->lhs);
+			if (node->lhs != NULL)
+				stmt(node->lhs);
 			sb_end();
 
 			// if
@@ -1005,7 +1007,8 @@ static void stmt(Node *node)
 
 			// for-block
 			sb_forwhile_start(lbegin2, lend);
-			stmt(node->lhs);
+			if (node->lhs != NULL)
+				stmt(node->lhs);
 			sb_end();
 
 			printf(".Lbegin%d:\n", lbegin2); // continue先

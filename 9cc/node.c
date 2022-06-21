@@ -731,7 +731,8 @@ static Node	*stmt(void)
 			error_at(token->str, ")ではないトークンです");
 
 		sb_forwhile_start(-1, -1);
-		node->rhs = stmt();
+		if (!consume(";"))
+			node->rhs = stmt();
 		sb_end();
 
 		return node;
@@ -747,7 +748,8 @@ static Node	*stmt(void)
 
 		if (!consume("("))
 			error_at(token->str, "(ではないトークンです");
-		node->rhs = expr();
+		if (!consume(";"))
+			node->rhs = expr();
 		if (!consume(")"))
 			error_at(token->str, ")ではないトークンです");
 	}
@@ -780,7 +782,8 @@ static Node	*stmt(void)
 
 		// stmt
 		sb_forwhile_start(-1, -1);
-		node->lhs = stmt();
+		if (!consume(";"))
+			node->lhs = stmt();
 		sb_end();
 
 		return node;
