@@ -686,4 +686,12 @@ assert_gcc "k_r_strcpy.c"
 assert_gcc "dowhile.c"
 assert_gcc "return.c"
 
+assert_gcc "continue1.c"
+assert_gcc "continue2.c"
+assert_gcc "continue3.c"
+
+assert_gcc "break1.c"
+assert_gcc "break2.c"
+assert_gcc "break3.c"
+
 echo OK

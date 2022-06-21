@@ -147,6 +147,20 @@ Token	*tokenize(char *p)
 			p += 6;
 			continue ;
 		}
+		if (match_word(p, "break"))
+		{
+			cur = new_token(TK_BREAK, cur, p);
+			cur->len = 5;
+			p += 5;
+			continue ;
+		}
+		if (match_word(p, "continue"))
+		{
+			cur = new_token(TK_CONTINUE, cur, p);
+			cur->len = 8;
+			p += 8;
+			continue ;
+		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);

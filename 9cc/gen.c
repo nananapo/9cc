@@ -1,4 +1,6 @@
 #include "9cc.h"
+#include "stack.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -14,6 +16,8 @@ static char	*arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int	stack_count = 0;
 
 extern t_str_elem	*str_literals;
+
+extern Stack	*sbstack;
 
 int	max(int a, int b)
 {
@@ -879,8 +883,10 @@ static void	expr(Node *node)
 
 static void stmt(Node *node)
 {
-	int	lend;
-	int	lbegin;
+	int		lend;
+	int		lbegin;
+	int		lbegin2;
+	SBData	*sbdata;
 
 	switch (node->kind)
 	{
@@ -890,6 +896,8 @@ static void stmt(Node *node)
 		case ND_DOWHILE:
 		case ND_FOR:
 		case ND_BLOCK:
+		case ND_BREAK:
+		case ND_CONTINUE:
 			break;
 		default:
 			expr(node);
@@ -936,7 +944,7 @@ static void stmt(Node *node)
 			lbegin = jumpLabelCount++;
 			lend = jumpLabelCount++;
 			
-			printf(".Lbegin%d:\n", lbegin);
+			printf(".Lbegin%d:\n", lbegin); // continue先
 			
 			// if
 			expr(node->lhs);
@@ -945,31 +953,39 @@ static void stmt(Node *node)
 			printf("    je .Lend%d\n", lend);
 			
 			// while block
+			sb_forwhile_start(lbegin, lend);
 			stmt(node->rhs);
+			sb_end();
 			
 			// next
 			printf("    jmp .Lbegin%d\n", lbegin);
 			
 			// end
-			printf(".Lend%d:\n", lend);
+			printf(".Lend%d:\n", lend); //break先
 			return;
 		case ND_DOWHILE:
 			lbegin = jumpLabelCount++;
+			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
 			
 			printf(".Lbegin%d:\n", lbegin);
 
 			// while block
+			sb_forwhile_start(lbegin2, lend);
 			stmt(node->lhs);
+			sb_end();
 
 			// if
+			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
 			expr(node->rhs);
 			mov(RDI, "0");
 			cmp(node->rhs->type, new_primitive_type(INT));
 			printf("    jne .Lbegin%d\n", lbegin);
+			printf(".Lend%d:\n", lend); // break先
 			return;
 		case ND_FOR:
 			lbegin = jumpLabelCount++;
+			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
 			
 			// init
@@ -988,8 +1004,11 @@ static void stmt(Node *node)
 			}
 
 			// for-block
+			sb_forwhile_start(lbegin2, lend);
 			stmt(node->lhs);
+			sb_end();
 
+			printf(".Lbegin%d:\n", lbegin2); // continue先
 			// next
 			if(node->for_next != NULL)
 				expr(node->for_next);
@@ -997,8 +1016,22 @@ static void stmt(Node *node)
 			printf("    jmp .Lbegin%d\n", lbegin);
 			
 			//end
-			printf(".Lend%d:\n", lend);
+			printf(".Lend%d:\n", lend); // break先
 			return;
+		case ND_BREAK:
+			sbdata = sb_peek();
+			// 一応チェック
+			if (sbdata == NULL)
+				error("breakに対応する文が見つかりません");
+			printf("jmp .Lend%d\n", sbdata->endlabel);
+			return ;
+		case ND_CONTINUE:
+			sbdata = sb_peek();
+			// 一応チェック
+			if (sbdata == NULL)
+				error("continueに対応する文が見つかりません");
+			printf("jmp .Lbegin%d\n", sbdata->startlabel);
+			return ;
 		case ND_BLOCK:
 			while(node != NULL)
 			{

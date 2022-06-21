@@ -1,4 +1,6 @@
 #include "9cc.h"
+#include "stack.h"
+
 #include <stdio.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -664,6 +666,34 @@ static Node	*expr(void)
 	return assign();
 }
 
+Stack	*sbstack;
+
+SBData	*sbdata_new(bool isswitch, int start, int end)
+{
+	SBData	*tmp;
+
+	tmp = (SBData *)malloc(sizeof(SBData));
+	tmp->isswitch = isswitch;
+	tmp->startlabel = start;
+	tmp->endlabel = end;
+	return (tmp);
+}
+
+void	sb_forwhile_start(int startlabel, int endlabel)
+{
+	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
+}
+
+void	sb_end(void)
+{
+	stack_pop(&sbstack);
+}
+
+SBData	*sb_peek(void)
+{
+	return (SBData *)stack_peek(sbstack);
+}
+
 // TODO 条件の中身がintegerか確認する
 static Node	*stmt(void)
 {
@@ -699,12 +729,18 @@ static Node	*stmt(void)
 		node = new_node(ND_WHILE, expr(), NULL);
 		if (!consume(")"))
 			error_at(token->str, ")ではないトークンです");
+
+		sb_forwhile_start(-1, -1);
 		node->rhs = stmt();
+		sb_end();
+
 		return node;
 	}
 	else if (consume_with_type(TK_DO))
 	{
+		sb_forwhile_start(-1, -1);
 		node = new_node(ND_DOWHILE, stmt(), NULL);
+		sb_end();
 
 		if (!consume_with_type(TK_WHILE))
 			error_at(token->str, "whileが必要です");
@@ -741,11 +777,29 @@ static Node	*stmt(void)
 			if(!consume(")"))
 				error_at(token->str, ")ではないトークンです");
 		}
+
 		// stmt
+		sb_forwhile_start(-1, -1);
 		node->lhs = stmt();
+		sb_end();
+
 		return node;
 	}
-	else if(consume("{"))
+	else if (consume_with_type(TK_BREAK))
+	{
+		SBData *sbdata = sb_peek();
+		if (sbdata == NULL)
+			error_at(token->str, "breakに対応するstatementがありません");
+		node = new_node(ND_BREAK, NULL, NULL);
+	}
+	else if (consume_with_type(TK_CONTINUE))
+	{
+		SBData *sbdata = sb_peek();
+		if (sbdata == NULL || sbdata->isswitch)
+			error_at(token->str, "continueに対応するstatementがありません");
+		node = new_node(ND_CONTINUE, NULL, NULL);
+	}
+	else if (consume("{"))
 	{
 		node = new_node(ND_BLOCK, NULL, NULL);
 		Node *start = node;

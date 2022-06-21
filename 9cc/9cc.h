@@ -54,14 +54,19 @@ typedef enum
 	TK_NUM,
 	TK_RETURN,
 	TK_IF,
+
 	TK_ELSE,
 	TK_WHILE,
 	TK_DO,
 	TK_FOR,
+	TK_BREAK,
+
+	TK_CONTINUE,
 	TK_STR_LITERAL,
 	TK_CHAR_LITERAL,
 	TK_EOF,
 	TK_SIZEOF,
+
 	TK_STRUCT
 } TokenKind;
 
@@ -116,7 +121,9 @@ typedef enum
 	ND_STRUCT_PTR_VALUE,
 
 	ND_CAST,
-	ND_PARENTHESES
+	ND_PARENTHESES,
+	ND_BREAK,
+	ND_CONTINUE
 } NodeKind;
 
 typedef enum
@@ -128,6 +135,19 @@ typedef enum
 	STRUCT,
 	VOID
 } PrimitiveType;
+
+typedef struct s_sbdata
+{
+	bool	isswitch;
+
+	int		startlabel;
+	int		endlabel;
+}	SBData;
+
+SBData	*sbdata_new(bool isswitch, int start, int end);
+void	sb_forwhile_start(int startlabel, int endlabel);
+void	sb_end(void);
+SBData	*sb_peek(void);
 
 struct Type
 {
