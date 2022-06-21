@@ -728,12 +728,23 @@ SBData	*sbdata_new(bool isswitch, int start, int end)
 	tmp->isswitch = isswitch;
 	tmp->startlabel = start;
 	tmp->endlabel = end;
+
+	tmp->type = NULL;
 	return (tmp);
 }
 
 void	sb_forwhile_start(int startlabel, int endlabel)
 {
 	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
+}
+
+void	sb_switch_start(Type *type, int endlabel)
+{
+	SBData	*tmp;
+
+	tmp = sbdata_new(true, -1, endlabel);
+	tmp->type = type;
+	stack_push(&sbstack, tmp);
 }
 
 void	sb_end(void)
@@ -744,6 +755,22 @@ void	sb_end(void)
 SBData	*sb_peek(void)
 {
 	return (SBData *)stack_peek(sbstack);
+}
+
+SBData	*sb_search(bool	isswitch)
+{
+	Stack	*tmp;
+	SBData	*data;
+
+	tmp = sbstack;
+	while (tmp != NULL)
+	{
+		data = (SBData *)tmp->data;
+		if (data->isswitch == isswitch)
+			return (data);
+		tmp = tmp->prev;
+	}
+	return (NULL);
 }
 
 // TODO 条件の中身がintegerか確認する
@@ -808,7 +835,7 @@ static Node	*stmt(void)
 	else if (consume_with_type(TK_FOR))
 	{
 		if (!consume("("))
-			error_at(token->str, ")ではないトークンです");
+			error_at(token->str, "(ではないトークンです");
 		node = new_node(ND_FOR, NULL, NULL);
 		// for init
 		if (!consume(";"))
@@ -840,6 +867,23 @@ static Node	*stmt(void)
 
 		return node;
 	}
+	else if (consume_with_type(TK_SWITCH))
+	{
+		if (!consume("("))
+			error_at(token->str, "(ではないトークンです");
+		node = new_node(ND_SWITCH, expr(), NULL);
+		if (!consume(")"))
+			error_at(token->str, ")ではないトークンです");
+
+		// TODO exprの型チェック, キャストも
+		if (!is_integer_type(node->lhs->type))
+			error_at(token->str, "switch文で整数型以外の型で分岐することはできません");
+
+		sb_switch_start(node->lhs->type, -1);
+		node->rhs = stmt();
+		sb_end();
+		return (node);
+	}
 	else if (consume_with_type(TK_BREAK))
 	{
 		SBData *sbdata = sb_peek();
@@ -849,8 +893,7 @@ static Node	*stmt(void)
 	}
 	else if (consume_with_type(TK_CONTINUE))
 	{
-		SBData *sbdata = sb_peek();
-		if (sbdata == NULL || sbdata->isswitch)
+		if (sb_search(false) == NULL)
 			error_at(token->str, "continueに対応するstatementがありません");
 		node = new_node(ND_CONTINUE, NULL, NULL);
 	}
@@ -1162,7 +1205,7 @@ static Node	*filescope(void)
 			return global_var(ret_type, ident);
 	}
 
-	error_at(token->str, "構文解析に失敗しました[filescope]");
+	error_at(token->str, "構文解析に失敗しました[filescope kind:%d]", token->kind);
 	return (NULL);
 }
 

@@ -162,6 +162,13 @@ Token	*tokenize(char *p)
 			p += 8;
 			continue ;
 		}
+		if (match_word(p, "switch"))
+		{
+			cur = new_token(TK_SWITCH, cur, p);
+			cur->len = 6;
+			p += 6;
+			continue ;
+		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);

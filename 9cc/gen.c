@@ -902,6 +902,7 @@ static void stmt(Node *node)
 		case ND_WHILE:
 		case ND_DOWHILE:
 		case ND_FOR:
+		case ND_SWITCH:
 		case ND_BLOCK:
 		case ND_BREAK:
 		case ND_CONTINUE:
@@ -1028,6 +1029,19 @@ static void stmt(Node *node)
 			//end
 			printf(".Lend%d:\n", lend); // break先
 			return;
+		case ND_SWITCH:
+			lend = jumpLabelCount++;
+
+			// 評価
+			expr(node->lhs);
+
+			// 文を出力
+			sb_switch_start(node->lhs->type, lend);
+			stmt(node->rhs);
+			sb_end();
+
+			printf(".Lend%d:\n", lend);
+			return ;
 		case ND_BREAK:
 			sbdata = sb_peek();
 			// 一応チェック
@@ -1036,7 +1050,7 @@ static void stmt(Node *node)
 			printf("jmp .Lend%d\n", sbdata->endlabel);
 			return ;
 		case ND_CONTINUE:
-			sbdata = sb_peek();
+			sbdata = sb_search(false);
 			// 一応チェック
 			if (sbdata == NULL)
 				error("continueに対応する文が見つかりません");

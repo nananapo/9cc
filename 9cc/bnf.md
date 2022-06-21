@@ -10,7 +10,7 @@ strct-block	= "{" struct-mems "}"
 struct-mem	= def-var ";"
 struct-mems	= struct-mem struct-mems? | struct-mem?
 
-stmt		= (if-stmt | while-stmt | dowhile-stmt | for-stmt | "{" stmts "}")
+stmt		= (if-stmt | while-stmt | dowhile-stmt | for-stmt | switch-stmt | "{" stmts "}")
 			| (def-var | "return" expr) ";"
 stmts		= stmt stmts | stmt?
 
@@ -18,6 +18,7 @@ if-stmt		= "if" "(" expr ")" stmt ("else" stmt)?
 while-stmt	= "while" "(" expr ")" stmt
 dowhile-stmt= "do" stmt "while" "(" expr ")" ";"
 for-stmt	= "for" "(" expr? ";" expr? ";" expr ")" stmt
+switch-stmt	= "switch" "(" expr ")" stmt
 
 def-var		= typep ident types ("=" assign)?
 

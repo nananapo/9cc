@@ -61,6 +61,7 @@ typedef enum
 	TK_DO,
 	TK_FOR,
 	TK_BREAK,
+	TK_SWITCH,
 
 	TK_CONTINUE,
 	TK_STR_LITERAL,
@@ -111,6 +112,8 @@ typedef enum
 	ND_WHILE,
 	ND_DOWHILE,
 	ND_FOR,
+	ND_SWITCH,
+
 	ND_ADDR,
 	ND_DEREF,
 
@@ -145,12 +148,16 @@ typedef struct s_sbdata
 
 	int		startlabel;
 	int		endlabel;
+
+	Type	*type;
 }	SBData;
 
 SBData	*sbdata_new(bool isswitch, int start, int end);
 void	sb_forwhile_start(int startlabel, int endlabel);
+void	sb_switch_start(Type *type, int endlabel);
 void	sb_end(void);
 SBData	*sb_peek(void);
+SBData	*sb_search(bool	isswitch);
 
 struct Type
 {
