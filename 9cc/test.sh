@@ -695,4 +695,7 @@ assert_gcc "break2.c"
 assert_gcc "break3.c"
 
 assert_gcc "nostmt1.c"
+
+assert_gcc "compound_assignment1.c"
+
 echo OK

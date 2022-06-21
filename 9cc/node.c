@@ -460,23 +460,107 @@ static Node *unary(void)
 	return arrow();
 }
 
+static Node	*create_mul(bool ismul, Node *lhs, Node *rhs)
+{
+	Node	*node;
+
+	if (ismul)
+		node = new_node(ND_MUL, lhs, rhs);
+	else
+		node = new_node(ND_DIV, lhs, rhs);
+
+	if (!is_integer_type(node->lhs->type)
+	|| !is_integer_type(node->rhs->type))
+		error_at(token->str, "ポインタ型に* か / を適用できません");
+
+	node->type = new_primitive_type(INT);
+	return (node);
+}
+
 static Node *mul(void)
 {
 	Node *node = unary();
 	for (;;)
 	{
 		if (consume("*"))
-			node = new_node(ND_MUL, node, unary());
+			node = create_mul(true, node, unary());
 		else if (consume("/"))
-			node = new_node(ND_DIV, node, unary());
+			node = create_mul(false, node, unary());
 		else
 			return node;
-
-		if (!is_integer_type(node->lhs->type)
-		|| !is_integer_type(node->rhs->type))
-			error_at(token->str, "ポインタ型に* か / を適用できません");
-		node->type = new_primitive_type(INT);
 	}
+}
+
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs)
+{
+	Node	*node;
+	Type	*l;
+	Type	*r;
+
+	if (isadd)
+		node = new_node(ND_ADD, lhs, rhs);
+	else
+		node = new_node(ND_SUB, lhs, rhs);
+
+	l = node->lhs->type;
+	r = node->rhs->type;
+
+	// 左辺をポインタにする
+	if (is_pointer_type(r))
+	{
+		Type	*tmp;
+		tmp = l;
+		l = r;
+		r = tmp;
+	}
+
+	// 両方ともポインタ
+	if (is_pointer_type(l)
+	&& is_pointer_type(r))
+	{
+		if (!type_equal(l, r))
+			error_at(token->str, "型が一致しないポインタ型どうしの加減算はできません");
+		node->type = new_primitive_type(INT);// TODO size_tにする
+
+		int size = type_size(l->ptr_to);
+		if (size == 0 || size > 1)
+		{
+			if (size == 0)
+				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
+			node = new_node(ND_DIV, node, new_node_num(size));
+			node->type = new_primitive_type(INT);
+		}
+		return (node);
+	}
+
+	// ポインタと整数の演算
+	if (is_pointer_type(l)
+	&& is_integer_type(r))
+	{
+		node->type = l;
+		return (node);
+	}
+
+	// 両方整数なら型の優先順位を考慮
+	if (is_integer_type(l)
+	|| is_integer_type(r))
+	{
+		// Intを左に寄せる
+		if (r->ty == INT)
+		{
+			Type	*tmp;
+			tmp = l;
+			l = r;
+			r = tmp;
+		}
+		// 左辺の型にする
+		node->type = l;
+		return (node);
+	}
+
+	error_at(token->str, "演算子 +, - が%dと%dの間に定義されていません",
+			node->lhs->type->ty, node->rhs->type->ty);
+	return (NULL);
 }
 
 static Node *add(void)
@@ -485,72 +569,11 @@ static Node *add(void)
 	for (;;)
 	{
 		if (consume("+"))
-			node = new_node(ND_ADD, node, mul());
+			node = create_add(true, node, mul());
 		else if (consume("-"))
-			node = new_node(ND_SUB, node, mul());
+			node = create_add(false, node, mul());
 		else
-			return node;
-
-		Type	*l;
-		Type	*r;
-
-		l = node->lhs->type;
-		r = node->rhs->type;
-		// 左辺をポインタにする
-		if (is_pointer_type(r))
-		{
-			Type	*tmp;
-			tmp = l;
-			l = r;
-			r = tmp;
-		}
-
-		// 両方ともポインタ
-		if (is_pointer_type(l)
-		&& is_pointer_type(r))
-		{
-			if (!type_equal(l, r))
-				error_at(token->str, "型が一致しないポインタ型どうしの加減算はできません");
-			node->type = new_primitive_type(INT);// TODO size_tにする
-
-			int size = type_size(l->ptr_to);
-			if (size == 0 || size > 1)
-			{
-				if (size == 0)
-					fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
-				node = new_node(ND_DIV, node, new_node_num(size));
-				node->type = new_primitive_type(INT);
-			}
-			continue ;
-		}
-
-		// ポインタと整数の演算
-		if (is_pointer_type(l)
-		&& is_integer_type(r))
-		{
-			node->type = l;
-			continue ;
-		}
-
-		// 両方整数なら型の優先順位を考慮
-		if (is_integer_type(l)
-		|| is_integer_type(r))
-		{
-			// Intを左に寄せる
-			if (r->ty == INT)
-			{
-				Type	*tmp;
-				tmp = l;
-				l = r;
-				r = tmp;
-			}
-			// 左辺の型にする
-			node->type = l;
-			continue ;
-		}
-
-		error_at(token->str, "演算子 +, - が%dと%dの間に定義されていません",
-				node->lhs->type->ty, node->rhs->type->ty);
+			return (node);
 	}
 }
 
@@ -627,38 +650,56 @@ static Node	*conditional(void)
 	return (node);
 }
 
+static Node	*create_assign(Node *lhs, Node *rhs)
+{
+	Node	*node;
+
+	node = new_node(ND_ASSIGN, lhs, rhs);
+
+	// 代入可能な型かどうか確かめる。
+	if (lhs->type->ty == VOID
+	|| rhs->type->ty == VOID)
+		error_at(token->str, "voidを宣言、代入できません");
+
+	if (!type_equal(rhs->type, lhs->type))
+	{
+		if (type_can_cast(rhs->type, lhs->type, false))
+		{
+			printf("#assign (%s) <- (%s)\n",
+					get_type_name(lhs->type),
+					get_type_name(rhs->type));
+			node->rhs = new_node(ND_CAST, rhs, NULL);
+			rhs = node->rhs;
+			rhs->type = lhs->type;
+		}
+		else
+		{
+			error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
+					get_type_name(lhs->type),
+					get_type_name(rhs->type));
+		}
+	}
+	node->type = lhs->type;
+	return (node);
+}
+
 static Node	*assign(void)
 {
-	Node	*node = conditional();
+	Node	*node;
+
+	node = conditional();
 	if (consume("="))
-	{
-		node = new_node(ND_ASSIGN, node, assign());
-
-		// 代入可能な型かどうか確かめる。
-		if (node->lhs->type->ty == VOID
-		|| node->rhs->type->ty == VOID)
-			error_at(token->str, "voidを宣言、代入できません");
-
-		if (!type_equal(node->rhs->type, node->lhs->type))
-		{
-			if (type_can_cast(node->rhs->type, node->lhs->type, false))
-			{
-				printf("#assign (%s) <- (%s)\n",
-						get_type_name(node->lhs->type),
-						get_type_name(node->rhs->type));
-				node->rhs = new_node(ND_CAST, node->rhs, NULL);
-				node->rhs->type = node->lhs->type;
-			}
-			else
-			{
-				error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
-						get_type_name(node->lhs->type),
-						get_type_name(node->rhs->type));
-			}
-		}
-		node->type = node->lhs->type;
-	}
-	return node;
+		node = create_assign(node, assign());
+	else if (consume("+="))
+		node = create_assign(node, create_add(true, node, assign()));
+	else if (consume("-="))
+		node = create_assign(node, create_add(false, node, assign()));
+	else if (consume("*="))
+		node = create_assign(node, create_mul(true, node, assign()));
+	else if (consume("/="))
+		node = create_assign(node, create_mul(false, node, assign()));
+	
+	return (node);
 }
 
 static Node	*expr(void)
