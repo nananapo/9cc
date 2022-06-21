@@ -903,6 +903,7 @@ static void stmt(Node *node)
 		case ND_DOWHILE:
 		case ND_FOR:
 		case ND_SWITCH:
+		case ND_CASE:
 		case ND_BLOCK:
 		case ND_BREAK:
 		case ND_CONTINUE:
@@ -1034,6 +1035,19 @@ static void stmt(Node *node)
 
 			// 評価
 			expr(node->lhs);
+			printf("    mov [rsp - 8], rax\n"); //結果を格納
+
+			// if
+			printf("    # switch if\n");
+			for (SwitchCase *tmp = node->switch_cases; tmp; tmp = tmp->next)
+			{
+				printf("    mov rax, [rsp - 8]\n");
+				movi(RDI, tmp->value);
+				cmp(node->lhs->type, node->lhs->type);
+				printf("    je .Lswitch%d\n", tmp->label);
+			}
+			printf("    jmp .Lend%d\n", lend);
+			printf("    # switch in\n");
 
 			// 文を出力
 			sb_switch_start(node->lhs->type, lend);
@@ -1041,6 +1055,9 @@ static void stmt(Node *node)
 			sb_end();
 
 			printf(".Lend%d:\n", lend);
+			return ;
+		case ND_CASE:
+			printf(".Lswitch%d:\n", node->switch_label);
 			return ;
 		case ND_BREAK:
 			sbdata = sb_peek();

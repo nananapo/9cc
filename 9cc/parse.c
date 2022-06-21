@@ -18,7 +18,7 @@ static char *reserved_words[] = {
 	">", "<", "=",
 	"+", "-", "*", "/", "%", "&", "!",
 	"(", ")", "{", "}", "[", "]",
-	",", ";",
+	",", ";", ":",
 	NULL
 };
 
@@ -167,6 +167,13 @@ Token	*tokenize(char *p)
 			cur = new_token(TK_SWITCH, cur, p);
 			cur->len = 6;
 			p += 6;
+			continue ;
+		}
+		if (match_word(p, "case"))
+		{
+			cur = new_token(TK_CASE, cur, p);
+			cur->len = 4;
+			p += 4;
 			continue ;
 		}
 		if (can_use_beginning_of_var(*p))

@@ -703,5 +703,6 @@ assert_gcc "mod.c"
 assert_gcc "declare_assign.c"
 
 assert_gcc "switch1.c"
+assert_gcc "switch2.c"
 
 echo OK

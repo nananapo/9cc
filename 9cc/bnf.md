@@ -12,6 +12,7 @@ struct-mems	= struct-mem struct-mems? | struct-mem?
 
 stmt		= (if-stmt | while-stmt | dowhile-stmt | for-stmt | switch-stmt | "{" stmts "}")
 			| (def-var | "return" expr | "return" | "continue" | "break") ";"
+			| "case" integer ":"
 stmts		= stmt stmts | stmt?
 
 if-stmt		= "if" "(" expr ")" stmt ("else" stmt)?

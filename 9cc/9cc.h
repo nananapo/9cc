@@ -61,7 +61,9 @@ typedef enum
 	TK_DO,
 	TK_FOR,
 	TK_BREAK,
+
 	TK_SWITCH,
+	TK_CASE,
 
 	TK_CONTINUE,
 	TK_STR_LITERAL,
@@ -113,6 +115,7 @@ typedef enum
 	ND_DOWHILE,
 	ND_FOR,
 	ND_SWITCH,
+	ND_CASE,
 
 	ND_ADDR,
 	ND_DEREF,
@@ -142,20 +145,28 @@ typedef enum
 	VOID
 } PrimitiveType;
 
+typedef struct	s_switchcase
+{
+	int					value;
+	int					label;
+	struct s_switchcase	*next;
+}	SwitchCase;
+
 typedef struct s_sbdata
 {
-	bool	isswitch;
+	bool		isswitch;
 
-	int		startlabel;
-	int		endlabel;
+	int			startlabel;
+	int			endlabel;
 
-	Type	*type;
+	Type		*type;
+	SwitchCase	*cases;
 }	SBData;
 
 SBData	*sbdata_new(bool isswitch, int start, int end);
 void	sb_forwhile_start(int startlabel, int endlabel);
 void	sb_switch_start(Type *type, int endlabel);
-void	sb_end(void);
+SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
 
@@ -219,6 +230,10 @@ struct Node
 	StructMemberElem	*struct_elem;
 
 	bool		is_struct_address;
+
+	// valとlabelでswicth-case
+	int			switch_label;
+	SwitchCase	*switch_cases;
 };
 
 struct	LVar

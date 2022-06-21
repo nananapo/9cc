@@ -730,6 +730,7 @@ SBData	*sbdata_new(bool isswitch, int start, int end)
 	tmp->endlabel = end;
 
 	tmp->type = NULL;
+	tmp->cases = NULL;
 	return (tmp);
 }
 
@@ -747,9 +748,9 @@ void	sb_switch_start(Type *type, int endlabel)
 	stack_push(&sbstack, tmp);
 }
 
-void	sb_end(void)
+SBData	*sb_end(void)
 {
-	stack_pop(&sbstack);
+	return ((SBData *)stack_pop(&sbstack));
 }
 
 SBData	*sb_peek(void)
@@ -771,6 +772,26 @@ SBData	*sb_search(bool	isswitch)
 		tmp = tmp->prev;
 	}
 	return (NULL);
+}
+
+static int	switchCaseCount = 0;
+
+static int	add_switchcase(SBData *sbdata, int number)
+{
+	int			count;
+	SwitchCase	*tmp;
+
+	count = switchCaseCount++;
+
+	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
+	tmp->value = number;
+	tmp->label = count;
+	tmp->next = sbdata->cases;
+	sbdata->cases = tmp;
+
+	//TODO 被りチェック
+
+	return (count);
 }
 
 // TODO 条件の中身がintegerか確認する
@@ -881,12 +902,34 @@ static Node	*stmt(void)
 
 		sb_switch_start(node->lhs->type, -1);
 		node->rhs = stmt();
-		sb_end();
+		SBData	*data = sb_end();
+
+		node->switch_cases = data->cases;
+		return (node);
+	}
+	else if (consume_with_type(TK_CASE))
+	{
+		int	number;
+
+		if (!consume_number(&number))
+			error_at(token->str, "数値が必要です");
+		if (!consume(":"))
+			error_at(token->str, ":が必要です");
+
+		node = new_node(ND_CASE, NULL, NULL);
+
+		SBData	*sbdata = sb_search(true);
+		if (sbdata == NULL)
+			error_at(token->str, "caseに対応するswitchがありません");
+		int label = add_switchcase(sbdata, number);
+
+		node->val = number;
+		node->switch_label = label;
 		return (node);
 	}
 	else if (consume_with_type(TK_BREAK))
 	{
-		SBData *sbdata = sb_peek();
+		SBData	*sbdata = sb_peek();
 		if (sbdata == NULL)
 			error_at(token->str, "breakに対応するstatementがありません");
 		node = new_node(ND_BREAK, NULL, NULL);
