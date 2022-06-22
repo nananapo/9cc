@@ -653,6 +653,35 @@ static void	mul(Node *node)
 	}
 }
 
+static void add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
+{
+	// 結果がポインタ型なら
+	if (restype->ty == PTR || restype->ty == ARRAY)
+	{
+		// 左辺をポインタ型にする
+		if (can_replace && 
+			(*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY)
+		{
+			Node *tmp = *lhs;
+			*lhs = *rhs;
+			*rhs = tmp;
+		}
+
+		// 右辺が整数型なら掛け算に置き換える
+		if (is_integer_type((*rhs)->type))
+		{
+			Node *size_node = new_node(ND_NUM, NULL, NULL);
+			size_node->val = type_size((*lhs)->type->ptr_to);
+			size_node->type = new_primitive_type(INT);
+			// 掛け算
+			*rhs = new_node(ND_MUL, *rhs, size_node);
+			(*rhs)->type = (*lhs)->type; // TODO
+			// INT
+			size_node->type = new_primitive_type(INT);
+		}
+	}
+}
+
 static void	add(Node *node)
 {
 	switch (node->kind)
@@ -664,32 +693,8 @@ static void	add(Node *node)
 			mul(node);
 			return;
 	}
-	
-	// 結果がポインタ型なら
-	if (node->type->ty == PTR
-	|| node->type->ty == ARRAY)
-	{
-		// 左辺をポインタ型にする
-		if (node->rhs->type->ty == PTR || node->rhs->type->ty == ARRAY)
-		{
-			Node *tmp = node->lhs;
-			node->lhs = node->rhs;
-			node->rhs = tmp;
-		}
 
-		// 右辺が整数型なら掛け算に置き換える
-		if (is_integer_type(node->rhs->type))
-		{
-			Node *size_node = new_node(ND_NUM, NULL, NULL);
-			size_node->val = type_size(node->lhs->type->ptr_to);
-			size_node->type = new_primitive_type(INT);
-			// 掛け算
-			node->rhs = new_node(ND_MUL, node->rhs, size_node);
-			node->rhs->type = node->lhs->type; // TODO
-			// INT
-			size_node->type = new_primitive_type(INT);
-		}
-	}
+	add_check_pointer(node->type, &node->lhs, &node->rhs, node->kind == ND_ADD);
 
 	expr(node->rhs);
 	push();
@@ -843,33 +848,112 @@ static void	conditional(Node *node)
 	}
 }
 
+static void	load_lval(Node *node)
+{
+	if (node->kind == ND_LVAR)
+		lval(node);
+	else if (node->kind == ND_LVAR_GLOBAL)
+		load_global(node);
+	else if (node->kind == ND_DEREF)
+		expr(node->lhs);// ここもDEREFと同じようにやってる！！！！！
+	else if (node->kind == ND_STRUCT_VALUE)
+		arrow(node, true);
+	else if (node->kind == ND_STRUCT_PTR_VALUE)
+		arrow(node, true);
+	else
+		error("左辺値が識別子かアドレスではありません");
+}
+
 static void	assign(Node *node)
 {
 	int	size;
 
-	if (node->kind != ND_ASSIGN)
+	switch (node->kind)
 	{
-		conditional(node);
-		return;
+		case ND_ASSIGN:
+		case ND_COMP_ADD:
+		case ND_COMP_SUB:
+		case ND_COMP_MUL:
+		case ND_COMP_DIV:
+		case ND_COMP_MOD:
+			break;
+		default:
+			conditional(node);
+			return;
 	}
 
 	//printf("#ASSIGN %d\n", node->lhs->kind);
-	
-	if (node->lhs->kind == ND_LVAR)
-		lval(node->lhs);
-	else if (node->lhs->kind == ND_LVAR_GLOBAL)
-		load_global(node->lhs);
-	else if (node->lhs->kind == ND_DEREF)
-		expr(node->lhs->lhs);// ここもDEREFと同じようにやってる！！！！！
-	else if (node->lhs->kind == ND_STRUCT_VALUE)
-		arrow(node->lhs, true);
-	else if (node->lhs->kind == ND_STRUCT_PTR_VALUE)
-		arrow(node->lhs, true);
-	else
-		error("代入の左辺値が識別子かアドレスではありません");
-
+	load_lval(node->lhs);	
 	push();
-	expr(node->rhs);
+
+	// TODO もっといい感じにやりたい
+	switch (node->kind)
+	{
+		case ND_ASSIGN:
+			expr(node->rhs);
+			break ;
+		case ND_COMP_ADD:
+			push();
+
+			//fprintf(stderr, "from %d\n", node->rhs->kind);
+			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
+			//fprintf(stderr, "kind %d\n", node->rhs->kind);
+
+			expr(node->rhs);
+			pop(RDI);
+			if (node->type->ty == ARRAY)
+				printf("    add rax, rdi\n");
+			else
+				printf("    add rax, [rdi]\n");
+			break ;
+		case ND_COMP_SUB:
+			push();
+			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
+
+			expr(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			if (node->type->ty == ARRAY)
+				printf("    sub rax, rdi\n");
+			else
+			{
+				printf("    mov rax, [rax]\n");
+				printf("    sub rax, rdi\n");
+			}
+			break ;
+		case ND_COMP_MUL:
+			push();
+			expr(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    imul rax, rdi\n");
+			break ;
+		case ND_COMP_DIV:
+			push();
+			expr(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+			break ;
+		case ND_COMP_MOD:
+			push();
+			expr(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+			mov(RAX, RDX);
+			break ;
+		default:
+			break;
+	}
 	pop("r10");
 
 	// storeする
@@ -1057,7 +1141,7 @@ static void stmt(Node *node)
 			printf(".Lend%d:\n", lend);
 			return ;
 		case ND_CASE:
-			printf(".Lswitch%d:\n", node->switch_label);
+			printf(".Lswitch%d: # case %d\n", node->switch_label, node->val);
 			return ;
 		case ND_BREAK:
 			sbdata = sb_peek();

@@ -98,6 +98,12 @@ typedef enum
 	ND_DIV,
 	ND_MOD,
 
+	ND_COMP_ADD,
+	ND_COMP_SUB,
+	ND_COMP_MUL,
+	ND_COMP_DIV,
+	ND_COMP_MOD,
+
 	ND_EQUAL,
 	ND_NEQUAL,
 	ND_LESS,
@@ -132,7 +138,7 @@ typedef enum
 	ND_CAST,
 	ND_PARENTHESES,
 	ND_BREAK,
-	ND_CONTINUE
+	ND_CONTINUE,
 } NodeKind;
 
 typedef enum

@@ -3,11 +3,7 @@ int	dint(int c);
 
 void	strcpy(char *s, char *t)
 {
-	int	dummy;
-	dummy = 0;
-
-	while (*s++ = *t++)
-		dummy++;
+	while (*s++ = *t++);
 }
 
 int main(void)

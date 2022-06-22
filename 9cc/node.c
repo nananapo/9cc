@@ -21,6 +21,7 @@ LVar				*locals;
 // Node
 static Node	*expr(void);
 static Node *unary(void);
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs);
 
 Node		*get_function_by_name(char *name, int len);
 Node		*new_node_num(int val);
@@ -162,29 +163,15 @@ static Node	*read_suffix_increment(Node *node)
 {
 	if (consume("++"))
 	{
-		// TODO 型チェック
-		node = new_node(ND_ASSIGN,
-						node,
-						new_node(ND_ADD, node, new_node_num(1)));
-		node->rhs->type = node->lhs->type; // とりあえず左辺の型にしておく
-		node->type = node->lhs->type;
-
-		// 1を引く
-		node = new_node(ND_SUB, node, new_node_num(1));
-		node->type = node->lhs->type;
+		node = create_add(true, node, new_node_num(1));
+		node->kind = ND_COMP_ADD;
+		node = create_add(false, node, new_node_num(1)); // 1を引く
 	}
 	else if (consume("--"))
 	{
-		// TODO 型チェック
-		node = new_node(ND_ASSIGN,
-						node,
-						new_node(ND_SUB, node, new_node_num(1)));
-		node->rhs->type = node->lhs->type; // とりあえず左辺の型にしておく
-		node->type = node->lhs->type;
-
-		// 1を足す
-		node = new_node(ND_ADD, node, new_node_num(1));
-		node->type = node->lhs->type;
+		node = create_add(false, node, new_node_num(1));
+		node->kind = ND_COMP_SUB;
+		node = create_add(true, node, new_node_num(1)); // 1を足す
 	}
 	return (node);
 }
@@ -420,26 +407,15 @@ static Node *unary(void)
 	}
 	else if (consume("++"))
 	{
-		node = unary();
-
 		// TODO 左辺値かの検証はしていない
-		node = new_node(ND_ASSIGN,
-						node,
-						new_node(ND_ADD, node, new_node_num(1)));
-		node->rhs->type = node->lhs->type;
-		node->type = node->lhs->type;
+		node = create_add(true, unary(), new_node_num(1));
+		node->kind = ND_COMP_ADD;
 		return (node);
 	}
 	else if (consume("--"))
 	{
-		node = unary();
-
-		// TODO 左辺値かの検証はしていない
-		node = new_node(ND_ASSIGN,
-						node,
-						new_node(ND_SUB, node, new_node_num(1)));
-		node->rhs->type = node->lhs->type;
-		node->type = node->lhs->type;
+		node = create_add(false, unary(), new_node_num(1));
+		node->kind = ND_COMP_SUB;
 		return (node);
 	}
 	else if (consume("!"))
@@ -701,15 +677,30 @@ static Node	*assign(void)
 	if (consume("="))
 		node = create_assign(node, assign());
 	else if (consume("+="))
-		node = create_assign(node, create_add(true, node, assign()));
+	{
+		node = create_add(true, node, assign());
+		node->kind = ND_COMP_ADD;
+	}
 	else if (consume("-="))
-		node = create_assign(node, create_add(false, node, assign()));
+	{
+		node = create_add(false, node, assign());
+		node->kind = ND_COMP_SUB;
+	}
 	else if (consume("*="))
-		node = create_assign(node, create_mul(0, node, assign()));
+	{
+		node = create_mul(0, node, assign());
+		node->kind = ND_COMP_MUL;
+	}
 	else if (consume("/="))
-		node = create_assign(node, create_mul(1, node, assign()));
+	{
+		node = create_mul(1, node, assign());
+		node->kind = ND_COMP_DIV;
+	}
 	else if (consume("%="))
-		node = create_assign(node, create_mul(2, node, assign()));
+	{
+		node = create_mul(2, node, assign());
+		node->kind = ND_COMP_MOD;
+	}
 	return (node);
 }
 
