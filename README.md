@@ -11,11 +11,15 @@ Darwin po.local 20.5.0 Darwin Kernel Version 20.5.0: Sat May  8 05:10:31 PDT 202
 
 https://www.sigbus.info/compilerbook
 
+セルフホストを目指して開発中！！！
+
 動く8queen
 
-https://github.com/nananapo/9cc/blob/master/9cc/test/unit/8queen.c
+https://github.com/nananapo/9cc/blob/master/9cc/test/unit/9queen.c
 
-switchや標準ライブラリを作成中
+動くDuff's device
+
+https://github.com/nananapo/9cc/blob/master/9cc/test/unit/duffsdevice.c
 
 テスト( 9cc/test.sh )
 
