@@ -290,28 +290,12 @@ char	*read_file(char	*name);
 
 int	align_to(int a, int to);
 
-int	is_alnum(char c);
 int	can_use_beginning_of_var(char c);
 int	is_escapedchar(char c);
 int get_char_to_int(char *p, int len);
 
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
-
-bool	consume(char *op);
-bool	consume_with_type(TokenKind kind);
-Token	*consume_ident();
-Token	*consume_ident_str(char *p);
-Token	*consume_str_literal();
-Token	*consume_char_literal();
-void	expect(char *op);
-int		expect_number();
-bool	 consume_number(int *result);
-bool	at_eof();
-
-Type	*consume_type_before();
-void	expect_type_after(Type **type);
-void	consume_type_ptr(Type **type);
 
 Token	*tokenize(char *p);
 
@@ -342,6 +326,6 @@ char	*get_str_literal_name(int index);
 
 void	gen(Node *node);
 
-void	program();
+Node	*parse(Token *tok);
 
 #endif

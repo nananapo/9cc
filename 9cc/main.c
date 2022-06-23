@@ -6,8 +6,6 @@
 
 char		*user_input;
 
-Token		*token;
-
 Node		*func_defs[N_MAX];
 Node		*func_protos[N_MAX];
 Node		*code[N_MAX];
@@ -23,6 +21,8 @@ int main(int argc, char **argv)
 	int			sign;
 	int			i;
 	t_str_elem	*lit;
+	Token		*token;
+	Node		*node;
 
 	if (argc == 1)
 		user_input = read_file("-");
@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 	token = tokenize(user_input);
 	printf("# Tokenized\n");
 
-	program();
+	node = parse(token);
 	printf("# Node constructed\n");
 
 	printf(".intel_syntax noprefix\n");
