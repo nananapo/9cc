@@ -64,6 +64,7 @@ typedef enum
 
 	TK_SWITCH,
 	TK_CASE,
+	TK_DEFAULT,
 
 	TK_CONTINUE,
 	TK_STR_LITERAL,
@@ -139,6 +140,7 @@ typedef enum
 	ND_PARENTHESES,
 	ND_BREAK,
 	ND_CONTINUE,
+	ND_DEFAULT,
 } NodeKind;
 
 typedef enum
@@ -167,11 +169,13 @@ typedef struct s_sbdata
 
 	Type		*type;
 	SwitchCase	*cases;
+
+	int			defaultLabel;
 }	SBData;
 
 SBData	*sbdata_new(bool isswitch, int start, int end);
 void	sb_forwhile_start(int startlabel, int endlabel);
-void	sb_switch_start(Type *type, int endlabel);
+void	sb_switch_start(Type *type, int endlabel, int defaultLabel);
 SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
@@ -240,6 +244,7 @@ struct Node
 	// valとlabelでswicth-case
 	int			switch_label;
 	SwitchCase	*switch_cases;
+	bool		switch_has_default;
 };
 
 struct	LVar

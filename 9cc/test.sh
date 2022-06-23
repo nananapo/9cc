@@ -704,6 +704,7 @@ assert_gcc "declare_assign.c"
 
 assert_gcc "switch1.c"
 assert_gcc "switch2.c"
+assert_gcc "switch3.c"
 
 assert_gcc "duffsdevice.c"
 

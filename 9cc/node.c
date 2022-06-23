@@ -722,6 +722,7 @@ SBData	*sbdata_new(bool isswitch, int start, int end)
 
 	tmp->type = NULL;
 	tmp->cases = NULL;
+	tmp->defaultLabel = -1;
 	return (tmp);
 }
 
@@ -730,12 +731,13 @@ void	sb_forwhile_start(int startlabel, int endlabel)
 	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
 }
 
-void	sb_switch_start(Type *type, int endlabel)
+void	sb_switch_start(Type *type, int endlabel, int defaultLabel)
 {
 	SBData	*tmp;
 
 	tmp = sbdata_new(true, -1, endlabel);
 	tmp->type = type;
+	tmp->defaultLabel = defaultLabel;
 	stack_push(&sbstack, tmp);
 }
 
@@ -765,7 +767,7 @@ SBData	*sb_search(bool	isswitch)
 	return (NULL);
 }
 
-static int	switchCaseCount = 0;
+int	switchCaseCount = 0;
 
 static int	add_switchcase(SBData *sbdata, int number)
 {
@@ -891,11 +893,12 @@ static Node	*stmt(void)
 		if (!is_integer_type(node->lhs->type))
 			error_at(token->str, "switch文で整数型以外の型で分岐することはできません");
 
-		sb_switch_start(node->lhs->type, -1);
+		sb_switch_start(node->lhs->type, -1, -1);
 		node->rhs = stmt();
 		SBData	*data = sb_end();
 
 		node->switch_cases = data->cases;
+		node->switch_has_default = data->defaultLabel != -1;
 		return (node);
 	}
 	else if (consume_with_type(TK_CASE))
@@ -930,6 +933,21 @@ static Node	*stmt(void)
 		if (sb_search(false) == NULL)
 			error_at(token->str, "continueに対応するstatementがありません");
 		node = new_node(ND_CONTINUE, NULL, NULL);
+	}
+	else if (consume_with_type(TK_DEFAULT))
+	{
+		if (!consume(":"))
+			error_at(token->str, ":が必要です");
+
+		SBData *data = sb_search(true);
+		if (data == NULL)
+			error_at(token->str, "defaultに対応するstatementがありません");
+		if (data->defaultLabel != -1)
+			error_at(token->str, "defaultが2個以上あります");
+
+		data->defaultLabel = 1;
+		node = new_node(ND_DEFAULT, NULL, NULL);
+		return (node);
 	}
 	else if (consume("{"))
 	{

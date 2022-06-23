@@ -176,6 +176,13 @@ Token	*tokenize(char *p)
 			p += 4;
 			continue ;
 		}
+		if (match_word(p, "default"))
+		{
+			cur = new_token(TK_DEFAULT, cur, p);
+			cur->len = 7;
+			p += 7;
+			continue ;
+		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);

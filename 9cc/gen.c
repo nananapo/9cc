@@ -972,6 +972,8 @@ static void	expr(Node *node)
 	assign(node);
 }
 
+extern int	switchCaseCount;
+
 static void stmt(Node *node)
 {
 	int		lend;
@@ -991,6 +993,7 @@ static void stmt(Node *node)
 		case ND_BLOCK:
 		case ND_BREAK:
 		case ND_CONTINUE:
+		case ND_DEFAULT:
 			break;
 		default:
 			expr(node);
@@ -1115,6 +1118,7 @@ static void stmt(Node *node)
 			printf(".Lend%d:\n", lend); // break先
 			return;
 		case ND_SWITCH:
+			lbegin = switchCaseCount++;
 			lend = jumpLabelCount++;
 
 			// 評価
@@ -1122,7 +1126,7 @@ static void stmt(Node *node)
 			printf("    mov [rsp - 8], rax\n"); //結果を格納
 
 			// if
-			printf("    # switch if\n");
+			printf("    # switch def:%d, end:%d\n", lbegin, lend);
 			for (SwitchCase *tmp = node->switch_cases; tmp; tmp = tmp->next)
 			{
 				printf("    mov rax, [rsp - 8]\n");
@@ -1130,11 +1134,15 @@ static void stmt(Node *node)
 				cmp(node->lhs->type, node->lhs->type);
 				printf("    je .Lswitch%d\n", tmp->label);
 			}
-			printf("    jmp .Lend%d\n", lend);
-			printf("    # switch in\n");
+			// defaultかendに飛ばす
+			if (node->switch_has_default)
+				printf("    jmp .Lswitch%d\n", lbegin);
+			else
+				printf("    jmp .Lend%d\n", lend);
 
+			printf("    # switch in\n");
 			// 文を出力
-			sb_switch_start(node->lhs->type, lend);
+			sb_switch_start(node->lhs->type, lend, lbegin);
 			stmt(node->rhs);
 			sb_end();
 
@@ -1148,14 +1156,21 @@ static void stmt(Node *node)
 			// 一応チェック
 			if (sbdata == NULL)
 				error("breakに対応する文が見つかりません");
-			printf("jmp .Lend%d\n", sbdata->endlabel);
+			printf("jmp .Lend%d # break\n", sbdata->endlabel);
 			return ;
 		case ND_CONTINUE:
 			sbdata = sb_search(false);
 			// 一応チェック
 			if (sbdata == NULL)
 				error("continueに対応する文が見つかりません");
-			printf("jmp .Lbegin%d\n", sbdata->startlabel);
+			printf("jmp .Lbegin%d # continue\n", sbdata->startlabel);
+			return ;
+		case ND_DEFAULT:
+			sbdata = sb_search(true);
+			// 一応チェック
+			if (sbdata == NULL)
+				error("defaultに対応する文が見つかりません");
+			printf(".Lswitch%d: # default\n", sbdata->defaultLabel);
 			return ;
 		case ND_BLOCK:
 			while(node != NULL)
