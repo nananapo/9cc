@@ -286,6 +286,24 @@ struct s_struct_definition
 	StructMemberElem	*members;
 };
 
+
+
+
+typedef struct	s_parseresult
+{
+	Token	*token;
+	Node	*code[1000];
+	Node	*func_defs[1000];
+	Node	*func_protos[1000];
+	Node	*global_vars[1000];
+	t_str_elem	*str_literals;
+	StructDef	*struct_defs[1000];
+	LVar	*locals;
+}	ParseResult;
+
+
+
+
 char	*read_file(char	*name);
 
 int	align_to(int a, int to);
@@ -301,7 +319,6 @@ Token	*tokenize(char *p);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 
-Node	*find_global(char *str, int len);
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
@@ -309,7 +326,7 @@ int		type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
-Type	*new_struct_type(char *name, int len);
+Type	*new_struct_type(ParseResult *env, char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
@@ -326,6 +343,6 @@ char	*get_str_literal_name(int index);
 
 void	gen(Node *node);
 
-Node	*parse(Token *tok);
+ParseResult	*parse(Token *tok);
 
 #endif

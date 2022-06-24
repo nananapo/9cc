@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern StructDef	*struct_defs[];
-
 static int max(int a, int b)
 {
 	return a > b ? a : b;
@@ -33,18 +31,18 @@ Type	*new_type_array(Type *ptr_to)
 	return type;
 }
 
-Type	*new_struct_type(char *name, int len)
+Type	*new_struct_type(ParseResult *env, char *name, int len)
 {
 	Type	*type;
 	int		i;
 
 	type = new_primitive_type(STRUCT);
-	for (i = 0; struct_defs[i]; i++)
+	for (i = 0; env->struct_defs[i]; i++)
 	{
-		if (struct_defs[i]->name_len == len
-		&& strncmp(struct_defs[i]->name, name, len) == 0)
+		if (env->struct_defs[i]->name_len == len
+		&& strncmp(env->struct_defs[i]->name, name, len) == 0)
 		{
-			type->strct = struct_defs[i];
+			type->strct = env->struct_defs[i];
 			break ;
 		}
 	}

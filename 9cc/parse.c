@@ -1,4 +1,5 @@
 #include "9cc.h"
+#include "parse.h"
 #include "stack.h"
 
 #include <stdio.h>
@@ -8,46 +9,33 @@
 #include <string.h>
 #include <stdbool.h>
 
-static Token *token;
-
-extern Node			*code[];
-extern Node			*func_defs[];
-extern Node			*func_protos[];
-extern Node			*global_vars[];
-extern t_str_elem	*str_literals;
-extern StructDef	*struct_defs[];
-
-LVar				*locals;
+#define Env ParseResult
 
 // Node
-static Node	*expr(void);
-static Node *unary(void);
-static Node	*create_add(bool isadd, Node *lhs, Node *rhs);
+static Node	*expr(Env *env);
+static Node *unary(Env *env);
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 
 // LVar
-LVar		*find_lvar(char *str, int len);
-LVar		*create_local_var(char *name, int len, Type *type, bool is_arg);
+LVar		*find_lvar(Env *env, char *str, int len);
+LVar		*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg);
 
 
-
-
-
-
-static Node	*get_function_by_name(char *name, int len)
+static Node	*get_function_by_name(Env *env, char *name, int len)
 {
 	int i = 0;
-	while (func_defs[i])
+	while (env->func_defs[i])
 	{
-	Node *tmp = func_defs[i];
+		Node *tmp = env->func_defs[i];
 		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
 			return tmp;
 		i++;
 	}
 
 	i = 0;
-	while (func_protos[i])
+	while (env->func_protos[i])
 	{
-		Node *tmp = func_protos[i];
+		Node *tmp = env->func_protos[i];
 		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
 			return tmp;
 		i++;
@@ -96,161 +84,6 @@ Node*new_node_num(int val)
 
 
 
-bool	consume(char *op)
-{
-	if (token->kind != TK_RESERVED ||
-		strlen(op) != token->len ||
-		memcmp(token->str, op, token->len) != 0)
-		return false;
-	token = token->next;
-	return true;
-}
-
-bool consume_number(int *result)
-{
-	if (token->kind != TK_NUM)
-		return false;
-	*result = token->val;
-	token = token->next;
-	return true;	
-}
-
-bool	consume_with_type(TokenKind kind)
-{
-	if (token->kind != kind)
-		return false;
-	token = token->next;
-	return true;
-}
-
-Token	*consume_ident()
-{
-	Token	*ret;
-	if (token->kind != TK_IDENT)
-		return NULL;
-	ret = token;
-	token = token->next;
-	return ret;
-}
-
-Token	*consume_ident_str(char *p)
-{
-	Token	*ret;
-	if (token->kind != TK_IDENT)
-		return NULL;
-	if (strncmp(p, token->str, strlen(p)) != 0)
-		return NULL;
-	ret = token;
-	token = token->next;
-	return ret;
-}
-
-Token	*consume_str_literal()
-{
-	Token	*ret;
-	if (token->kind != TK_STR_LITERAL)
-		return NULL;
-	ret = token;
-	token = token->next;
-	return ret;
-}
-
-Token	*consume_char_literal()
-{
-	Token	*ret;
-	if (token->kind != TK_CHAR_LITERAL)
-		return NULL;
-	ret = token;
-	token = token->next;
-	return ret;
-}
-
-void	consume_type_ptr(Type **type)
-{
-	Type	*tmp;
-
-	while (consume("*"))
-	{
-		tmp = new_primitive_type(PTR);
-		tmp->ptr_to = *type;
-		*type = tmp;
-	}
-}
-
-// 型宣言の前部分 (type ident arrayのtype部分)を読む
-Type	*consume_type_before()
-{
-	Type	*type;
-	Token	*ident;
-
-	// type name
-	if (consume_ident_str("int"))
-		type = new_primitive_type(INT);
-	else if (consume_ident_str("char"))
-		type = new_primitive_type(CHAR);
-	else if (consume_ident_str("void"))
-		type = new_primitive_type(VOID);
-	else if (consume_with_type(TK_STRUCT))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			return (NULL);
-		type = new_struct_type(ident->str, ident->len);
-		if (type == NULL)
-			return (NULL);
-	}
-	else
-		return (NULL);
-
-	consume_type_ptr(&type);
-	return type;
-}
-
-// 型宣言のarray部分を読む
-void	expect_type_after(Type **type)// expect size
-{
-	int		size;
-
-	while (consume("["))
-	{
-		*type = new_type_array(*type);
-		if (!consume_number(&size))
-			error_at(token->str, "配列のサイズが定義されていません");
-		(*type)->array_size = size;
-		if (!consume("]"))
-			error_at(token->str, "]がありません");
-	}
-	return;
-}
-
-void	expect(char *op)
-{
-	if (token->kind != TK_RESERVED ||
-		strlen(op) != token->len ||
-		memcmp(token->str, op, token->len) != 0)
-		error_at(token->str, "'%s'ではありません", op);
-	token = token->next;
-}
-
-int expect_number()
-{
-	int val;
-
-	if (token->kind != TK_NUM)
-		error_at(token->str, "数ではありません");
-	val = token->val;
-	token = token->next;
-	return val;	
-}
-
-bool	at_eof()
-{
-	return token->kind == TK_EOF;
-}
-
-
-
-
 
 
 
@@ -261,11 +94,11 @@ bool	at_eof()
 
 
 // リテラルを探す
-static int	get_str_literal_index(char *str, int len)
+static int	get_str_literal_index(Env *env, char *str, int len)
 {
 	t_str_elem	*tmp;
 
-	tmp = str_literals;
+	tmp = env->str_literals;
 	while (tmp != NULL)
 	{
 		if (len == tmp->len && strncmp(tmp->str, str, len) == 0)
@@ -276,18 +109,18 @@ static int	get_str_literal_index(char *str, int len)
 	tmp = calloc(1, sizeof(t_str_elem));
 	tmp->str = str;
 	tmp->len = len;
-	if (str_literals == NULL)
+	if (env->str_literals == NULL)
 		tmp->index = 0;
 	else
-		tmp->index = str_literals->index + 1;
+		tmp->index = env->str_literals->index + 1;
 
-	tmp->next = str_literals;
-	str_literals = tmp;
+	tmp->next = env->str_literals;
+	env->str_literals = tmp;
 
 	return (tmp->index);
 }
 
-static Node *call(Token *tok)
+static Node *call(Env *env, Token *tok)
 {
 	Node	*node;
 	Node	*args;
@@ -300,20 +133,20 @@ static Node *call(Token *tok)
 
 	args = NULL;
 
-	if (!consume(")"))
+	if (!consume(env, ")"))
 	{
-		Node *arg = expr();
+		Node *arg = expr(env);
 		args = arg;
 		node->argdef_count = 1;
 
 		for (;;)
 		{	
-			if (consume(")"))
+			if (consume(env, ")"))
 				break;
-			if (!consume(","))
-				error_at(token->str, "トークンが,ではありません");
+			if (!consume(env, ","))
+				error_at(env->token->str, "トークンが,ではありません");
 			
-			arg = expr();
+			arg = expr(env);
 			arg->next = NULL;
 			if (args == NULL)
 				args = arg;
@@ -332,14 +165,14 @@ static Node *call(Token *tok)
 		}
 	}
 
-	Node *refunc = get_function_by_name(node->fname, node->flen);
+	Node *refunc = get_function_by_name(env, node->fname, node->flen);
 	// 関数定義が見つからない場合エラー
 	if (refunc == NULL)
-		error_at(token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
+		error_at(env->token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
 
 	// 引数の数を確認
 	if (node->argdef_count != refunc->argdef_count)
-		error_at(token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
+		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
 
 	// 引数の型を比べる
 	LVar *def = refunc->locals;
@@ -351,7 +184,7 @@ static Node *call(Token *tok)
 		{
 			// 暗黙的なキャストの確認
 			if (!type_can_cast(args->type, def->type, false))
-				error_at(token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
+				error_at(env->token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
 						strndup(node->fname, node->flen),
 						strndup(def->name, def->len),
 						get_type_name(def->type),
@@ -389,29 +222,29 @@ static Node *call(Token *tok)
 }
 
 // 後置インクリメント, デクリメント
-static Node	*read_suffix_increment(Node *node)
+static Node	*read_suffix_increment(Env *env, Node *node)
 {
-	if (consume("++"))
+	if (consume(env, "++"))
 	{
-		node = create_add(true, node, new_node_num(1));
+		node = create_add(true, node, new_node_num(1), env->token);
 		node->kind = ND_COMP_ADD;
-		node = create_add(false, node, new_node_num(1)); // 1を引く
+		node = create_add(false, node, new_node_num(1), env->token); // 1を引く
 	}
-	else if (consume("--"))
+	else if (consume(env, "--"))
 	{
-		node = create_add(false, node, new_node_num(1));
+		node = create_add(false, node, new_node_num(1), env->token);
 		node->kind = ND_COMP_SUB;
-		node = create_add(true, node, new_node_num(1)); // 1を足す
+		node = create_add(true, node, new_node_num(1), env->token); // 1を足す
 	}
 	return (node);
 }
 
 // 添字によるDEREF
-static Node	*read_deref_index(Node *node)
+static Node	*read_deref_index(Env *env, Node *node)
 {
-	while (consume("["))
+	while (consume(env, "["))
 	{
-		Node	*add = new_node(ND_ADD, node, expr());
+		Node	*add = new_node(ND_ADD, node, expr(env));
 
 		// 左にポインタを寄せる
 		if (is_pointer_type(add->rhs->type))
@@ -423,63 +256,62 @@ static Node	*read_deref_index(Node *node)
 		}
 
 		if (!is_pointer_type(add->lhs->type))
-			error_at(token->str, "ポインタ型ではありません");
+			error_at(env->token->str, "ポインタ型ではありません");
 		if (!is_integer_type(add->rhs->type))
-			error_at(token->str, "添字の型が整数ではありません");
+			error_at(env->token->str, "添字の型が整数ではありません");
 		add->type = add->lhs->type;
 
 		node = new_node(ND_DEREF, add, NULL);
 		node->type = node->lhs->type->ptr_to;
 
-		if (!consume("]"))
-			error_at(token->str, "%s");
+		if (!consume(env, "]"))
+			error_at(env->token->str, "%s");
 	}
-	return read_suffix_increment(node);
+	return read_suffix_increment(env, node);
 }
 
-static Node *primary()
+static Node *primary(Env *env)
 {
 	Token	*tok;
 	Node	*node;
 	Type	*type_cast;
 
 	// 括弧
-	if (consume("("))
+	if (consume(env, "("))
 	{
 		// 型を読む
-		tok = token;
-		type_cast = consume_type_before();
+		type_cast = consume_type_before(env);
 		
 		// 括弧の中身が型ではないなら優先順位を上げる括弧
 		if (type_cast == NULL)
 		{
-			node = new_node(ND_PARENTHESES, expr(), NULL);
+			node = new_node(ND_PARENTHESES, expr(env), NULL);
 			node->type = node->lhs->type;
-			expect(")");
-			return read_deref_index(node);
+			expect(env, ")");
+			return read_deref_index(env, node);
 		}
 
 		// 明示的なキャスト
 		// TODO キャストの優先順位が違う
-		expect(")");
-		node = new_node(ND_CAST, unary(), NULL);
+		expect(env, ")");
+		node = new_node(ND_CAST, unary(env), NULL);
 		if (!type_can_cast(node->lhs->type, type_cast, true))
-			error_at(token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
+			error_at(env->token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
 		node->type = type_cast;
-		return read_deref_index(node);
+		return read_deref_index(env, node);
 	}
 	
 	// identかcall
-	tok = consume_ident();
+	tok = consume_ident(env);
 	if (tok)
 	{
 		// call func
-		if (consume("("))
-			node = call(tok);
+		if (consume(env, "("))
+			node = call(env, tok);
 		// use ident
 		else
 		{
-			LVar	*lvar = find_lvar(tok->str, tok->len);
+			LVar	*lvar = find_lvar(env, tok->str, tok->len);
 			if (lvar != NULL)
 			{
 				node = new_node(ND_LVAR, NULL, NULL);
@@ -488,7 +320,7 @@ static Node *primary()
 			}
 			else
 			{
-				Node *glovar = find_global(tok->str, tok->len);
+				Node *glovar = find_global(env, tok->str, tok->len);
 				if (glovar != NULL)
 				{
 					node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
@@ -502,127 +334,127 @@ static Node *primary()
 						strndup(tok->str, tok->len));
 			}
 		}
-		return read_deref_index(node);
+		return read_deref_index(env, node);
 	}
 
 	// string
-	tok = consume_str_literal();
+	tok = consume_str_literal(env);
 	if (tok)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
-		node->str_index = get_str_literal_index(tok->str, tok->len);
+		node->str_index = get_str_literal_index(env, tok->str, tok->len);
 		node->type = new_type_ptr_to(new_primitive_type(CHAR));
-		return read_deref_index(node);
+		return read_deref_index(env, node);
 	}
 
 	// char
-	tok = consume_char_literal();
+	tok = consume_char_literal(env);
 	if (tok)
 	{
 		node = new_node_num(get_char_to_int(tok->str, tok->strlen_actual));
 		node->type = new_primitive_type(CHAR);
-		return read_deref_index(node); // charの後ろに[]はおかしいけれど、とりあえず許容
+		return read_deref_index(env, node); // charの後ろに[]はおかしいけれど、とりあえず許容
 	}
 
 	// 数
 	int number;
-	if (!consume_number(&number))
-		error_at(token->str, "数字が必要です");
+	if (!consume_number(env, &number))
+		error_at(env->token->str, "数字が必要です");
 	node = new_node_num(number);
 
-	return read_deref_index(node);
+	return read_deref_index(env, node);
 }
 
-static Node	*arrow_loop(Node *node)
+static Node	*arrow_loop(Env *env, Node *node)
 {
 	Token				*ident;
 	StructMemberElem	*elem;
 
-	if (consume("->"))
+	if (consume(env, "->"))
 	{
 		if (!is_pointer_type(node->type) || node->type->ptr_to->ty != STRUCT)
-			error_at(token->str, "struct*ではありません");
+			error_at(env->token->str, "struct*ではありません");
 		
-		ident = consume_ident();
+		ident = consume_ident(env);
 
 		if (ident == NULL)
-			error_at(token->str, "識別子が必要です");
+			error_at(env->token->str, "識別子が必要です");
 		elem = struct_get_member(node->type->ptr_to->strct, ident->str, ident->len);
 		if (elem == NULL)
-			error_at(token->str, "識別子が存在しません", strndup(ident->str, ident->len));
+			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
 		
 		node = new_node(ND_STRUCT_PTR_VALUE, node, NULL);
 		node->struct_elem = elem;
 		node->type = elem->type;
 
-		node = read_deref_index(node);
+		node = read_deref_index(env, node);
 
-		return arrow_loop(node);
+		return arrow_loop(env, node);
 	}
-	else if (consume("."))
+	else if (consume(env, "."))
 	{
 		if (node->type->ty != STRUCT)
-			error_at(token->str, "structではありません");
+			error_at(env->token->str, "structではありません");
 
-		ident = consume_ident();
+		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(token->str, "識別子が必要です");
+			error_at(env->token->str, "識別子が必要です");
 		elem = struct_get_member(node->type->strct, ident->str, ident->len);
 		if (elem == NULL)
-			error_at(token->str, "識別子が存在しません", strndup(ident->str, ident->len));
+			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
 
 		node = new_node(ND_STRUCT_VALUE, node, NULL);
 		node->struct_elem = elem;
 		node->type = elem->type;
 
-		node = read_deref_index(node);
+		node = read_deref_index(env, node);
 
-		return arrow_loop(node);
+		return arrow_loop(env, node);
 	}
 	else
 		return (node);
 }
 
-static Node	*arrow(void)
+static Node	*arrow(Env *env)
 {
 	Node	*node;
 
-	node = primary();
-	return (arrow_loop(node));
+	node = primary(env);
+	return (arrow_loop(env, node));
 }
 
-static Node *unary(void)
+static Node *unary(Env *env)
 {
 	Node	*node;
 
-	if (consume("+"))
+	if (consume(env, "+"))
 	{
-		node = unary();
+		node = unary(env);
 		if (is_pointer_type(node->type))
-			error_at(token->str, "ポインタ型に対してunary -を適用できません");
+			error_at(env->token->str, "ポインタ型に対してunary -を適用できません");
 		return node;
 	}
-	else if (consume("-"))
+	else if (consume(env, "-"))
 	{
-		node = new_node(ND_SUB, new_node_num(0), unary());
+		node = new_node(ND_SUB, new_node_num(0), unary(env));
 		if (is_pointer_type(node->rhs->type))
-			error_at(token->str, "ポインタ型に対してunary -を適用できません");
+			error_at(env->token->str, "ポインタ型に対してunary -を適用できません");
 		node->type = node->rhs->type;
 		return node;
 	}
-	else if (consume("*"))
+	else if (consume(env, "*"))
 	{
-		node = new_node(ND_DEREF, unary(), NULL);
+		node = new_node(ND_DEREF, unary(env), NULL);
 		if (!is_pointer_type(node->lhs->type))
-			error_at(token->str,
+			error_at(env->token->str,
 					"ポインタではない型(%d)に対してunary *を適用できません",
 					node->lhs->type->ty);
 		node->type = node->lhs->type->ptr_to;	
 		return node;
 	}
-	else if (consume("&"))
+	else if (consume(env, "&"))
 	{
-		node = new_node(ND_ADDR, unary(), NULL);
+		node = new_node(ND_ADDR, unary(env), NULL);
 
 		// 変数と構造体、ND_DEREFに対する&
 		if (node->lhs->kind != ND_LVAR
@@ -630,40 +462,40 @@ static Node *unary(void)
 		&& node->lhs->kind != ND_STRUCT_VALUE
 		&& node->lhs->kind != ND_STRUCT_PTR_VALUE
 		&& node->lhs->kind != ND_DEREF) // TODO 文字列リテラルは？
-			error_at(token->str, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
+			error_at(env->token->str, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
 
 		node->type = new_type_ptr_to(node->lhs->type);
 		return node;
 	}
-	else if (consume("++"))
+	else if (consume(env, "++"))
 	{
 		// TODO 左辺値かの検証はしていない
-		node = create_add(true, unary(), new_node_num(1));
+		node = create_add(true, unary(env), new_node_num(1), env->token);
 		node->kind = ND_COMP_ADD;
 		return (node);
 	}
-	else if (consume("--"))
+	else if (consume(env, "--"))
 	{
-		node = create_add(false, unary(), new_node_num(1));
+		node = create_add(false, unary(env), new_node_num(1), env->token);
 		node->kind = ND_COMP_SUB;
 		return (node);
 	}
-	else if (consume("!"))
+	else if (consume(env, "!"))
 	{
 		// TODO 生成する関数を作る
-		node = unary();
+		node = unary(env);
 		node = new_node(ND_EQUAL, node, new_node_num(0));
 		node->type = new_primitive_type(INT);
 		return (node);
 	}
-	else if (consume_with_type(TK_SIZEOF))
+	else if (consume_with_type(env, TK_SIZEOF))
 	{
-		node = unary();
+		node = unary(env);
 		node = new_node_num(type_size(node->type));
 		return node;
 	}
 
-	return arrow();
+	return arrow(env);
 }
 
 /*
@@ -672,7 +504,7 @@ static Node *unary(void)
  * 1 : /
  * 2 : %
  */
-static Node	*create_mul(int type, Node *lhs, Node *rhs)
+static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
 {
 	Node	*node;
 
@@ -685,29 +517,29 @@ static Node	*create_mul(int type, Node *lhs, Node *rhs)
 
 	if (!is_integer_type(node->lhs->type)
 	|| !is_integer_type(node->rhs->type))
-		error_at(token->str, "ポインタ型に* か / を適用できません");
+		error_at(tok->str, "ポインタ型に* か / を適用できません");
 
 	node->type = new_primitive_type(INT);
 	return (node);
 }
 
-static Node *mul(void)
+static Node *mul(Env *env)
 {
-	Node *node = unary();
+	Node *node = unary(env);
 	for (;;)
 	{
-		if (consume("*"))
-			node = create_mul(0, node, unary());
-		else if (consume("/"))
-			node = create_mul(1, node, unary());
-		else if (consume("%"))
-			node = create_mul(2, node, unary());
+		if (consume(env, "*"))
+			node = create_mul(0, node, unary(env), env->token);
+		else if (consume(env, "/"))
+			node = create_mul(1, node, unary(env), env->token);
+		else if (consume(env, "%"))
+			node = create_mul(2, node, unary(env), env->token);
 		else
 			return node;
 	}
 }
 
-static Node	*create_add(bool isadd, Node *lhs, Node *rhs)
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 {
 	Node	*node;
 	Type	*l;
@@ -735,7 +567,7 @@ static Node	*create_add(bool isadd, Node *lhs, Node *rhs)
 	&& is_pointer_type(r))
 	{
 		if (!type_equal(l, r))
-			error_at(token->str, "型が一致しないポインタ型どうしの加減算はできません");
+			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
 		node->type = new_primitive_type(INT);// TODO size_tにする
 
 		int size = type_size(l->ptr_to);
@@ -774,99 +606,99 @@ static Node	*create_add(bool isadd, Node *lhs, Node *rhs)
 		return (node);
 	}
 
-	error_at(token->str, "演算子 +, - が%dと%dの間に定義されていません",
+	error_at(tok->str, "演算子 +, - が%dと%dの間に定義されていません",
 			node->lhs->type->ty, node->rhs->type->ty);
 	return (NULL);
 }
 
-static Node *add(void)
+static Node *add(Env *env)
 {
-	Node *node = mul();
+	Node *node = mul(env);
 	for (;;)
 	{
-		if (consume("+"))
-			node = create_add(true, node, mul());
-		else if (consume("-"))
-			node = create_add(false, node, mul());
+		if (consume(env, "+"))
+			node = create_add(true, node, mul(env), env->token);
+		else if (consume(env, "-"))
+			node = create_add(false, node, mul(env), env->token);
 		else
 			return (node);
 	}
 }
 
-static Node *relational(void)
+static Node *relational(Env *env)
 {
-	Node *node = add();
+	Node *node = add(env);
 	for (;;)
 	{
-		if (consume("<"))
-			node = new_node(ND_LESS, node, add());
-		else if (consume("<="))
-			node = new_node(ND_LESSEQ, node, add());
-		else if (consume(">"))
-			node = new_node(ND_LESS, add(), node);
-		else if (consume(">="))
-			node = new_node(ND_LESSEQ, add(), node);
+		if (consume(env, "<"))
+			node = new_node(ND_LESS, node, add(env));
+		else if (consume(env, "<="))
+			node = new_node(ND_LESSEQ, node, add(env));
+		else if (consume(env, ">"))
+			node = new_node(ND_LESS, add(env), node);
+		else if (consume(env, ">="))
+			node = new_node(ND_LESSEQ, add(env), node);
 		else
 			return node;
 
 		node->type = new_primitive_type(INT);
 
 		if (!can_compared(node->lhs->type, node->rhs->type))
-			error_at(token->str,
+			error_at(env->token->str,
 					"%sと%sを比較することはできません",
 					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 	}
 }
 
-static Node *equality(void)
+static Node *equality(Env *env)
 {
-	Node *node = relational();
+	Node *node = relational(env);
 	for (;;)
 	{
-		if (consume("=="))
-			node = new_node(ND_EQUAL, node, relational());
-		else if (consume("!="))
-			node = new_node(ND_NEQUAL, node, relational());
+		if (consume(env, "=="))
+			node = new_node(ND_EQUAL, node, relational(env));
+		else if (consume(env, "!="))
+			node = new_node(ND_NEQUAL, node, relational(env));
 		else
 			return node;
 
 		node->type = new_primitive_type(INT);
 
 		if (!can_compared(node->lhs->type, node->rhs->type))
-			error_at(token->str,
+			error_at(env->token->str,
 					"%sと%sを比較することはできません",
 					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 	}
 }
 
-static Node	*conditional(void)
+static Node	*conditional(Env *env)
 {
 	Node	*node;
 
-	node = equality();
-	if (consume("&&"))
+	node = equality(env);
+	if (consume(env, "&&"))
 	{
-		node = new_node(ND_COND_AND, node, conditional());
+		node = new_node(ND_COND_AND, node, conditional(env));
 		node->type = new_primitive_type(INT);
 
 		// TODO 型チェック
 		//if (!is_integer_type(node->lhs)
 		//|| !is_integer_type(node->rhs))
-		//	error_at(token->str, "左辺か右辺の型が整数型ではありません (&&)");
+		//	error_at(env->token->str, "左辺か右辺の型が整数型ではありません (&&)");
 	}
-	else if (consume("||"))
+	else if (consume(env, "||"))
 	{
-		node = new_node(ND_COND_OR, node, conditional());
+		node = new_node(ND_COND_OR, node, conditional(env));
 		node->type = new_primitive_type(INT);
 
 		//if (!is_integer_type(node->lhs)
 		//|| !is_integer_type(node->rhs))
-		//	error_at(token->str, "左辺か右辺の型が整数型ではありません (||)");
+		//	error_at(env->token->str, "左辺か右辺の型が整数型ではありません (||)");
 	}
 	return (node);
 }
 
-static Node	*create_assign(Node *lhs, Node *rhs)
+static Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
 {
 	Node	*node;
 
@@ -875,7 +707,7 @@ static Node	*create_assign(Node *lhs, Node *rhs)
 	// 代入可能な型かどうか確かめる。
 	if (lhs->type->ty == VOID
 	|| rhs->type->ty == VOID)
-		error_at(token->str, "voidを宣言、代入できません");
+		error_at(tok->str, "voidを宣言、代入できません");
 
 	if (!type_equal(rhs->type, lhs->type))
 	{
@@ -890,7 +722,7 @@ static Node	*create_assign(Node *lhs, Node *rhs)
 		}
 		else
 		{
-			error_at(token->str, "左辺(%s)に右辺(%s)を代入できません",
+			error_at(tok->str, "左辺(%s)に右辺(%s)を代入できません",
 					get_type_name(lhs->type),
 					get_type_name(rhs->type));
 		}
@@ -899,44 +731,44 @@ static Node	*create_assign(Node *lhs, Node *rhs)
 	return (node);
 }
 
-static Node	*assign(void)
+static Node	*assign(Env *env)
 {
 	Node	*node;
 
-	node = conditional();
-	if (consume("="))
-		node = create_assign(node, assign());
-	else if (consume("+="))
+	node = conditional(env);
+	if (consume(env, "="))
+		node = create_assign(node, assign(env), env->token);
+	else if (consume(env, "+="))
 	{
-		node = create_add(true, node, assign());
+		node = create_add(true, node, assign(env), env->token);
 		node->kind = ND_COMP_ADD;
 	}
-	else if (consume("-="))
+	else if (consume(env, "-="))
 	{
-		node = create_add(false, node, assign());
+		node = create_add(false, node, assign(env), env->token);
 		node->kind = ND_COMP_SUB;
 	}
-	else if (consume("*="))
+	else if (consume(env, "*="))
 	{
-		node = create_mul(0, node, assign());
+		node = create_mul(0, node, assign(env), env->token);
 		node->kind = ND_COMP_MUL;
 	}
-	else if (consume("/="))
+	else if (consume(env, "/="))
 	{
-		node = create_mul(1, node, assign());
+		node = create_mul(1, node, assign(env), env->token);
 		node->kind = ND_COMP_DIV;
 	}
-	else if (consume("%="))
+	else if (consume(env, "%="))
 	{
-		node = create_mul(2, node, assign());
+		node = create_mul(2, node, assign(env), env->token);
 		node->kind = ND_COMP_MOD;
 	}
 	return (node);
 }
 
-static Node	*expr(void)
+static Node	*expr(Env *env)
 {
-	return assign();
+	return assign(env);
 }
 
 Stack	*sbstack;
@@ -1018,174 +850,174 @@ static int	add_switchcase(SBData *sbdata, int number)
 }
 
 // TODO 条件の中身がintegerか確認する
-static Node	*stmt(void)
+static Node	*stmt(Env *env)
 {
 	Node	*node;
 
-	if (consume_with_type(TK_RETURN))
+	if (consume_with_type(env, TK_RETURN))
 	{
 		// TODO 型チェック
-		if (consume(";"))
+		if (consume(env, ";"))
 		{
 			node = new_node(ND_RETURN, NULL, NULL);
 			return (node);
 		}
 		else
-			node = new_node(ND_RETURN, expr(), NULL);
+			node = new_node(ND_RETURN, expr(env), NULL);
 	}
-	else if (consume_with_type(TK_IF))
+	else if (consume_with_type(env, TK_IF))
 	{
-		if (!consume("("))
-			error_at(token->str, "(ではないトークンです");
-		node = new_node(ND_IF, expr(), NULL);
-		if (!consume(")"))
-			error_at(token->str, ")ではないトークンです");
-		node->rhs = stmt();
-		if (consume_with_type(TK_ELSE))
-			node->els = stmt();
+		if (!consume(env, "("))
+			error_at(env->token->str, "(ではないトークンです");
+		node = new_node(ND_IF, expr(env), NULL);
+		if (!consume(env, ")"))
+			error_at(env->token->str, ")ではないトークンです");
+		node->rhs = stmt(env);
+		if (consume_with_type(env, TK_ELSE))
+			node->els = stmt(env);
 		return node;
 	}
-	else if (consume_with_type(TK_WHILE))
+	else if (consume_with_type(env, TK_WHILE))
 	{
-		if (!consume("("))
-			error_at(token->str, "(ではないトークンです");
-		node = new_node(ND_WHILE, expr(), NULL);
-		if (!consume(")"))
-			error_at(token->str, ")ではないトークンです");
+		if (!consume(env, "("))
+			error_at(env->token->str, "(ではないトークンです");
+		node = new_node(ND_WHILE, expr(env), NULL);
+		if (!consume(env, ")"))
+			error_at(env->token->str, ")ではないトークンです");
 
 		sb_forwhile_start(-1, -1);
-		if (!consume(";"))
-			node->rhs = stmt();
+		if (!consume(env, ";"))
+			node->rhs = stmt(env);
 		sb_end();
 
 		return node;
 	}
-	else if (consume_with_type(TK_DO))
+	else if (consume_with_type(env, TK_DO))
 	{
 		sb_forwhile_start(-1, -1);
-		node = new_node(ND_DOWHILE, stmt(), NULL);
+		node = new_node(ND_DOWHILE, stmt(env), NULL);
 		sb_end();
 
-		if (!consume_with_type(TK_WHILE))
-			error_at(token->str, "whileが必要です");
+		if (!consume_with_type(env, TK_WHILE))
+			error_at(env->token->str, "whileが必要です");
 
-		if (!consume("("))
-			error_at(token->str, "(ではないトークンです");
-		if (!consume(";"))
-			node->rhs = expr();
-		if (!consume(")"))
-			error_at(token->str, ")ではないトークンです");
+		if (!consume(env, "("))
+			error_at(env->token->str, "(ではないトークンです");
+		if (!consume(env, ";"))
+			node->rhs = expr(env);
+		if (!consume(env, ")"))
+			error_at(env->token->str, ")ではないトークンです");
 	}
-	else if (consume_with_type(TK_FOR))
+	else if (consume_with_type(env, TK_FOR))
 	{
-		if (!consume("("))
-			error_at(token->str, "(ではないトークンです");
+		if (!consume(env, "("))
+			error_at(env->token->str, "(ではないトークンです");
 		node = new_node(ND_FOR, NULL, NULL);
 		// for init
-		if (!consume(";"))
+		if (!consume(env, ";"))
 		{
-			node->for_init = expr();
-			if (!consume(";"))
-				error_at(token->str, ";が必要です");
+			node->for_init = expr(env);
+			if (!consume(env, ";"))
+				error_at(env->token->str, ";が必要です");
 		}
 		// for if
-		if (!consume(";"))
+		if (!consume(env, ";"))
 		{
-			node->for_if = expr();
-			if (!consume(";"))
-				error_at(token->str, ";が必要です");
+			node->for_if = expr(env);
+			if (!consume(env, ";"))
+				error_at(env->token->str, ";が必要です");
 		}
 		// for next
-		if (!consume(")"))
+		if (!consume(env, ")"))
 		{
-			node->for_next = expr();
-			if(!consume(")"))
-				error_at(token->str, ")ではないトークンです");
+			node->for_next = expr(env);
+			if(!consume(env, ")"))
+				error_at(env->token->str, ")ではないトークンです");
 		}
 
 		// stmt
 		sb_forwhile_start(-1, -1);
-		if (!consume(";"))
-			node->lhs = stmt();
+		if (!consume(env, ";"))
+			node->lhs = stmt(env);
 		sb_end();
 
 		return node;
 	}
-	else if (consume_with_type(TK_SWITCH))
+	else if (consume_with_type(env, TK_SWITCH))
 	{
-		if (!consume("("))
-			error_at(token->str, "(ではないトークンです");
-		node = new_node(ND_SWITCH, expr(), NULL);
-		if (!consume(")"))
-			error_at(token->str, ")ではないトークンです");
+		if (!consume(env, "("))
+			error_at(env->token->str, "(ではないトークンです");
+		node = new_node(ND_SWITCH, expr(env), NULL);
+		if (!consume(env, ")"))
+			error_at(env->token->str, ")ではないトークンです");
 
 		// TODO exprの型チェック, キャストも
 		if (!is_integer_type(node->lhs->type))
-			error_at(token->str, "switch文で整数型以外の型で分岐することはできません");
+			error_at(env->token->str, "switch文で整数型以外の型で分岐することはできません");
 
 		sb_switch_start(node->lhs->type, -1, -1);
-		node->rhs = stmt();
+		node->rhs = stmt(env);
 		SBData	*data = sb_end();
 
 		node->switch_cases = data->cases;
 		node->switch_has_default = data->defaultLabel != -1;
 		return (node);
 	}
-	else if (consume_with_type(TK_CASE))
+	else if (consume_with_type(env, TK_CASE))
 	{
 		int	number;
 
-		if (!consume_number(&number))
-			error_at(token->str, "数値が必要です");
-		if (!consume(":"))
-			error_at(token->str, ":が必要です");
+		if (!consume_number(env, &number))
+			error_at(env->token->str, "数値が必要です");
+		if (!consume(env, ":"))
+			error_at(env->token->str, ":が必要です");
 
 		node = new_node(ND_CASE, NULL, NULL);
 
 		SBData	*sbdata = sb_search(true);
 		if (sbdata == NULL)
-			error_at(token->str, "caseに対応するswitchがありません");
+			error_at(env->token->str, "caseに対応するswitchがありません");
 		int label = add_switchcase(sbdata, number);
 
 		node->val = number;
 		node->switch_label = label;
 		return (node);
 	}
-	else if (consume_with_type(TK_BREAK))
+	else if (consume_with_type(env, TK_BREAK))
 	{
 		SBData	*sbdata = sb_peek();
 		if (sbdata == NULL)
-			error_at(token->str, "breakに対応するstatementがありません");
+			error_at(env->token->str, "breakに対応するstatementがありません");
 		node = new_node(ND_BREAK, NULL, NULL);
 	}
-	else if (consume_with_type(TK_CONTINUE))
+	else if (consume_with_type(env, TK_CONTINUE))
 	{
 		if (sb_search(false) == NULL)
-			error_at(token->str, "continueに対応するstatementがありません");
+			error_at(env->token->str, "continueに対応するstatementがありません");
 		node = new_node(ND_CONTINUE, NULL, NULL);
 	}
-	else if (consume_with_type(TK_DEFAULT))
+	else if (consume_with_type(env, TK_DEFAULT))
 	{
-		if (!consume(":"))
-			error_at(token->str, ":が必要です");
+		if (!consume(env, ":"))
+			error_at(env->token->str, ":が必要です");
 
 		SBData *data = sb_search(true);
 		if (data == NULL)
-			error_at(token->str, "defaultに対応するstatementがありません");
+			error_at(env->token->str, "defaultに対応するstatementがありません");
 		if (data->defaultLabel != -1)
-			error_at(token->str, "defaultが2個以上あります");
+			error_at(env->token->str, "defaultが2個以上あります");
 
 		data->defaultLabel = 1;
 		node = new_node(ND_DEFAULT, NULL, NULL);
 		return (node);
 	}
-	else if (consume("{"))
+	else if (consume(env, "{"))
 	{
 		node = new_node(ND_BLOCK, NULL, NULL);
 		Node *start = node;
-		while (!consume("}"))
+		while (!consume(env, "}"))
 		{
-			node->lhs = stmt();
+			node->lhs = stmt(env);
 			node->rhs = new_node(ND_BLOCK, NULL, NULL);
 			node = node->rhs;
 		}
@@ -1193,53 +1025,53 @@ static Node	*stmt(void)
 	}
 	else
 	{
-		Type	*type = consume_type_before();
+		Type	*type = consume_type_before(env);
 		if (type != NULL)
 		{
-			Token *tok = consume_ident();
+			Token *tok = consume_ident(env);
 
 			if (tok == NULL)
-				error_at(token->str, "識別子が必要です");
+				error_at(env->token->str, "識別子が必要です");
 
-			expect_type_after(&type);
+			expect_type_after(env, &type);
 
 			// TODO voidチェックは違うパスでやりたい....
 			if (!is_declarable_type(type))
-				error_at(token->str, "宣言できない型の変数です");
+				error_at(env->token->str, "宣言できない型の変数です");
 
-			LVar *created = create_local_var(tok->str, tok->len, type, false);
+			LVar *created = create_local_var(env, tok->str, tok->len, type, false);
 
 			node = new_node(ND_DEFVAR, NULL, NULL);
 			node->type = type;
 			node->offset = created->offset;
 
 			// 宣言と同時に代入
-			if (consume("="))
+			if (consume(env, "="))
 			{
 				node = new_node(ND_LVAR, NULL, NULL);
 				node->offset = created->offset;
 				node->type = created->type;
-				node = create_assign(node, expr());
+				node = create_assign(node, expr(env), env->token);
 			}
 		}
 		else
 		{
-			node = expr();
+			node = expr(env);
 		}
 	}
-	if(!consume(";"))
-		error_at(token->str, ";ではないトークン(Kind : %d , %s)です", token->kind, strndup(token->str, token->len));
+	if(!consume(env, ";"))
+		error_at(env->token->str, ";ではないトークン(Kind : %d , %s)です", env->token->kind, strndup(env->token->str, env->token->len));
 
 	return node;
 }
 
-static Node	*global_var(Type *type, Token *ident)
+static Node	*global_var(Env *env, Type *type, Token *ident)
 {
 	int		i;
 	Node	*node;
 
 	// 後ろの型を読む
-	expect_type_after(&type);
+	expect_type_after(env, &type);
 
 	node = new_node(ND_DEFVAR_GLOBAL, NULL, NULL);
 	node->type = type;
@@ -1248,23 +1080,23 @@ static Node	*global_var(Type *type, Token *ident)
 
 	// TODO Voidチェックは違うパスでやりたい....
 	if (!is_declarable_type(type))
-		error_at(token->str, "宣言できない型の変数です");
+		error_at(env->token->str, "宣言できない型の変数です");
 	
 
 	// TODO 代入文 , 定数じゃないとだめ
 
-	if (!consume(";"))
-		error_at(token->str, ";が必要です。");
+	if (!consume(env, ";"))
+		error_at(env->token->str, ";が必要です。");
 
 	i = -1;
-	while (global_vars[++i])
+	while (env->global_vars[++i])
 		continue;
-	global_vars[i] = node;
+	env->global_vars[i] = node;
 
 	return node;
 }
 
-static Node	*struct_block(Token *ident)
+static Node	*struct_block(Env *env, Token *ident)
 {
 	Type				*type;
 	StructDef			*def;
@@ -1273,7 +1105,7 @@ static Node	*struct_block(Token *ident)
 	int					typesize;
 	int					maxsize;
 
-	for (i = 0; struct_defs[i]; i++)
+	for (i = 0; env->struct_defs[i]; i++)
 		continue ;
 
 	def = calloc(1, sizeof(StructDef));
@@ -1281,24 +1113,24 @@ static Node	*struct_block(Token *ident)
 	def->name_len = ident->len;
 	def->mem_size = -1;
 	def->members = NULL;
-	struct_defs[i] = def;
+	env->struct_defs[i] = def;
 
 	printf("# READ STRUCT %s\n", strndup(ident->str, ident->len));
 
 	while (1)
 	{
-		if (consume("}"))
+		if (consume(env, "}"))
 			break;
 
-		type = consume_type_before();
+		type = consume_type_before(env);
 		if (type == NULL)
-			error_at(token->str, "型宣言が必要です");
-		ident = consume_ident();
+			error_at(env->token->str, "型宣言が必要です");
+		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(token->str, "識別子が必要です");
-		expect_type_after(&type);
-		if (!consume(";"))
-			error_at(token->str, ";が必要です");
+			error_at(env->token->str, "識別子が必要です");
+		expect_type_after(env, &type);
+		if (!consume(env, ";"))
+			error_at(env->token->str, ";が必要です");
 
 		tmp = calloc(1, sizeof(StructMemberElem));
 		tmp->name = ident->str;
@@ -1341,7 +1173,7 @@ static Node	*struct_block(Token *ident)
 		def->mem_size = 0;
 	else
 	{
-		maxsize = max_type_size(new_struct_type(def->name, def->name_len));
+		maxsize = max_type_size(new_struct_type(env, def->name, def->name_len));
 		printf("#  MAX_SIZE = %d\n", maxsize);
 		def->mem_size = align_to(def->members->offset, maxsize);
 	}
@@ -1353,8 +1185,8 @@ static Node	*struct_block(Token *ident)
 		tmp->offset -= type_size(tmp->type);
 	}
 
-	if (!consume(";"))
-		error_at(token->str, ";が必要です");
+	if (!consume(env, ";"))
+		error_at(env->token->str, ";が必要です");
 
 	return (new_node(ND_STRUCT_DEF, NULL, NULL));
 }
@@ -1362,11 +1194,11 @@ static Node	*struct_block(Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-static Node	*funcdef(Type *ret_type, Token *ident)
+static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 {
 	Node	*node;
 
-	locals = NULL;
+	env->locals = NULL;
 
 	// create node
 	node = new_node(ND_FUNCDEF, NULL, NULL);
@@ -1376,36 +1208,36 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	node->argdef_count = 0;
 
 	// args
-	if (!consume(")"))
+	if (!consume(env, ")"))
 	{
 		for (;;)
 		{
 			// 型宣言の確認
-			Type *type = consume_type_before();
+			Type *type = consume_type_before(env);
 			if (type == NULL)
-				error_at(token->str,"型宣言が必要です");
+				error_at(env->token->str,"型宣言が必要です");
 
 			// 仮引数名
-			Token *arg = consume_ident();
+			Token *arg = consume_ident(env);
 			if (arg == NULL)
 			{
 				// voidなら引数0個
 				if (type->ty == VOID && node->argdef_count == 0)
 				{
-					if (!consume(")"))
-						error_at(token->str, ")が見つかりませんでした。");
+					if (!consume(env, ")"))
+						error_at(env->token->str, ")が見つかりませんでした。");
 					break ;
 				}
-				error_at(token->str, "仮引数が必要です");
+				error_at(env->token->str, "仮引数が必要です");
 			}
 			// LVarを作成
-			LVar *created = create_local_var(arg->str, arg->len, type, true);
+			LVar *created = create_local_var(env, arg->str, arg->len, type, true);
 			// arrayを読む
-			expect_type_after(&type);
+			expect_type_after(env, &type);
 
 			// TODO Voidチェックは違うパスでやりたい....
 			if (!is_declarable_type(type))
-				error_at(token->str, "宣言できない型の変数です");
+				error_at(env->token->str, "宣言できない型の変数です");
 
 			// 型情報を保存
 			type->next = node->arg_type;
@@ -1413,10 +1245,10 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 			node->argdef_count++;
 			
 			// )か,
-			if (consume(")"))
+			if (consume(env, ")"))
 				break;
-			if (!consume(","))
-				error_at(token->str, ",が必要です");
+			if (!consume(env, ","))
+				error_at(env->token->str, ",が必要です");
 		}
 	}
 
@@ -1425,25 +1257,25 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	// func_defsに代入
 	// TODO 関数名被り
 	// TODO プロトタイプ宣言後の関数定義
-	if (consume(";"))
+	if (consume(env, ";"))
 	{
 		node->kind = ND_PROTOTYPE;
 
 		int i = 0;
-		while (func_protos[i])
+		while (env->func_protos[i])
 			i += 1;
-		func_protos[i] = node;
-		node->locals = locals;
+		env->func_protos[i] = node;
+		node->locals = env->locals;
 	}
 	else
 	{
 		int i = 0;
-		while (func_defs[i])
+		while (env->func_defs[i])
 			i += 1;
-		func_defs[i] = node;
-		node->locals = locals;
-		node->lhs = stmt();
-		node->locals = locals;
+		env->func_defs[i] = node;
+		node->locals = env->locals;
+		node->lhs = stmt(env);
+		node->locals = env->locals;
 	}
 	
 	printf("# CREATED FUNC %s\n", strndup(node->fname, node->flen));
@@ -1451,59 +1283,62 @@ static Node	*funcdef(Type *ret_type, Token *ident)
 	return node;
 }
 
-static Node	*filescope(void)
+static Node	*filescope(Env *env)
 {
 	Token	*ident;
 	Type	*ret_type;
 
 	// structの宣言か返り値がstructか
-	if (consume_with_type(TK_STRUCT))
+	if (consume_with_type(env, TK_STRUCT))
 	{
-		ident = consume_ident();
+		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(token->str, "構造体の識別子が必要です");
+			error_at(env->token->str, "構造体の識別子が必要です");
 			
-		if (consume("{"))
-			return struct_block(ident);
+		if (consume(env, "{"))
+			return struct_block(env, ident);
 
-		ret_type = new_struct_type(ident->str, ident->len);
-		consume_type_ptr(&ret_type);
+		ret_type = new_struct_type(env, ident->str, ident->len);
+		consume_type_ptr(env, &ret_type);
 	}
 	else
-		ret_type = consume_type_before();
+		ret_type = consume_type_before(env);
 
 	// グローバル変数か関数宣言か
 	if (ret_type != NULL)
 	{
 		// ident
-		ident = consume_ident();
+		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(token->str, "不明なトークンです");
+			error_at(env->token->str, "不明なトークンです");
 
 		// function definition
-		if (consume("("))
-			return funcdef(ret_type, ident);
+		if (consume(env, "("))
+			return funcdef(env, ret_type, ident);
 		else
-			return global_var(ret_type, ident);
+			return global_var(env, ret_type, ident);
 	}
 
-	error_at(token->str, "構文解析に失敗しました[filescope kind:%d]", token->kind);
+	error_at(env->token->str, "構文解析に失敗しました[filescope kind:%d]", env->token->kind);
 	return (NULL);
 }
 
-void	program(void)
+void	program(Env *env)
 {
 	int	i;
 
 	i = 0;
-	while (!at_eof())
-		code[i++] = filescope();
-	code[i] = NULL;
+	while (!at_eof(env))
+		env->code[i++] = filescope(env);
+	env->code[i] = NULL;
 }
 
-Node	*parse(Token *tok)
+Env	*parse(Token *tok)
 {
-	token = tok;
-	program();
-	return NULL;
+	Env	*env;
+
+	env = calloc(1, sizeof(Env));
+	env->token = tok;
+	program(env);
+	return env;
 }

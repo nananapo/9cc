@@ -6,8 +6,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-static Token	*token;
-
 extern char		*user_input;
 
 static char *reserved_words[] = {
@@ -40,6 +38,11 @@ static char	*match_reserved_word(char *str)
 	return NULL;
 }
 
+static bool	issymbol(char c)
+{
+	return (c == '_');
+}
+
 // read var name
 // return length
 int	read_var_name(char *p)
@@ -48,7 +51,7 @@ int	read_var_name(char *p)
 
 	while (*p)
 	{
-		if (!isalnum(*p))
+		if (!isalnum(*p) && !issymbol(*p))
 			return l;
 		l++;
 		p++;

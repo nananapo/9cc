@@ -14,7 +14,7 @@ assert() {
   expected="$1"
   input="$2"
 
-  ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
+  echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
   if [ "$?" != "0" ]; then
 	echo "$input => FAILED TO COMPILE"
 	exit 1
@@ -32,7 +32,7 @@ assert() {
   if [ "$actual" = "$expected" ]; then
     echo "$input => $actual"
   else
-    echo "$input => $expected expected, but got $actual"
+    echo "ASSERT $input => $expected expected, but got $actual"
     exit 1
   fi
 }
@@ -45,14 +45,15 @@ assert_out(){
 	expected="$1"
 	input="$prefix$2"
 	
-    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
+    HEY="`echo "$input" | ../prpr/prpr -`"
+	echo "$HEY"| ./9cc > tmp.s
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp`
 
   	if [ "$actual" = "$expected" ]; then
   	  echo "$arg2 => $actual"
   	else
-  	  echo "$input => $expected expected, but got $actual"
+  	  echo "ASSERT OUT $input => $expected expected, but got $actual"
   	  exit 1
   	fi
 }
@@ -65,14 +66,14 @@ assert_cat(){
 	expected="$1"
 	input="$prefix $2"
 	
-    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
+    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
 	cc -o tmp tmp.s "test/print.c"
 	actual=`./tmp | cat -e`
 
   	if [ "$actual" = "$expected" ]; then
   	  echo "$arg2 => $actual"
   	else
-  	  echo "$input => $expected expected, but got $actual"
+  	  echo "ASSERT CAT $input => $expected expected, but got $actual"
   	  exit 1
   	fi
 }
@@ -81,7 +82,7 @@ assert_cat(){
 assert_ret(){
 	input="`cat test/unit/$1`"
 	
-    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
+    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
@@ -111,7 +112,7 @@ assert_ret(){
   	if [ "$actual" = "$expected" ]; then
   	  echo "$1 => OK act:$actual , exp:$expected"
   	else
-  	  echo "$1 => KO act:$actual , exp:$expected"
+  	  echo "ASSERT RET$1 => KO act:$actual , exp:$expected"
   	  exit 1
   	fi
 }
@@ -119,7 +120,7 @@ assert_ret(){
 assert_gcc(){
 	input="$prefix`cat test/unit/$1`"
 	
-    ./9cc "`echo "$input" | ../prpr/prpr -`" > tmp.s
+    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
@@ -149,7 +150,7 @@ assert_gcc(){
   	if [ "$actual" = "$expected" ]; then
   	  echo "$1 => OK"
   	else
-  	  echo "$1 => KO"
+  	  echo "ASSERT GCC $1 => KO"
   	  exit 1
   	fi
 }

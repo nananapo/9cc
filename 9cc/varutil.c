@@ -1,39 +1,39 @@
 #include "9cc.h"
+#include "parse.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
 
-extern LVar		*locals;
-extern Node		*global_vars[];
+#define Env ParseResult
 
 int	align_to(int n, int align);
 int	max(int a, int b);
 int	min(int a, int b);
 
-static void alloc_local_var(LVar *lvar);
+static void alloc_local_var(Env *env, LVar *lvar);
 
-LVar	*find_lvar(char *str, int len)
+LVar	*find_lvar(Env *env, char *str, int len)
 {
-	for (LVar *var = locals; var; var = var->next)
+	for (LVar *var = env->locals; var; var = var->next)
 		if (var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
 	return NULL;
 }
 
-Node	*find_global(char *str, int len)
+Node	*find_global(Env *env, char *str, int len)
 {
-	for (int i = 0; global_vars[i]; i++)
-		if (len == global_vars[i]->var_name_len
+	for (int i = 0; env->global_vars[i]; i++)
+		if (len == env->global_vars[i]->var_name_len
 			&& memcmp(str,
-					global_vars[i]->var_name,
-					global_vars[i]->var_name_len) == 0)
-			return global_vars[i];
+					env->global_vars[i]->var_name,
+					env->global_vars[i]->var_name_len) == 0)
+			return env->global_vars[i];
 	return NULL;
 }
 
 // TODO サイズ0はどうなるか確かめる
-static void	alloc_argument(LVar *lvar)
+static void	alloc_argument(Env *env, LVar *lvar)
 {
 	int		size;
 	int		regindex_max;
@@ -45,7 +45,7 @@ static void	alloc_argument(LVar *lvar)
 	// rbpをプッシュした分を考慮する
 	offset_min = -16;
 	offset_max = 0;
-	for (tmp = locals; tmp; tmp = tmp->next)
+	for (tmp = env->locals; tmp; tmp = tmp->next)
 	{
 		regindex_max = max(regindex_max, tmp->arg_regindex);
 		if (tmp->arg_regindex == -1)
@@ -72,7 +72,7 @@ static void	alloc_argument(LVar *lvar)
 	lvar->offset = offset_min;
 }
 
-static void alloc_local_var(LVar *lvar)
+static void alloc_local_var(Env *env, LVar *lvar)
 {
 	int		size;
 	int 	offset_max;
@@ -80,7 +80,7 @@ static void alloc_local_var(LVar *lvar)
 
 	// オフセットの正の最大値を求める
 	offset_max = 0;
-	for (tmp = locals; tmp; tmp = tmp->next)
+	for (tmp = env->locals; tmp; tmp = tmp->next)
 		offset_max = max(offset_max, max(0, tmp->offset));
 
 	size = type_size(lvar->type);
@@ -101,7 +101,7 @@ static void alloc_local_var(LVar *lvar)
 
 // TODO 同じ名前の変数がないかチェックする
 // TODO struct
-LVar	*create_local_var(char *name, int len, Type *type, bool is_arg)
+LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 {
 	LVar	*lvar;
 
@@ -114,17 +114,17 @@ LVar	*create_local_var(char *name, int len, Type *type, bool is_arg)
 
 	// メモリを割り当て
 	if (is_arg)
-		alloc_argument(lvar);
+		alloc_argument(env, lvar);
 	else
-		alloc_local_var(lvar);
+		alloc_local_var(env, lvar);
 
 	// localsに保存
 	lvar->next = NULL;
-	if (locals == NULL)
-		locals = lvar;
+	if (env->locals == NULL)
+		env->locals = lvar;
 	else
 	{
-		for(LVar *tmp = locals; tmp; tmp = tmp->next)
+		for(LVar *tmp = env->locals; tmp; tmp = tmp->next)
 		{
 			if (tmp->next == NULL)
 			{
