@@ -709,4 +709,6 @@ assert_gcc "switch3.c"
 
 assert_gcc "duffsdevice.c"
 
+assert_gcc "typedef1.c"
+
 echo OK
