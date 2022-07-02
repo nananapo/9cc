@@ -713,4 +713,6 @@ assert_gcc "typedef1.c"
 assert_gcc "defstruct1.c"
 assert_gcc "defstruct2.c"
 
+assert_gcc "elseif.c"
+
 echo OK

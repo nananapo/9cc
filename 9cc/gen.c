@@ -1015,7 +1015,18 @@ static void stmt(Node *node)
 
 			lend = jumpLabelCount++;
 
-			if (node->els == NULL)
+			if (node->elsif != NULL)
+			{	
+				int lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				stmt(node->rhs);
+				printf("    jmp .Lend%d\n", lend);
+
+				// else if
+				printf(".Lelse%d:\n", lelse);
+				stmt(node->elsif);
+			}
+			else if (node->els == NULL)
 			{
 				printf("    je .Lend%d\n", lend);
 				stmt(node->rhs);
@@ -1024,8 +1035,6 @@ static void stmt(Node *node)
 			{
 				int lelse = jumpLabelCount++;
 				printf("    je .Lelse%d\n", lelse);
-				
-				// if stmt
 				stmt(node->rhs);
 				printf("    jmp .Lend%d\n", lend);
 

@@ -214,6 +214,7 @@ struct Node
 	Type		*type;
 
 	// else of if
+	Node		*elsif;
 	Node		*els;
 
 	// for

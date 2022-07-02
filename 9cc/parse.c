@@ -14,6 +14,7 @@
 // Node
 static Node	*expr(Env *env);
 static Node *unary(Env *env);
+static Node	*stmt(Env *env);
 Node	*read_struct_block(Env *env, Token *ident);
 static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 
@@ -851,6 +852,27 @@ static int	add_switchcase(SBData *sbdata, int number)
 	return (count);
 }
 
+// ifの後ろの括弧から読む
+static Node	*read_ifblock(Env *env)
+{
+	Node	*node;
+
+	if (!consume(env, "("))
+		error_at(env->token->str, "(ではないトークンです");
+	node = new_node(ND_IF, expr(env), NULL);
+	if (!consume(env, ")"))
+		error_at(env->token->str, ")ではないトークンです");
+	node->rhs = stmt(env);
+	if (consume_with_type(env, TK_ELSE))
+	{
+		if (consume_with_type(env, TK_IF))
+			node->elsif = read_ifblock(env);
+		else
+			node->els = stmt(env);
+	}
+	return (node);
+}
+
 // TODO 条件の中身がintegerか確認する
 static Node	*stmt(Env *env)
 {
@@ -871,15 +893,7 @@ static Node	*stmt(Env *env)
 	}
 	else if (consume_with_type(env, TK_IF))
 	{
-		if (!consume(env, "("))
-			error_at(env->token->str, "(ではないトークンです");
-		node = new_node(ND_IF, expr(env), NULL);
-		if (!consume(env, ")"))
-			error_at(env->token->str, ")ではないトークンです");
-		node->rhs = stmt(env);
-		if (consume_with_type(env, TK_ELSE))
-			node->els = stmt(env);
-		return node;
+		return (read_ifblock(env));
 	}
 	else if (consume_with_type(env, TK_WHILE))
 	{
