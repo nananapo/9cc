@@ -525,7 +525,6 @@ static void	primary(Node *node)
 			expr(node->lhs);
 			break;
 		case ND_STRUCT_DEF:
-			error("おかしい");
 			return;
 		default:
 			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);

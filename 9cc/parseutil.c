@@ -4,6 +4,8 @@
 
 #define Env ParseResult
 
+Node	*read_struct_block(Env *env, Token *ident);
+
 bool	consume(Env *env, char *op)
 {
 	if (env->token->kind != TK_RESERVED ||
@@ -100,7 +102,8 @@ static bool	consume_type_alias(Env *env, Type **type)
 }
 
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
-Type	*consume_type_before(Env *env)
+// read_def	: structの宣言を読むかどうか
+Type	*consume_type_before(Env *env, bool read_def)
 {
 	Type	*type;
 	Token	*ident;
@@ -117,6 +120,9 @@ Type	*consume_type_before(Env *env)
 		ident = consume_ident(env);
 		if (ident == NULL)
 			return (NULL);
+		if (read_def && consume(env, "{"))
+			read_struct_block(env, ident);
+
 		type = new_struct_type(env, ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);

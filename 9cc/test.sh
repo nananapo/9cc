@@ -710,5 +710,7 @@ assert_gcc "switch3.c"
 assert_gcc "duffsdevice.c"
 
 assert_gcc "typedef1.c"
+assert_gcc "defstruct1.c"
+assert_gcc "defstruct2.c"
 
 echo OK

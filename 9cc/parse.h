@@ -11,7 +11,7 @@ Token	*consume_ident_str(ParseResult *env, char *p);
 Token	*consume_str_literal(ParseResult *env);
 Token	*consume_char_literal(ParseResult *env);
 void	consume_type_ptr(ParseResult *env, Type **type);
-Type	*consume_type_before(ParseResult *env);
+Type	*consume_type_before(ParseResult *env, int read_def);
 void	expect_type_after(ParseResult *env, Type **type);
 void	expect(ParseResult *env, char *op);
 int		expect_number(ParseResult *env);

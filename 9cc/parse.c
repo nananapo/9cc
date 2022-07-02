@@ -14,6 +14,7 @@
 // Node
 static Node	*expr(Env *env);
 static Node *unary(Env *env);
+Node	*read_struct_block(Env *env, Token *ident);
 static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 
 // LVar
@@ -281,7 +282,7 @@ static Node *primary(Env *env)
 	if (consume(env, "("))
 	{
 		// 型を読む
-		type_cast = consume_type_before(env);
+		type_cast = consume_type_before(env, false);
 		
 		// 括弧の中身が型ではないなら優先順位を上げる括弧
 		if (type_cast == NULL)
@@ -854,6 +855,8 @@ static int	add_switchcase(SBData *sbdata, int number)
 static Node	*stmt(Env *env)
 {
 	Node	*node;
+	Type	*type;
+	Token 	*ident;
 
 	if (consume_with_type(env, TK_RETURN))
 	{
@@ -1026,12 +1029,33 @@ static Node	*stmt(Env *env)
 	}
 	else
 	{
-		Type	*type = consume_type_before(env);
+		// 構造体なら宣言の可能性がある
+		// TODO ここはfilescopeのコピペ
+		if (consume_with_type(env, TK_STRUCT))
+		{
+			ident = consume_ident(env);
+			if (ident == NULL)
+				error_at(env->token->str, "構造体の識別子が必要です");
+
+			if (consume(env, "{"))
+			{
+				node = read_struct_block(env, ident);
+				// ;なら構造体の宣言
+				// そうでないなら型宣言
+				if (consume(env, ";"))
+					return (node);
+			}
+			type = new_struct_type(env, ident->str, ident->len);
+			consume_type_ptr(env, &type);
+		}
+		else
+			type = consume_type_before(env, false);
+
 		if (type != NULL)
 		{
-			Token *tok = consume_ident(env);
+			ident = consume_ident(env);
 
-			if (tok == NULL)
+			if (ident == NULL)
 				error_at(env->token->str, "識別子が必要です");
 
 			expect_type_after(env, &type);
@@ -1040,7 +1064,7 @@ static Node	*stmt(Env *env)
 			if (!is_declarable_type(type))
 				error_at(env->token->str, "宣言できない型の変数です");
 
-			LVar *created = create_local_var(env, tok->str, tok->len, type, false);
+			LVar *created = create_local_var(env, ident->str, ident->len, type, false);
 
 			node = new_node(ND_DEFVAR, NULL, NULL);
 			node->type = type;
@@ -1097,7 +1121,8 @@ static Node	*global_var(Env *env, Type *type, Token *ident)
 	return node;
 }
 
-static Node	*struct_block(Env *env, Token *ident)
+// {以降を読む
+Node	*read_struct_block(Env *env, Token *ident)
 {
 	Type				*type;
 	StructDef			*def;
@@ -1123,7 +1148,7 @@ static Node	*struct_block(Env *env, Token *ident)
 		if (consume(env, "}"))
 			break;
 
-		type = consume_type_before(env);
+		type = consume_type_before(env, false);
 		if (type == NULL)
 			error_at(env->token->str, "型宣言が必要です");
 		ident = consume_ident(env);
@@ -1186,9 +1211,6 @@ static Node	*struct_block(Env *env, Token *ident)
 		tmp->offset -= type_size(tmp->type);
 	}
 
-	if (!consume(env, ";"))
-		error_at(env->token->str, ";が必要です");
-
 	return (new_node(ND_STRUCT_DEF, NULL, NULL));
 }
 
@@ -1214,7 +1236,7 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 		for (;;)
 		{
 			// 型宣言の確認
-			Type *type = consume_type_before(env);
+			Type *type = consume_type_before(env, false);
 			if (type == NULL)
 				error_at(env->token->str,"型宣言が必要です");
 
@@ -1296,7 +1318,7 @@ static Node	*read_typedef(Env *env)
 	TypedefPair	*pair;
 
 	// 型を読む
-	type = consume_type_before(env);
+	type = consume_type_before(env, true);
 	if (type == NULL)
 		error_at(env->token->str, "型宣言が必要です");
 	expect_type_after(env, &type);
@@ -1324,6 +1346,7 @@ static Node	*filescope(Env *env)
 	Token	*ident;
 	Type	*ret_type;
 	bool	is_static;
+	Node	*node;
 
 	// typedef
 	// TODO 後でTK_TYPEDEFにする
@@ -1347,15 +1370,19 @@ static Node	*filescope(Env *env)
 			
 		if (consume(env, "{"))
 		{
-			// TODO 一旦、宣言かつ関数宣言と、staticは無視
-			return struct_block(env, ident);
+			node = read_struct_block(env, ident);
+			// ;なら構造体の宣言
+			// そうでないなら返り値かグローバル変数
+			if (consume(env, ";"))
+				return (node);
 		}
 		ret_type = new_struct_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &ret_type);
 	}
 	else
-		ret_type = consume_type_before(env);
+		ret_type = consume_type_before(env, true);
 
+	// TODO 一旦staticは無視
 	// グローバル変数か関数宣言か
 	if (ret_type != NULL)
 	{
