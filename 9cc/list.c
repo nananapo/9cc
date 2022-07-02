@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
+#include "list.h"
 
 t_linked_list	*linked_list_new(listcmp cmp)
 {
@@ -40,7 +41,7 @@ void	linked_list_insert_tail(t_linked_list *list, void *value)
 	list->sentinel->prev = elem;
 }
 
-t_list_elem	*linked_list_search(t_linked_list *list, void *value)
+void	*linked_list_search(t_linked_list *list, void *value)
 {
 	t_linked_list_elem	*tmp;
 
@@ -48,13 +49,13 @@ t_list_elem	*linked_list_search(t_linked_list *list, void *value)
 	while (!tmp->is_sentinel)
 	{
 		if (list->cmp(tmp->value, value) == 0)
-			return  (tmp);
+			return  (tmp->value);
 		tmp = tmp->next;
 	}
 	return (NULL);
 }
 
-void	*linked_list_delete(t_linked_list *list, t_linked_list_elem *elem)
+void	linked_list_delete(t_linked_list *list, t_linked_list_elem *elem)
 {
 	elem->prev->next = elem->next;
 	elem->next->prev = elem->prev;

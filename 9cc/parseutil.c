@@ -85,6 +85,20 @@ void	consume_type_ptr(Env *env, Type **type)
 	}
 }
 
+static bool	consume_type_alias(Env *env, Type **type)
+{
+	TypedefPair	*pair;
+
+	if (env->token->kind != TK_IDENT)
+		return (false);
+	pair = linked_list_search(env->type_alias, strndup(env->token->str, env->token->len));
+	if (pair == NULL)
+		return (false);
+	consume_ident(env);
+	*type = pair->type;
+	return (true);
+}
+
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
 Type	*consume_type_before(Env *env)
 {
@@ -106,6 +120,9 @@ Type	*consume_type_before(Env *env)
 		type = new_struct_type(env, ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
+	}
+	else if (consume_type_alias(env, &type))
+	{
 	}
 	else
 		return (NULL);

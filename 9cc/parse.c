@@ -171,7 +171,8 @@ static Node *call(Env *env, Token *tok)
 		error_at(env->token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
 
 	// 引数の数を確認
-	if (node->argdef_count != refunc->argdef_count)
+	if (refunc->argdef_count != -1
+		&& node->argdef_count != refunc->argdef_count)
 		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
 
 	// 引数の型を比べる
@@ -1288,11 +1289,48 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 	return node;
 }
 
+static Node	*read_typedef(Env *env)
+{
+	Type		*type;
+	Token		*token;
+	TypedefPair	*pair;
+
+	// 型を読む
+	type = consume_type_before(env);
+	if (type == NULL)
+		error_at(env->token->str, "型宣言が必要です");
+	expect_type_after(env, &type);
+
+	// 識別子を読む
+	token = consume_ident(env);
+	if (token == NULL)
+		error_at(env->token->str, "識別子が必要です");
+
+	// ペアを追加
+	pair = malloc(sizeof(TypedefPair));
+	pair->name = token->str;
+	pair->name_len = token->len;
+	pair->type = type;
+	linked_list_insert(env->type_alias, pair);
+
+	if (!consume(env, ";"))
+		error_at(env->token->str, ";が必要です");
+
+	return (new_node(ND_TYPEDEF, NULL, NULL));
+}
+
 static Node	*filescope(Env *env)
 {
 	Token	*ident;
 	Type	*ret_type;
 	bool	is_static;
+
+	// typedef
+	// TODO 後でTK_TYPEDEFにする
+	if (consume_ident_str(env, "typedef"))
+	{
+		return (read_typedef(env));
+	}
 
 	is_static = false;
 	if (consume_ident_str(env, "static"))
@@ -1347,12 +1385,25 @@ void	program(Env *env)
 	env->code[i] = NULL;
 }
 
+int	typealias_search(void *a, void *t)
+{
+	TypedefPair	*pair;
+	char		*target;
+
+	pair = (TypedefPair *)a;
+	target = (char *)t;
+	if (pair->name_len != strlen(target))
+		return (-1);
+	return (strncmp(pair->name, target, pair->name_len));
+}
+
 Env	*parse(Token *tok)
 {
 	Env	*env;
 
 	env = calloc(1, sizeof(Env));
 	env->token = tok;
+	env->type_alias = linked_list_new(typealias_search);
 	program(env);
 	return env;
 }

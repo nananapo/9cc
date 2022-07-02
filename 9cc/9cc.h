@@ -89,6 +89,7 @@ typedef enum
 {
 	ND_FUNCDEF,
 	ND_PROTOTYPE,
+	ND_TYPEDEF,
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
@@ -286,23 +287,28 @@ struct s_struct_definition
 	StructMemberElem	*members;
 };
 
+#include "list.h"
 
-
-
-typedef struct	s_parseresult
+typedef struct s_parseresult
 {
-	Token	*token;
-	Node	*code[1000];
-	Node	*func_defs[1000];
-	Node	*func_protos[1000];
-	Node	*global_vars[1000];
-	t_str_elem	*str_literals;
-	StructDef	*struct_defs[1000];
-	LVar	*locals;
+	Token			*token;
+	Node			*code[1000];
+	Node			*func_defs[1000];
+	Node			*func_protos[1000];
+	Node			*global_vars[1000];
+	t_str_elem		*str_literals;
+	StructDef		*struct_defs[1000];
+	LVar			*locals;
+
+	t_linked_list	*type_alias;
 }	ParseResult;
 
-
-
+typedef struct s_typedefpair
+{
+	char	*name;
+	int		name_len;
+	Type	*type;
+}	TypedefPair;
 
 char	*read_file(char	*name);
 
