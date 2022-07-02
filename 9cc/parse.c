@@ -1251,6 +1251,11 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 				error_at(env->token->str, ",が必要です");
 		}
 	}
+	else
+	{
+		// 可変長
+		node->argdef_count = -1;
+	}
 
 	printf("# READ ARGS\n");
 
@@ -1287,7 +1292,14 @@ static Node	*filescope(Env *env)
 {
 	Token	*ident;
 	Type	*ret_type;
+	bool	is_static;
 
+	is_static = false;
+	if (consume_ident_str(env, "static"))
+	{
+		is_static = true;
+	}
+	
 	// structの宣言か返り値がstructか
 	if (consume_with_type(env, TK_STRUCT))
 	{
@@ -1296,8 +1308,10 @@ static Node	*filescope(Env *env)
 			error_at(env->token->str, "構造体の識別子が必要です");
 			
 		if (consume(env, "{"))
+		{
+			// TODO 一旦、宣言かつ関数宣言と、staticは無視
 			return struct_block(env, ident);
-
+		}
 		ret_type = new_struct_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &ret_type);
 	}
