@@ -5,6 +5,7 @@
 #define Env ParseResult
 
 Node	*read_struct_block(Env *env, Token *ident);
+Node	*read_enum_block(Env *env, Token *ident);
 
 bool	consume(Env *env, char *op)
 {
@@ -124,6 +125,18 @@ Type	*consume_type_before(Env *env, bool read_def)
 			read_struct_block(env, ident);
 
 		type = new_struct_type(env, ident->str, ident->len);
+		if (type == NULL)
+			return (NULL);
+	}
+	else if (consume_with_type(env, TK_ENUM))
+	{
+		ident = consume_ident(env);
+		if (ident == NULL)
+			return (NULL);
+		if (read_def && consume(env, "{"))
+			read_enum_block(env, ident);
+
+		type = new_enum_type(env, ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
 	}

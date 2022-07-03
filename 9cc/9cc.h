@@ -47,6 +47,7 @@ typedef struct LVar LVar;
 typedef struct Type	Type;
 typedef struct s_struct_definition StructDef;
 typedef struct s_struct_members StructMemberElem;
+typedef struct s_enum_definition EnumDef;
 
 typedef enum
 {
@@ -72,7 +73,10 @@ typedef enum
 	TK_EOF,
 	TK_SIZEOF,
 
-	TK_STRUCT
+	TK_STRUCT,
+	TK_ENUM,
+	TK_STATIC,
+	TK_TYPEDEF
 } TokenKind;
 
 struct Token
@@ -136,6 +140,7 @@ typedef enum
 	ND_STRUCT_DEF,
 	ND_STRUCT_VALUE,
 	ND_STRUCT_PTR_VALUE,
+	ND_ENUM_DEF,
 
 	ND_CAST,
 	ND_PARENTHESES,
@@ -151,6 +156,7 @@ typedef enum
 	PTR,
 	ARRAY,
 	STRUCT,
+	ENUM,
 	VOID
 } PrimitiveType;
 
@@ -192,6 +198,7 @@ struct Type
 	Type		*next;
 
 	StructDef	*strct;
+	EnumDef		*enm;
 };
 
 struct Node
@@ -288,6 +295,21 @@ struct s_struct_definition
 	StructMemberElem	*members;
 };
 
+struct s_enum_definition
+{
+	char	*name;
+	int		name_len;
+
+	char	*kinds[1000];
+	int		kind_len;
+};
+
+typedef struct	s_find_enum_res
+{
+	Type	*type;
+	int		value;
+}	FindEnumRes;
+
 #include "list.h"
 
 typedef struct s_parseresult
@@ -299,6 +321,7 @@ typedef struct s_parseresult
 	Node			*global_vars[1000];
 	t_str_elem		*str_literals;
 	StructDef		*struct_defs[1000];
+	EnumDef			*enum_defs[1000];
 	LVar			*locals;
 
 	t_linked_list	*type_alias;
@@ -334,6 +357,7 @@ Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
 Type	*new_struct_type(ParseResult *env, char *name, int len);
+Type	*new_enum_type(ParseResult *env, char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);

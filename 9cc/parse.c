@@ -16,12 +16,13 @@ static Node	*expr(Env *env);
 static Node *unary(Env *env);
 static Node	*stmt(Env *env);
 Node	*read_struct_block(Env *env, Token *ident);
+Node	*read_enum_block(Env *env, Token *ident);
 static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 
 // LVar
 LVar		*find_lvar(Env *env, char *str, int len);
+FindEnumRes	*find_enum(Env *env, char *str, int len);
 LVar		*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg);
-
 
 static Node	*get_function_by_name(Env *env, char *name, int len)
 {
@@ -314,27 +315,38 @@ static Node *primary(Env *env)
 		// use ident
 		else
 		{
-			LVar	*lvar = find_lvar(env, tok->str, tok->len);
-			if (lvar != NULL)
+			// enum
+			FindEnumRes	*fer = find_enum(env, tok->str, tok->len);
+			if (fer != NULL)
 			{
-				node = new_node(ND_LVAR, NULL, NULL);
-				node->offset = lvar->offset;
-				node->type = lvar->type;
+				node = new_node_num(fer->value);
+				node->type = fer->type;
 			}
 			else
 			{
-				Node *glovar = find_global(env, tok->str, tok->len);
-				if (glovar != NULL)
+				// 変数
+				LVar	*lvar = find_lvar(env, tok->str, tok->len);
+				if (lvar != NULL)
 				{
-					node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
-					node->var_name = glovar->var_name;
-					node->var_name_len = glovar->var_name_len;
-					node->type = glovar->type;
+					node = new_node(ND_LVAR, NULL, NULL);
+					node->offset = lvar->offset;
+					node->type = lvar->type;
 				}
 				else
-					error_at(tok->str,
-						"%sが定義されていません",
-						strndup(tok->str, tok->len));
+				{
+					Node *glovar = find_global(env, tok->str, tok->len);
+					if (glovar != NULL)
+					{
+						node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
+						node->var_name = glovar->var_name;
+						node->var_name_len = glovar->var_name_len;
+						node->type = glovar->type;
+					}
+					else
+						error_at(tok->str,
+							"%sが定義されていません",
+							strndup(tok->str, tok->len));
+				}
 			}
 		}
 		return read_deref_index(env, node);
@@ -1062,6 +1074,24 @@ static Node	*stmt(Env *env)
 			type = new_struct_type(env, ident->str, ident->len);
 			consume_type_ptr(env, &type);
 		}
+		// enumの可能性
+		else if (consume_with_type(env, TK_ENUM))
+		{
+			ident = consume_ident(env);
+			if (ident == NULL)
+				error_at(env->token->str, "enumの識別子が必要です");
+
+			if (consume(env, "{"))
+			{
+				node = read_enum_block(env, ident);
+				// ;ならenumの宣言
+				// そうでないなら型宣言
+				if (consume(env, ";"))
+					return (node);
+			}
+			type = new_enum_type(env, ident->str, ident->len);
+			consume_type_ptr(env, &type);
+		}
 		else
 			type = consume_type_before(env, false);
 
@@ -1228,6 +1258,43 @@ Node	*read_struct_block(Env *env, Token *ident)
 	return (new_node(ND_STRUCT_DEF, NULL, NULL));
 }
 
+// {以降を読む
+Node	*read_enum_block(Env *env, Token *ident)
+{
+	int		i;
+	Type	*type;
+	EnumDef	*def;
+
+	for (i = 0; env->enum_defs[i]; i++)
+		continue ;
+
+	def = calloc(1, sizeof(EnumDef));
+	def->name = ident->str;
+	def->name_len = ident->len;
+	def->kind_len = 0;
+	env->enum_defs[i] = def;
+
+	printf("# READ ENUM %s\n", strndup(ident->str, ident->len));
+
+	while (1)
+	{
+		if (consume(env, "}"))
+			break ;
+		ident = consume_ident(env);
+		if (ident == NULL)
+			error_at(env->token->str, "識別子が見つかりません");
+		def->kinds[def->kind_len++] = strndup(ident->str, ident->len);
+		if (!consume(env, ","))
+		{
+			if (!consume(env, "}"))
+				error_at(env->token->str, "}が見つかりません");
+			break ;
+		}
+		printf("# ENUM %s\n", def->kinds[def->kind_len - 1]);
+	}
+	return (new_node(ND_ENUM_DEF, NULL, NULL));
+}
+
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
@@ -1363,14 +1430,13 @@ static Node	*filescope(Env *env)
 	Node	*node;
 
 	// typedef
-	// TODO 後でTK_TYPEDEFにする
-	if (consume_ident_str(env, "typedef"))
+	if (consume_with_type(env, TK_TYPEDEF))
 	{
 		return (read_typedef(env));
 	}
 
 	is_static = false;
-	if (consume_ident_str(env, "static"))
+	if (consume_with_type(env, TK_STATIC))
 	{
 		is_static = true;
 	}
@@ -1380,7 +1446,7 @@ static Node	*filescope(Env *env)
 	{
 		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(env->token->str, "構造体の識別子が必要です");
+			error_at(env->token->str, "識別子が必要です");
 			
 		if (consume(env, "{"))
 		{
@@ -1391,6 +1457,24 @@ static Node	*filescope(Env *env)
 				return (node);
 		}
 		ret_type = new_struct_type(env, ident->str, ident->len);
+		consume_type_ptr(env, &ret_type);
+	}
+	// enumの宣言か返り値がenumか
+	else if (consume_with_type(env, TK_ENUM))
+	{
+		ident = consume_ident(env);
+		if (ident == NULL)
+			error_at(env->token->str, "識別子が必要です");
+			
+		if (consume(env, "{"))
+		{
+			node = read_enum_block(env, ident);
+			// ;ならenumの宣言
+			// そうでないなら返り値かグローバル変数
+			if (consume(env, ";"))
+				return (node);
+		}
+		ret_type = new_enum_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &ret_type);
 	}
 	else

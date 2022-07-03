@@ -13,6 +13,28 @@ int	min(int a, int b);
 
 static void alloc_local_var(Env *env, LVar *lvar);
 
+FindEnumRes	*find_enum(Env *env, char *str, int len)
+{
+	for (int i = 0; env->enum_defs[i]; i++)
+	{
+		EnumDef	*def = env->enum_defs[i];
+		for (int j = 0; j < def->kind_len; j++)
+		{
+			char *var = def->kinds[j];
+			if (strlen(var) == len
+			&& strncmp(str, var, strlen(var)) == 0)
+			{
+				FindEnumRes	*res;
+				res = malloc(sizeof(FindEnumRes));
+				res->type = new_enum_type(env, def->name, def->name_len);
+				res->value = j;
+				return (res);
+			}
+		}
+	}
+	return (NULL);
+}
+
 LVar	*find_lvar(Env *env, char *str, int len)
 {
 	for (LVar *var = env->locals; var; var = var->next)

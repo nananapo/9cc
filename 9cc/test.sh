@@ -715,4 +715,10 @@ assert_gcc "defstruct2.c"
 
 assert_gcc "elseif.c"
 
+assert_gcc "enum1.c"
+assert_gcc "enum2.c"
+assert_gcc "enum3.c"
+assert_gcc "enum4.c"
+assert_gcc "enum5.c"
+
 echo OK

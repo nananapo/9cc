@@ -83,7 +83,7 @@ void	cmp(Type *dst, Type *from)
 			cmps(RAX, RDI);
 		else if (dst->ty == CHAR)
 			cmps(AL, DIL);
-		else if (dst->ty == INT)
+		else if (dst->ty == INT || dst->ty == ENUM)
 			cmps(EAX, EDI);
 		return ;
 	}
@@ -241,7 +241,7 @@ static void	load(Type *type)
 		printf("    movzx %s, %s\n", RAX, AL);
 		return ;
 	}
-	else if (type->ty == INT)
+	else if (type->ty == INT || type->ty == ENUM)
 	{
 		printf("    mov %s, %s [%s]\n", EAX, DWORD_PTR, RAX);
 		//printf("    movzx %s, %s\n", RAX, EAX);
@@ -432,6 +432,8 @@ static void	cast(Type *from, Type *to)
 	if (type_equal(from, to))
 		return ;
 
+	printf("# cast %s -> %s\n", get_type_name(from), get_type_name(to));
+
 	// ポインタからポインタのキャストは何もしない
 	if (is_pointer_type(from)
 	&& is_pointer_type(to))
@@ -462,8 +464,6 @@ static void	cast(Type *from, Type *to)
 		pop(RAX);
 		return ;
 	}
-
-	printf("#CASTCAST\n");
 
 	// 整数から整数は符号を考えながらキャスト
 	if (is_integer_type(from)
@@ -525,6 +525,7 @@ static void	primary(Node *node)
 			expr(node->lhs);
 			break;
 		case ND_STRUCT_DEF:
+		case ND_ENUM_DEF:
 			return;
 		default:
 			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
@@ -1289,7 +1290,8 @@ void	gen(Node *node)
 	if (node->kind == ND_PROTOTYPE
 	|| node->kind == ND_DEFVAR
 	|| node->kind == ND_STRUCT_DEF
-	|| node->kind == ND_TYPEDEF)
+	|| node->kind == ND_TYPEDEF
+	|| node->kind == ND_ENUM_DEF)
 		return;
 	filescope(node);
 }

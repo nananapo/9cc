@@ -186,6 +186,27 @@ Token	*tokenize(char *p)
 			p += 7;
 			continue ;
 		}
+		if (match_word(p, "static"))
+		{
+			cur = new_token(TK_STATIC, cur, p);
+			cur->len = 6;
+			p += 6;
+			continue ;
+		}
+		if (match_word(p, "typedef"))
+		{
+			cur = new_token(TK_TYPEDEF, cur, p);
+			cur->len = 7;
+			p += 7;
+			continue ;
+		}
+		if (match_word(p, "enum"))
+		{
+			cur = new_token(TK_ENUM, cur, p);
+			cur->len = 4;
+			p += 4;
+			continue ;
+		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);

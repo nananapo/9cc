@@ -31,6 +31,26 @@ Type	*new_type_array(Type *ptr_to)
 	return type;
 }
 
+Type	*new_enum_type(ParseResult *env, char *name, int len)
+{
+	Type	*type;
+	int		i;
+
+	type = new_primitive_type(ENUM);
+	for (i = 0; env->enum_defs[i]; i++)
+	{
+		if (env->enum_defs[i]->name_len == len
+		&& strncmp(env->enum_defs[i]->name, name, len) == 0)
+		{
+			type->enm = env->enum_defs[i];
+			break ;
+		}
+	}
+	if (type->enm == NULL)
+		return (NULL);
+	return (type);
+}
+
 Type	*new_struct_type(ParseResult *env, char *name, int len)
 {
 	Type	*type;
@@ -67,6 +87,8 @@ bool	type_equal(Type *t1, Type *t2)
 		return type_equal(t1->ptr_to, t2->ptr_to);
 	if (t1->ty == STRUCT)
 		return (t1->strct == t2->strct);
+	if (t1->ty == ENUM)
+		return (t1->enm == t2->enm);
 	return true;
 }
 
@@ -83,6 +105,8 @@ int	type_size(Type *type)
 		return (type_size(type->ptr_to) * type->array_size);
 	if (type->ty == STRUCT)
 		return (type->strct->mem_size);
+	if (type->ty == ENUM)
+		return (4);
 	if (type->ty == VOID)
 		return 0;
 	return -1;
@@ -92,7 +116,8 @@ int	type_size(Type *type)
 bool	is_integer_type(Type *type)
 {
 	return (type->ty == INT
-			|| type->ty == CHAR);
+			|| type->ty == CHAR
+			|| type->ty == ENUM);
 }
 
 // 配列かどうか確認する
@@ -163,6 +188,8 @@ static void	typename_loop(Type *type, char *str)
 		strcat(str, "void");
 	else if (type->ty == STRUCT)
 		strcat(str, "struct"); // TODO struct name
+	else if (type->ty == ENUM)
+		strcat(str, "enum");
 	else if (type->ty == ARRAY)
 	{
 		typename_loop(type->ptr_to, str);
