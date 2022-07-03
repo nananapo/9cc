@@ -10,9 +10,6 @@ OBJS=${SRCS:.c=.o}
 ${NAME}: ${OBJS}
 	$(CC) -g -o $(NAME) $(OBJS) $(LDFLAGS)
 
-test: $(NAME)
-	./$(TEST_SCRIPT)
-
 clean:
 	rm -rf ${OBJS} *~ tmp* *dSYM a.out
 

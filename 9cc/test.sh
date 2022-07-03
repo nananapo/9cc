@@ -1,6 +1,7 @@
 #!/bin/bash
 
-prefix="int pint(int i);
+prefix="
+int pint(int i);
 int dint(int i);
 int pchar(char a);
 int pspace(int n);
@@ -10,11 +11,16 @@ int my_print(char *s);
 int *my_malloc_int(int n);
 "
 
+testdir="../test/"
+ncc="./9cc"
+prpr="../prpr/prpr"
+module="$testdir/sub/print.c"
+
 assert() {
   expected="$1"
   input="$2"
 
-  echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
+  echo "$input" | $prpr - | $ncc > tmp.s
   if [ "$?" != "0" ]; then
 	echo "$input => FAILED TO COMPILE"
 	exit 1
@@ -45,9 +51,9 @@ assert_out(){
 	expected="$1"
 	input="$prefix$2"
 	
-    HEY="`echo "$input" | ../prpr/prpr -`"
-	echo "$HEY"| ./9cc > tmp.s
-	cc -o tmp tmp.s "../test/print.c"
+    HEY="`echo "$input" | $prpr -`"
+	echo "$HEY"| $ncc > tmp.s
+	cc -o tmp tmp.s $module
 	actual=`./tmp`
 
   	if [ "$actual" = "$expected" ]; then
@@ -58,35 +64,40 @@ assert_out(){
   	fi
 }
 
+actualfile="actual.output"
+expectedfile="expected.output"
+tmpcfile="$testdir/tmp.c"
+
 assert_gcc(){
-	input="$prefix`cat ../test/$1`"
+	input="$prefix`cat $testdir/$1`"
 	
-    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
+    echo "$input" | $prpr - | $ncc > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
 	fi
 	
-	cc -o tmp1 tmp.s "../test/print.c"
+	cc -o tmp1 tmp.s $module
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc gcc compile KO"
 		exit 1
 	fi
 
-	./tmp1 > ../test/actual.output
-	actual=`cat -e ../test/actual.output`
+	./tmp1 > $actualfile
+	actual=`cat -e $actualfile`
 
-	echo "$input" > ../test/tmp.c
-	cc -o tmp2 ../test/tmp.c ../test/print.c
+	echo "$input" > $tmpcfile
+	cc -o tmp2 $tmpcfile $module
 	if [ "$?" != "0" ]; then
+		rm -rf $tmpcfile
 		echo "$1 => gcc segv KO"
 		exit 1
 	fi
 
-	./tmp2 > ../test/expected.output
-	expected=`cat -e ../test/expected.output`
+	./tmp2 > $actualfile
+	expected=`cat -e $actualfile`
 
-	rm -rf ../test/tmp.c tmp1 tmp2
+	rm -rf $tmpcfile tmp1 tmp2
 
   	if [ "$actual" = "$expected" ]; then
   	  echo "$1 => OK"
@@ -614,7 +625,7 @@ assert_gcc "implicit_cast0.c"
 
 assert_gcc "cond1.c"
 
-assert_gcc "std/ctype.c"
+assert_gcc "ctype.c"
 
 assert_gcc "increments1.c"
 assert_gcc "increments2.c"
