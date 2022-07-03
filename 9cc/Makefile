@@ -21,13 +21,4 @@ fclean: clean
 
 re: fclean $(NAME)
 
-sub: ${NAME}
-	./9cc "`cat test/hey.c`" > tmp.s
-	${CC} -o tmp tmp.s test/print.c
-	./tmp
-
-sub2: ${NAME}
-	./9cc "`cat test/hey2.c`" > tmp2.s
-	${CC} -o tmp2 tmp2.s test/print.c
-	./tmp2
 .PHONY: test clean fclean re
