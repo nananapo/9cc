@@ -21,5 +21,6 @@ int	main(int argc, char **argv)
 		return (0);
 	tok = tokenize(str);
 	node = parse(&tok, 0);
+	set_currentdir(filename);
 	gen(node);
 }

@@ -105,6 +105,7 @@ typedef struct s_gen_env
 void	debug(char *fmt, ...);
 
 char	*read_file(char *name);
+char	*getdir(char *full);
 
 int		start_with(char *haystack, char *needle);
 char	*skip_space(char *p);
@@ -116,14 +117,14 @@ char	*read_ident(char *str);
 char	*read_number(char *str);
 int		is_reserved_word(char *str);
 
-bool	is_number(char str);
-bool	is_alnum(char str);
 bool	is_symbol(char str);
 void	add_str_elem(StrElem **list, char *str);
 
 Token	*tokenize(char *str);
 Node	*parse(Token **tok, int nest);
 void	gen(Node *node);
+
+void	set_currentdir(char *filename);
 
 Node	*create_node(NodeKind kind);
 

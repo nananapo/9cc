@@ -81,3 +81,13 @@ static char	*read_all(int fd)
 	}
 	return (p);
 }
+
+char	*getdir(char *full)
+{
+	char	*end;
+
+	end = strrchr(full, '/');
+	if (end == NULL)
+		return ("./");
+	return (strndup(full, end - full));
+}

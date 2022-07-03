@@ -1,4 +1,5 @@
 #include "prlib.h"
+#include <ctype.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
@@ -51,7 +52,7 @@ char	*read_ident(char *str)
 	if (!is_ident_prefix(*str))
 		return (str);
 	str++;
-	while (*str && (is_alnum(*str) || is_symbol(*str)))
+	while (*str && (isalnum(*str) || is_symbol(*str)))
 		str++;
 	return (str);
 }
@@ -59,7 +60,7 @@ char	*read_ident(char *str)
 // TODO 小数点とか
 char	*read_number(char *str)
 {
-	while (*str && is_number(*str))
+	while (*str && isnumber(*str))
 		str++;
 	return (str);
 }

@@ -6,6 +6,8 @@
 
 extern GenEnv	gen_env;
 
+static char	*currentdir;
+
 static void	add_macro(char *name, StrElem *params, Token *codes, int codes_len)
 {
 	Macro	*tmp;
@@ -172,7 +174,7 @@ static void	include(Node *node)
 
 static void	define_macro(Node *node)
 {
-	// TODO 被り
+	// TODO 被りチェック
 	add_macro(node->macro_name, node->params, node->codes, node->codes_len);
 }
 
@@ -242,4 +244,9 @@ void	gen(Node *node)
 		}
 		node = node->next;
 	}
+}
+
+void	set_currentdir(char *filename)
+{
+	currentdir = getdir(filename);
 }
