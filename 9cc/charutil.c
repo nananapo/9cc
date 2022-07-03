@@ -1,4 +1,3 @@
-#include "9cc.h"
 #include <ctype.h>
 
 int	can_use_beginning_of_var(char c)
@@ -40,8 +39,6 @@ int get_char_to_int(char *p, int len)
 			return '\0';
 		case '\\':
 			return '\\';
-		default:
-			error("不明なエスケープシーケンスです %c", *p);
 	}
 	return -1;
 }

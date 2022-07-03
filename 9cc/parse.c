@@ -304,6 +304,7 @@ static Node *primary(Env *env)
 	Token	*tok;
 	Node	*node;
 	Type	*type_cast;
+	int 	number;
 
 	// 括弧
 	if (consume(env, "("))
@@ -388,13 +389,15 @@ static Node *primary(Env *env)
 	tok = consume_char_literal(env);
 	if (tok)
 	{
-		node = new_node_num(get_char_to_int(tok->str, tok->strlen_actual));
+		number = get_char_to_int(tok->str, tok->strlen_actual);
+		if (number == -1)
+			error_at(tok->str, "不明なエスケープシーケンスです");
+		node = new_node_num(number);
 		node->type = new_primitive_type(CHAR);
 		return read_deref_index(env, node); // charの後ろに[]はおかしいけれど、とりあえず許容
 	}
 
 	// 数
-	int number;
 	if (!consume_number(env, &number))
 		error_at(env->token->str, "数字が必要です");
 	node = new_node_num(number);
