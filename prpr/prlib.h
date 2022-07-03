@@ -100,6 +100,7 @@ typedef struct s_gen_env
 	Macro	*macros;
 	int		print_count;
 	int		nest_count;
+	char	*stddir;
 }	GenEnv;
 
 void	debug(char *fmt, ...);
@@ -124,7 +125,7 @@ Token	*tokenize(char *str);
 Node	*parse(Token **tok, int nest);
 void	gen(Node *node);
 
-void	set_currentdir(char *filename);
+void	set_currentdir(char *stddir, char *filename);
 
 Node	*create_node(NodeKind kind);
 

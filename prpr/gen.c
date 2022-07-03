@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-extern GenEnv	gen_env;
+static GenEnv	gen_env;
 
 static char	*currentdir;
 
@@ -147,7 +147,10 @@ static void	load(char *file_name)
 
 	str = read_file(file_name);
 	if (str == NULL)
-		error("ファイル %s が見つかりせん", file_name);
+	{
+		printf("%s\n", file_name);
+		error("^ ファイルが見つかりませんでした");
+	}
 	tok = tokenize(str);
 	node = parse(&tok, 0);
 	gen(node);
@@ -162,7 +165,7 @@ static void	include(Node *node)
 	if (node->is_std_include)
 	{
 		str[0] = '\0';
-		strcat(str, "/Users/kanapo/Documents/cc/std/");
+		strcat(str, gen_env.stddir);
 		strcat(str, file_name);
 		load(str);
 	}
@@ -246,7 +249,8 @@ void	gen(Node *node)
 	}
 }
 
-void	set_currentdir(char *filename)
+void	set_currentdir(char *stddir, char *filename)
 {
+	gen_env.stddir = stddir;
 	currentdir = getdir(filename);
 }

@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <string.h>
 
-GenEnv	*gen_env;
-
 int	main(int argc, char **argv)
 {
 	char	*str;
@@ -11,16 +9,32 @@ int	main(int argc, char **argv)
 	int		len;
 	Token	*tok;
 	Node	*node;
+	int		findex;
+	char	*stddir;
 
 	if (argc < 2)
 		error("no input file");
-	filename = argv[1];
-	len = strlen(argv[1]);
+
+	if (strcmp(argv[1], "--stddir") == 0)
+	{
+		if (argc < 4)
+			error("Usage: prpr --stddir [dir] [input file]");
+		findex = 3;
+		stddir = argv[2];
+	}
+	else
+	{
+		findex = 1;
+		stddir = "";
+	}
+
+	filename = argv[findex];
+	len = strlen(filename);
 	str = read_file(strndup(filename, len));
 	if (str == NULL)
 		return (0);
 	tok = tokenize(str);
 	node = parse(&tok, 0);
-	set_currentdir(filename);
+	set_currentdir(stddir, filename);
 	gen(node);
 }
