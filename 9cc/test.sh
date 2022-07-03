@@ -720,5 +720,6 @@ assert_gcc "enum2.c"
 assert_gcc "enum3.c"
 assert_gcc "enum4.c"
 assert_gcc "enum5.c"
+assert_gcc "enum6.c"
 
 echo OK

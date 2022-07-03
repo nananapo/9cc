@@ -91,6 +91,31 @@ Node*new_node_num(int val)
 
 
 
+bool	consume_enum_key(Env *env, Type **type, int *value)
+{
+	Token		*tok;
+	FindEnumRes	*fer;
+
+	if (env->token->kind != TK_IDENT)
+		return (false);
+	tok = env->token;
+	fer = find_enum(env, tok->str, tok->len);
+	if (fer != NULL)
+	{
+		consume_ident(env);
+		if (type != NULL)
+			*type = fer->type;
+		if (value != NULL)
+			*value = fer->value;
+		return (true);
+	}
+	return (false);
+}
+
+
+
+
+
 
 
 
@@ -304,52 +329,49 @@ static Node *primary(Env *env)
 		node->type = type_cast;
 		return read_deref_index(env, node);
 	}
-	
+
+	// enumの値
+	Type	*enum_type;
+	int		enum_value;
+	if (consume_enum_key(env, &enum_type, &enum_value))
+	{
+		node = new_node_num(enum_value);
+		node->type = enum_type;
+		return read_deref_index(env, node);
+	}
+
 	// identかcall
 	tok = consume_ident(env);
 	if (tok)
 	{
 		// call func
 		if (consume(env, "("))
-			node = call(env, tok);
-		// use ident
-		else
 		{
-			// enum
-			FindEnumRes	*fer = find_enum(env, tok->str, tok->len);
-			if (fer != NULL)
-			{
-				node = new_node_num(fer->value);
-				node->type = fer->type;
-			}
-			else
-			{
-				// 変数
-				LVar	*lvar = find_lvar(env, tok->str, tok->len);
-				if (lvar != NULL)
-				{
-					node = new_node(ND_LVAR, NULL, NULL);
-					node->offset = lvar->offset;
-					node->type = lvar->type;
-				}
-				else
-				{
-					Node *glovar = find_global(env, tok->str, tok->len);
-					if (glovar != NULL)
-					{
-						node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
-						node->var_name = glovar->var_name;
-						node->var_name_len = glovar->var_name_len;
-						node->type = glovar->type;
-					}
-					else
-						error_at(tok->str,
-							"%sが定義されていません",
-							strndup(tok->str, tok->len));
-				}
-			}
+			node = call(env, tok);
+			return read_deref_index(env, node);
 		}
-		return read_deref_index(env, node);
+
+		// ローカル変数
+		LVar	*lvar = find_lvar(env, tok->str, tok->len);
+		if (lvar != NULL)
+		{
+			node = new_node(ND_LVAR, NULL, NULL);
+			node->offset = lvar->offset;
+			node->type = lvar->type;
+			return read_deref_index(env, node);
+		}
+
+		// グローバル変数
+		Node *glovar = find_global(env, tok->str, tok->len);
+		if (glovar != NULL)
+		{
+			node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
+			node->var_name = glovar->var_name;
+			node->var_name_len = glovar->var_name_len;
+			node->type = glovar->type;
+			return read_deref_index(env, node);
+		}
+		error_at(tok->str,"%sが定義されていません", strndup(tok->str, tok->len));
 	}
 
 	// string
@@ -998,7 +1020,10 @@ static Node	*stmt(Env *env)
 		int	number;
 
 		if (!consume_number(env, &number))
-			error_at(env->token->str, "数値が必要です");
+		{
+			if (!consume_enum_key(env, NULL, &number))
+				error_at(env->token->str, "定数が必要です");
+		}
 		if (!consume(env, ":"))
 			error_at(env->token->str, ":が必要です");
 
