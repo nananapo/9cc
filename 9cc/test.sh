@@ -47,7 +47,7 @@ assert_out(){
 	
     HEY="`echo "$input" | ../prpr/prpr -`"
 	echo "$HEY"| ./9cc > tmp.s
-	cc -o tmp tmp.s "test/print.c"
+	cc -o tmp tmp.s "../test/print.c"
 	actual=`./tmp`
 
   	if [ "$actual" = "$expected" ]; then
@@ -58,67 +58,8 @@ assert_out(){
   	fi
 }
 
-assert_cat(){
-	echo "#-- Test----------------------------"
-
-	arg2="$2"
-
-	expected="$1"
-	input="$prefix $2"
-	
-    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
-	cc -o tmp tmp.s "test/print.c"
-	actual=`./tmp | cat -e`
-
-  	if [ "$actual" = "$expected" ]; then
-  	  echo "$arg2 => $actual"
-  	else
-  	  echo "ASSERT CAT $input => $expected expected, but got $actual"
-  	  exit 1
-  	fi
-}
-
-
-assert_ret(){
-	input="`cat test/unit/$1`"
-	
-    echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
-	if [ "$?" != "0" ]; then
-		echo "$1 => 9cc KO"
-		exit 1
-	fi
-	
-	cc -o tmp1 tmp.s "test/print.c"
-	if [ "$?" != "0" ]; then
-		echo "$1 => 9cc gcc compile KO"
-		exit 1
-	fi
-
-	./tmp1
-	actual=`echo $?`
-
-	echo "$input" > test/unit/tmp.c
-	cc -o tmp2 test/unit/tmp.c test/print.c
-	if [ "$?" != "0" ]; then
-		echo "$1 => gcc segv KO"
-		exit 1
-	fi
-
-	./tmp2
-	expected=`echo $?`
-
-	rm -rf test/unit/tmp.c tmp1 tmp2
-
-  	if [ "$actual" = "$expected" ]; then
-  	  echo "$1 => OK act:$actual , exp:$expected"
-  	else
-  	  echo "ASSERT RET$1 => KO act:$actual , exp:$expected"
-  	  exit 1
-  	fi
-}
-
 assert_gcc(){
-	input="$prefix`cat test/unit/$1`"
+	input="$prefix`cat ../test/$1`"
 	
     echo "$input" | ../prpr/prpr - | ./9cc > tmp.s
 	if [ "$?" != "0" ]; then
@@ -126,26 +67,26 @@ assert_gcc(){
 		exit 1
 	fi
 	
-	cc -o tmp1 tmp.s "test/print.c"
+	cc -o tmp1 tmp.s "../test/print.c"
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc gcc compile KO"
 		exit 1
 	fi
 
-	./tmp1 > test/unit/actual.output
-	actual=`cat -e test/unit/actual.output`
+	./tmp1 > ../test/actual.output
+	actual=`cat -e ../test/actual.output`
 
-	echo "$input" > test/unit/tmp.c
-	cc -o tmp2 test/unit/tmp.c test/print.c
+	echo "$input" > ../test/tmp.c
+	cc -o tmp2 ../test/tmp.c ../test/print.c
 	if [ "$?" != "0" ]; then
 		echo "$1 => gcc segv KO"
 		exit 1
 	fi
 
-	./tmp2 > test/unit/expected.output
-	expected=`cat -e test/unit/expected.output`
+	./tmp2 > ../test/expected.output
+	expected=`cat -e ../test/expected.output`
 
-	rm -rf test/unit/tmp.c tmp1 tmp2
+	rm -rf ../test/tmp.c tmp1 tmp2
 
   	if [ "$actual" = "$expected" ]; then
   	  echo "$1 => OK"
@@ -528,7 +469,7 @@ assert_out "1" "int main()
 	pint(-n);
 }"
 
-assert_cat "Hello\$" "int printf(char *a);
+assert_out "Hello" "int printf(char *a);
 int main()
 {
 	char	*s;
