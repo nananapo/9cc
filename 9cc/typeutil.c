@@ -223,7 +223,7 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 
 	// どちらもポインタ
 	if (is_pointer_type(from) && is_pointer_type(to))
-		return (is_explicit);
+		return (true);
 
 	// どちらかがポインタ
 	if (is_pointer_type(from) != is_pointer_type(to))
