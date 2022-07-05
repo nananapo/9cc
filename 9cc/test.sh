@@ -13,7 +13,7 @@ int *my_malloc_int(int n);
 
 testdir="../test/"
 ncc="./9cc"
-prpr="../prpr/prpr"
+prpr="../prpr/prpr --stddir ../std/"
 module="$testdir/sub/print.c"
 
 assert() {
@@ -296,6 +296,11 @@ assert 120 "int main(){char *a[5][3]; return sizeof(a);}"
 assert 8 "int main(){int *a;return sizeof(a);}"
 assert 8 "int main(){int a;return sizeof(&a);}"
 
+assert 1 "int main() {return sizeof(char); }"
+assert 4 "int main() {return sizeof(int); }"
+assert 8 "int main() {return sizeof(int *); }"
+assert 8 "int main() {return sizeof(int **); }"
+assert 8 "int main() {return sizeof(char *); }"
 
 assert 10 "int main(){int a[3]; int *b; b = a; *b = 10; return *a;}"
 assert 33 "int main(){int a[3]; *a = 10; *(a + 1) = 11; *(a + 2) = 12; return (*a + *(a + 1) + *(a + 2));}"

@@ -9,6 +9,7 @@
 extern char		*user_input;
 
 static char *reserved_words[] = {
+	"...",
 	"++", "--", "->", ".",
 	">=", "<=", "==", "!=",
 	"||", "&&",

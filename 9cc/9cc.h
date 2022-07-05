@@ -242,6 +242,7 @@ struct Node
 	Type		*ret_type;
 	int			stack_size;
 	LVar 		*locals;
+	bool		is_variable_argument;
 
 	// general
 	Node		*next;

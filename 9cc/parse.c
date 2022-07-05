@@ -466,6 +466,7 @@ static Node	*arrow(Env *env)
 static Node *unary(Env *env)
 {
 	Node	*node;
+	Type	*type;
 
 	if (consume(env, "+"))
 	{
@@ -530,9 +531,28 @@ static Node *unary(Env *env)
 	}
 	else if (consume_with_type(env, TK_SIZEOF))
 	{
-		node = unary(env);
-		node = new_node_num(type_size(node->type));
-		return node;
+		// とりあえずsizeof (型)を読めるように
+		if (consume(env, "("))
+		{
+			type = consume_type_before(env, true);
+			if (type == NULL)
+			{
+				node = unary(env);
+				node = new_node_num(type_size(node->type));
+			}
+			else
+				node = new_node_num(type_size(type));
+		
+			if (!consume(env, ")"))
+				error_at(env->token->str, ")が必要です");
+			return (node);
+		}
+		else
+		{
+			node = unary(env);
+			node = new_node_num(type_size(node->type));
+			return (node);
+		}
 	}
 
 	return arrow(env);
@@ -1338,12 +1358,22 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 	node->flen = ident->len;
 	node->ret_type = ret_type;
 	node->argdef_count = 0;
+	node->is_variable_argument = false;
 
 	// args
 	if (!consume(env, ")"))
 	{
 		for (;;)
 		{
+			// variable argument
+			if (node->argdef_count != 0 && consume(env, "..."))
+			{
+				if (!consume(env, ")"))
+					error_at(env->token->str, ")が必要です");
+				node->is_variable_argument = true;
+				break ;
+			}
+
 			// 型宣言の確認
 			Type *type = consume_type_before(env, false);
 			if (type == NULL)
@@ -1385,7 +1415,7 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 	}
 	else
 	{
-		// 可変長
+		// ?
 		node->argdef_count = -1;
 	}
 

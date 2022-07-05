@@ -1206,6 +1206,39 @@ static void	funcdef(Node *node)
 	printf("_%s:\n", funcname);	
 	prologue();
 
+
+	if (node->is_variable_argument)
+	{
+		printf("sub rsp, 400\n");
+		printf("movaps	xmmword ptr [rbp - 400], xmm7\n");
+		printf("movaps	xmmword ptr [rbp - 384], xmm6\n");
+		printf("movaps	xmmword ptr [rbp - 368], xmm5\n");
+		printf("movaps	xmmword ptr [rbp - 352], xmm4\n");
+		printf("movaps	xmmword ptr [rbp - 336], xmm3\n");
+		printf("movaps	xmmword ptr [rbp - 320], xmm2\n");
+		printf("movaps	xmmword ptr [rbp - 304], xmm1\n");
+		printf("movaps	xmmword ptr [rbp - 288], xmm0\n");
+		printf("mov	qword ptr [rbp - 272], r9\n ");
+		printf("mov	qword ptr [rbp - 264], r8\n");
+		printf("mov	qword ptr [rbp - 256], rcx\n");
+		printf("mov	qword ptr [rbp - 248], rdx\n");
+		printf("mov	qword ptr [rbp - 240], rsi\n");
+		printf("mov	qword ptr [rbp - 232], rdi\n");
+    	
+		printf("mov	rcx, qword ptr [rbp - 232]\n");
+		printf("mov	rax, qword ptr [rbp - 240]\n");
+		printf("mov	rdx, qword ptr [rbp - 248]\n");
+		printf("mov	rsi, qword ptr [rbp - 256]\n");
+		printf("mov	rdi, qword ptr [rbp - 264]\n");
+		printf("mov	r8, qword ptr [rbp - 272] \n");
+		printf("mov	qword ptr [rbp - 184], r8\n");
+		printf("mov	qword ptr [rbp - 192], rdi\n");
+		printf("mov	qword ptr [rbp - 200], rsi\n");
+		printf("mov	qword ptr [rbp - 208], rdx\n");
+		printf("mov	qword ptr [rbp - 216], rax\n");
+
+    }
+
 	if (node->locals != NULL)
 	{
 		int maxoff = 0;
