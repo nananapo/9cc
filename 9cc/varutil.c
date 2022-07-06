@@ -12,6 +12,7 @@ int	max(int a, int b);
 int	min(int a, int b);
 
 static void alloc_local_var(Env *env, LVar *lvar);
+Type	*type_cast_forarg(Type *type);
 
 FindEnumRes	*find_enum(Env *env, char *str, int len)
 {
@@ -54,8 +55,16 @@ Node	*find_global(Env *env, char *str, int len)
 	return NULL;
 }
 
-// TODO サイズ0はどうなるか確かめる
-static void	alloc_argument(Env *env, LVar *lvar)
+LVar	*copy_lvar(LVar *f)
+{
+	LVar	*lvar;
+
+	lvar = calloc(1, sizeof(LVar));
+	*lvar = *f;
+	return (lvar);
+}
+
+void	alloc_argument_simu(LVar *first, LVar *lvar)
 {
 	int		size;
 	int		regindex_max;
@@ -67,8 +76,10 @@ static void	alloc_argument(Env *env, LVar *lvar)
 	// rbpをプッシュした分を考慮する
 	offset_min = -16;
 	offset_max = 0;
-	for (tmp = env->locals; tmp; tmp = tmp->next)
+	for (tmp = first; tmp; tmp = tmp->next)
 	{
+		if (!tmp->is_arg)
+			continue ;
 		regindex_max = max(regindex_max, tmp->arg_regindex);
 		if (tmp->arg_regindex == -1)
 		{
@@ -94,17 +105,26 @@ static void	alloc_argument(Env *env, LVar *lvar)
 	lvar->offset = offset_min;
 }
 
+
+
+// TODO サイズ0はどうなるか確かめる
+static void	alloc_argument(Env *env, LVar *lvar)
+{
+	alloc_argument_simu(env->locals, lvar);
+}
+
 static void alloc_local_var(Env *env, LVar *lvar)
 {
 	int		size;
 	int 	offset_max;
 	LVar	*tmp;
 
-	// オフセットの正の最大値を求める
+	// 引数のオフセットの正の最大値を求める
 	offset_max = 0;
 	for (tmp = env->locals; tmp; tmp = tmp->next)
+	{
 		offset_max = max(offset_max, max(0, tmp->offset));
-
+	}
 	size = type_size(lvar->type);
 
 	// offsetの最大値を基準に配置する
@@ -130,6 +150,8 @@ LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 	lvar = calloc(1, sizeof(LVar));
 	lvar->name = name;
 	lvar->len = len;
+	if (is_arg)
+		type = type_cast_forarg(type);
 	lvar->type = type;
 	lvar->is_arg = is_arg;
 	lvar->arg_regindex = -1;

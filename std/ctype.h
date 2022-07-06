@@ -21,6 +21,7 @@ int	isxdigit(int c);
 int	tolower(int c);
 int	toupper(int c);
 
+/*
 int	isalnum(int c)
 {
 	return (isalpha(c) || isdigit(c));
@@ -97,5 +98,6 @@ int	toupper(int c)
 		return (c - 'a' + 'A');
 	return (c);
 }
+*/
 
 #endif

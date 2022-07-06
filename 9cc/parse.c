@@ -24,6 +24,10 @@ LVar		*find_lvar(Env *env, char *str, int len);
 FindEnumRes	*find_enum(Env *env, char *str, int len);
 LVar		*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg);
 
+Type	*type_cast_forarg(Type *type);
+LVar	*copy_lvar(LVar *f);
+void	alloc_argument_simu(LVar *first, LVar *lvar);
+
 static Node	*get_function_by_name(Env *env, char *name, int len)
 {
 	int i = 0;
@@ -112,7 +116,18 @@ bool	consume_enum_key(Env *env, Type **type, int *value)
 	return (false);
 }
 
+bool consume_charlit(Env *env, int *number)
+{
+	if (env->token->kind != TK_CHAR_LITERAL)
+		return (false);
 
+	*number = get_char_to_int(env->token->str, env->token->strlen_actual);
+	if (*number == -1)
+		error_at(env->token->str, "不明なエスケープシーケンスです");
+
+	env->token = env->token->next; // 進める
+	return (true);
+}
 
 
 
@@ -152,6 +167,9 @@ static Node *call(Env *env, Token *tok)
 {
 	Node	*node;
 	Node	*args;
+	Node	*readarg;
+
+	printf("# CALL %s START\n", strndup(tok->str, tok->len));
 
 	node  = new_node(ND_CALL, NULL, NULL);
 	node->fname = tok->str;
@@ -163,8 +181,8 @@ static Node *call(Env *env, Token *tok)
 
 	if (!consume(env, ")"))
 	{
-		Node *arg = expr(env);
-		args = arg;
+		readarg = expr(env);
+		args = readarg;
 		node->argdef_count = 1;
 
 		for (;;)
@@ -174,17 +192,17 @@ static Node *call(Env *env, Token *tok)
 			if (!consume(env, ","))
 				error_at(env->token->str, "トークンが,ではありません");
 			
-			arg = expr(env);
-			arg->next = NULL;
+			readarg = expr(env);
+			readarg->next = NULL;
 			if (args == NULL)
-				args = arg;
+				args = readarg;
 			else
 			{
 				for (Node *tmp = args; tmp; tmp = tmp->next)
 				{
 					if (tmp->next == NULL)
 					{
-						tmp->next = arg;
+						tmp->next = readarg;
 						break ;
 					}
 				}
@@ -200,32 +218,70 @@ static Node *call(Env *env, Token *tok)
 
 	// 引数の数を確認
 	if (refunc->argdef_count != -1
-		&& node->argdef_count != refunc->argdef_count)
+		&& (
+			(!refunc->is_variable_argument && node->argdef_count != refunc->argdef_count)
+			|| (refunc->is_variable_argument && node->argdef_count < refunc->argdef_count)))
 		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
 
-	// 引数の型を比べる
-	LVar *def = refunc->locals;
+	// 関数の情報を保存しておく
+	node->is_variable_argument = refunc->is_variable_argument;
+
+	// 引数を定義と比較
+	LVar	*def;
+	LVar	*lastdef;
+	LVar	*firstdef;
+
+	if (refunc->locals != NULL)
+		def = copy_lvar(refunc->locals);
+	else
+		def = NULL;
+	firstdef = def;
+	lastdef = NULL;
 
 	for (int i = 0; i < node->argdef_count; i++)
 	{
-		// 型の確認
-		if (!type_equal(def->type, args->type))
-		{
-			// 暗黙的なキャストの確認
-			if (!type_can_cast(args->type, def->type, false))
-				error_at(env->token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-						strndup(node->fname, node->flen),
-						strndup(def->name, def->len),
-						get_type_name(def->type),
-						get_type_name(args->type));
+		printf("#  READ ARG(%d) START\n", i);
 
-			Node *cast = new_node(ND_CAST, args, NULL);
-			cast->type = def->type;
-			cast->next = args->next;
-			args = cast;
+		if (def != NULL && def->is_arg)
+		{
+			printf("#  is ARG\n");
+			// 型の確認
+			if (!type_equal(def->type, args->type))
+			{
+				// 暗黙的なキャストの確認
+				if (!type_can_cast(args->type, def->type, false))
+					error_at(env->token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
+							strndup(node->fname, node->flen),
+							strndup(def->name, def->len),
+							get_type_name(def->type),
+							get_type_name(args->type));
+
+				Node *cast = new_node(ND_CAST, args, NULL);
+				cast->type = def->type;
+				cast->next = args->next;
+				args = cast;
+			}
+		}
+		else
+		{
+			// defがNULL -> 可変長引数
+			printf("#  is VA\n");
+
+			// create_local_varからのコピペ
+			def = calloc(1, sizeof(LVar));
+			def->name = "VA";
+			def->len = 2;
+			def->type = type_cast_forarg(args->type);
+			def->is_arg = true;
+			def->arg_regindex = -1;
+			def->next = NULL;
+
+			alloc_argument_simu(firstdef, def); 
+
+			lastdef->next = def;
 		}
 
-		// きっとuse->localsは使われないので使ってしまう
+		// use->localsにdefを入れる
 		args->locals = def;
 
 		// 格納
@@ -240,12 +296,20 @@ static Node *call(Env *env, Token *tok)
 		}
 
 		// 進める
-		def = def->next;
+		lastdef = def;
+		if (def->next != NULL)
+			def = copy_lvar(def->next);
+		else
+			def = NULL;
 		args = args->next;
+
+		printf("#  READ ARG(%d) END\n", i);
 	}
 
 	// 型を返り値の型に設定
 	node->type = refunc->ret_type;
+
+	printf("# CALL END\n");
 
 	return node;
 }
@@ -914,12 +978,20 @@ static Node	*read_ifblock(Env *env)
 {
 	Node	*node;
 
+	printf("#  IF START\n");
+
 	if (!consume(env, "("))
 		error_at(env->token->str, "(ではないトークンです");
 	node = new_node(ND_IF, expr(env), NULL);
+
+	printf("#   IF READed EXPR\n");
+
 	if (!consume(env, ")"))
 		error_at(env->token->str, ")ではないトークンです");
 	node->rhs = stmt(env);
+
+	printf("#   IF READ STMT\n");
+
 	if (consume_with_type(env, TK_ELSE))
 	{
 		if (consume_with_type(env, TK_IF))
@@ -927,6 +999,7 @@ static Node	*read_ifblock(Env *env)
 		else
 			node->els = stmt(env);
 	}
+	printf("#  IF END\n");
 	return (node);
 }
 
@@ -950,10 +1023,13 @@ static Node	*stmt(Env *env)
 	}
 	else if (consume_with_type(env, TK_IF))
 	{
-		return (read_ifblock(env));
+		node = read_ifblock(env);
+		return (node);
 	}
 	else if (consume_with_type(env, TK_WHILE))
 	{
+		printf("#  WHILE START\n");
+
 		if (!consume(env, "("))
 			error_at(env->token->str, "(ではないトークンです");
 		node = new_node(ND_WHILE, expr(env), NULL);
@@ -965,6 +1041,7 @@ static Node	*stmt(Env *env)
 			node->rhs = stmt(env);
 		sb_end();
 
+		printf("#  WHILE END\n");
 		return node;
 	}
 	else if (consume_with_type(env, TK_DO))
@@ -1045,7 +1122,10 @@ static Node	*stmt(Env *env)
 		if (!consume_number(env, &number))
 		{
 			if (!consume_enum_key(env, NULL, &number))
-				error_at(env->token->str, "定数が必要です");
+			{
+				if (!consume_charlit(env, &number))
+					error_at(env->token->str, "定数が必要です");
+			}
 		}
 		if (!consume(env, ":"))
 			error_at(env->token->str, ":が必要です");

@@ -4,6 +4,8 @@
 # include <stddef.h>
 # include <stdlib.h>
 
+# include <stddef.h>
+
 // TODO restrict, const
 void	*memcpy(void *s1, void *s2, size_t n);
 void	*memmove(void *s1, void *s2, size_t n);
@@ -28,6 +30,10 @@ char	*memset(void *s, int c, size_t n);
 char	*strerror(int errnum);
 size_t	strlen(char *s);
 
+char	*strdup(char *s1);
+char	*strndup(char *s1, size_t n);
+
+/*
 void	*memcpy(void *s1, void *s2, size_t n)
 {
 	size_t	i;
@@ -297,5 +303,6 @@ size_t	strlen(char *s)
 		i = i + 1;
 	return (i);
 }
+*/
 
 #endif

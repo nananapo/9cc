@@ -227,7 +227,7 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 
 	// どちらかがポインタ
 	if (is_pointer_type(from) != is_pointer_type(to))
-		return (is_explicit);
+		return (true);
 
 	// どちらも数字？
 	size1 = type_size(from);
@@ -235,6 +235,14 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 	//if (size1 > size2)
 	//	return (is_explicit);
 	return (true);
+}
+
+Type	*type_cast_forarg(Type *type)
+{
+	if (type->ty == PTR)
+		return (new_type_ptr_to(type->ptr_to));
+	else
+		return (type);
 }
 
 char	*get_type_name(Type *type)

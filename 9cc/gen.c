@@ -406,6 +406,8 @@ static void	call(Node *node)
 
 	// call
 	printf("# CALL RBP_OFFSET: %d\n", rbp_offset);
+	if (node->is_variable_argument)
+		printf("    mov al, 0\n");
 	printf("    call _%s\n", strndup(node->fname, node->flen));
 
 	// rspを元に戻す

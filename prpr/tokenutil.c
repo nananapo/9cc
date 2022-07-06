@@ -6,6 +6,7 @@
 
 static char	*g_reserved_words[] = {
 	"//", "/*", "*/",
+	"...",
 	"->", ".",
 	"--", "++",
 	">=", "<=", "==", "!=",
@@ -18,8 +19,7 @@ static char	*g_reserved_words[] = {
 	NULL
 };
 
-// return if str is reserved word,
-// if so, return strlen(reserved word).
+// if str is reserved word, return strlen(reserved word).
 // Otherwise return 0.
 int	is_reserved_word(char *str)
 {
