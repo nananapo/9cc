@@ -22,7 +22,7 @@ FindEnumRes	*find_enum(Env *env, char *str, int len)
 		for (int j = 0; j < def->kind_len; j++)
 		{
 			char *var = def->kinds[j];
-			if (strlen(var) == len
+			if ((int)strlen(var) == len
 			&& strncmp(str, var, strlen(var)) == 0)
 			{
 				FindEnumRes	*res;

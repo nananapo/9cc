@@ -20,7 +20,7 @@ typedef struct s_linked_list
 t_linked_list	*linked_list_new(listcmp cmp);
 void	linked_list_insert(t_linked_list *list, void *value);
 void	*linked_list_search(t_linked_list *list, void *value);
-void	linked_list_delete(t_linked_list *list, t_linked_list_elem *elem);
+void	linked_list_delete(t_linked_list_elem *elem);
 
 #endif
 

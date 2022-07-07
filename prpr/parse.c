@@ -71,7 +71,7 @@ static bool	consume_ident(ParseEnv *env, char *str, bool is_dir)
 	if (env->token == NULL
 	|| env->token->kind != TK_IDENT
 	|| env->token->is_directive != is_dir
-	|| env->token->len != strlen(str)
+	|| env->token->len != (int)strlen(str)
 	|| strncmp(env->token->str, str, strlen(str)) != 0)
 		return (false);
 	env->token = env->token->next;
@@ -83,7 +83,7 @@ static bool	check_ident(Token *token, char *str, bool is_dir)
 	if (token == NULL
 	|| token->kind != TK_IDENT
 	|| token->is_directive != is_dir
-	|| token->len != strlen(str)
+	|| token->len != (int)strlen(str)
 	|| strncmp(token->str, str, strlen(str)) != 0)
 		return (false);
 	return (true);
@@ -122,23 +122,12 @@ static Token	*consume_keyword(ParseEnv *env, char *str, bool is_dir)
 	if (env->token == NULL
 	|| env->token->kind != TK_RESERVED
 	|| env->token->is_directive != is_dir
-	|| env->token->len != strlen(str)
+	|| env->token->len != (int)strlen(str)
 	|| strncmp(env->token->str, str, strlen(str)) != 0)
 		return (NULL);
 	tmp = env->token;
 	env->token = env->token->next;
 	return (tmp);
-}
-
-static bool	check_keyword(Token *token, char *str, bool is_dir)
-{
-	if (token == NULL
-	|| token->kind != TK_RESERVED
-	|| token->is_directive != is_dir
-	|| token->len != strlen(str)
-	|| strncmp(token->str, str, strlen(str)) != 0)
-		return (false);
-	return (true);
 }
 
 static Token	*consume_code(ParseEnv *env, bool is_dir)
@@ -256,11 +245,14 @@ static Node	*parse_undef(ParseEnv *env)
 	return (node);
 }
 
+/*
 static Node	*parse_if(ParseEnv *env)
 {
 	// TODO
+	(void)env;
 	return (NULL);
 }
+*/
 
 static Node	*parse_else(ParseEnv *env, int nest)
 {
@@ -280,6 +272,8 @@ static Node	*parse_else(ParseEnv *env, int nest)
 
 static Node	*parse_elif(ParseEnv *env, int nest)
 {
+	(void) env;
+	(void) nest;
 	// TODO
 	return (NULL);
 }

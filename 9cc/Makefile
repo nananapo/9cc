@@ -2,7 +2,7 @@ NAME=9cc
 TEST_SCRIPT=test.sh
 
 CC=gcc
-CFLAGS=-std=c11 -g -static
+CFLAGS=-std=c11 -g -static -Wall -Werror -Wextra
 
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)

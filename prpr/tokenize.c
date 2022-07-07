@@ -53,7 +53,7 @@ static bool	tokenize_comment(TokenizeEnv *env, int len)
 	}
 	if (len == 2 && strncmp(env->str, "*/", 2) == 0)
 	{
-		error_at(tmp, "*/に対応する/*が見つかりませんでした");
+		error_at(env->str, "*/に対応する/*が見つかりませんでした");
 	}
 	return (false);
 }
@@ -219,7 +219,6 @@ static bool	tokenize_directive(TokenizeEnv *env)
 Token	*tokenize(char *str)
 {
 	TokenizeEnv	env;
-	Node		*node;
 
 	env.str = str;
 	env.token = NULL;

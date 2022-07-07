@@ -55,7 +55,7 @@ void	*linked_list_search(t_linked_list *list, void *value)
 	return (NULL);
 }
 
-void	linked_list_delete(t_linked_list *list, t_linked_list_elem *elem)
+void	linked_list_delete(t_linked_list_elem *elem)
 {
 	elem->prev->next = elem->next;
 	elem->next->prev = elem->prev;

@@ -234,6 +234,8 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 	size2 = type_size(to);
 	//if (size1 > size2)
 	//	return (is_explicit);
+
+	(void)is_explicit;
 	return (true);
 }
 

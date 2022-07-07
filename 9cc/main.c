@@ -8,8 +8,6 @@ char		*user_input;
 
 int main(int argc, char **argv)
 {
-	char		*str;
-	int			sign;
 	int			i;
 	t_str_elem	*lit;
 	Token		*token;

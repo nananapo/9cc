@@ -1262,7 +1262,7 @@ static Node	*stmt(Env *env)
 	return node;
 }
 
-static Node	*global_var(Env *env, Type *type, Token *ident)
+static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern)
 {
 	int		i;
 	Node	*node;
@@ -1425,6 +1425,7 @@ Node	*read_enum_block(Env *env, Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
+static Node	*funcdef(Env *env, Type *type, Token *ident)
 {
 	Node	*node;
 
@@ -1561,7 +1562,7 @@ static Node	*read_typedef(Env *env)
 static Node	*filescope(Env *env)
 {
 	Token	*ident;
-	Type	*ret_type;
+	Type	*type;
 	bool	is_static;
 	Node	*node;
 
@@ -1665,7 +1666,7 @@ int	typealias_search(void *a, void *t)
 
 	pair = (TypedefPair *)a;
 	target = (char *)t;
-	if (pair->name_len != strlen(target))
+	if (pair->name_len != (int)strlen(target))
 		return (-1);
 	return (strncmp(pair->name, target, pair->name_len));
 }

@@ -92,8 +92,6 @@ void	cmp(Type *dst, Type *from)
 
 void	load_global(Node *node)
 {
-	char	*prefix;
-
 	printf("    mov rax, [rip + _%s@GOTPCREL]\n",
 		strndup(node->var_name, node->var_name_len));
 }
@@ -494,8 +492,6 @@ static void	cast(Type *from, Type *to)
 
 static void	primary(Node *node)
 {
-	char *ch;
-
 	switch (node->kind)
 	{
 		case ND_CAST:
@@ -661,8 +657,8 @@ static void add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_re
 	if (restype->ty == PTR || restype->ty == ARRAY)
 	{
 		// 左辺をポインタ型にする
-		if (can_replace && 
-			(*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY)
+		if (can_replace &&
+			((*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY))
 		{
 			Node *tmp = *lhs;
 			*lhs = *rhs;
@@ -868,8 +864,6 @@ static void	load_lval(Node *node)
 
 static void	assign(Node *node)
 {
-	int	size;
-
 	switch (node->kind)
 	{
 		case ND_ASSIGN:

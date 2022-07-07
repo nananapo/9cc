@@ -7,7 +7,6 @@ typedef struct s_stack
 	struct s_stack	*prev;
 }	Stack;
 
-static Stack	*create_stack(void *data);
 void	stack_push(Stack **stack, void *data);
 void	*stack_pop(Stack **stack);
 void	*stack_peek(Stack *stack);

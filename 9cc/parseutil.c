@@ -10,7 +10,7 @@ Node	*read_enum_block(Env *env, Token *ident);
 bool	consume(Env *env, char *op)
 {
 	if (env->token->kind != TK_RESERVED ||
-		strlen(op) != env->token->len ||
+		(int)strlen(op) != env->token->len ||
 		memcmp(env->token->str, op, env->token->len) != 0)
 		return false;
 	env->token = env->token->next;
@@ -170,7 +170,7 @@ void	expect_type_after(Env *env, Type **type)// expect size
 void	expect(Env *env, char *op)
 {
 	if (env->token->kind != TK_RESERVED ||
-		strlen(op) != env->token->len ||
+		(int)strlen(op) != env->token->len ||
 		memcmp(env->token->str, op, env->token->len) != 0)
 		error_at(env->token->str, "'%s'ではありません", op);
 	env->token = env->token->next;
