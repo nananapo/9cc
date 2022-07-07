@@ -76,7 +76,8 @@ typedef enum
 	TK_STRUCT,
 	TK_ENUM,
 	TK_STATIC,
-	TK_TYPEDEF
+	TK_TYPEDEF,
+	TK_EXTERN
 } TokenKind;
 
 struct Token
@@ -209,6 +210,9 @@ struct Node
 
 	char		*var_name;
 	int			var_name_len;
+
+	// global var
+	bool		is_extern;
 
 	// num
 	int			val;

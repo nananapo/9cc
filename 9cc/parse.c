@@ -1274,6 +1274,7 @@ static Node	*global_var(Env *env, Type *type, Token *ident)
 	node->type = type;
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
+	node->is_extern = is_extern;
 
 	// TODO Voidチェックは違うパスでやりたい....
 	if (!is_declarable_type(type))
@@ -1281,7 +1282,6 @@ static Node	*global_var(Env *env, Type *type, Token *ident)
 	
 
 	// TODO 代入文 , 定数じゃないとだめ
-
 	if (!consume(env, ";"))
 		error_at(env->token->str, ";が必要です。");
 
@@ -1390,7 +1390,6 @@ Node	*read_struct_block(Env *env, Token *ident)
 Node	*read_enum_block(Env *env, Token *ident)
 {
 	int		i;
-	Type	*type;
 	EnumDef	*def;
 
 	for (i = 0; env->enum_defs[i]; i++)
@@ -1426,7 +1425,6 @@ Node	*read_enum_block(Env *env, Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 {
 	Node	*node;
 
@@ -1436,7 +1434,7 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 	node = new_node(ND_FUNCDEF, NULL, NULL);
 	node->fname = strndup(ident->str, ident->len);
 	node->flen = ident->len;
-	node->ret_type = ret_type;
+	node->ret_type = type;
 	node->argdef_count = 0;
 	node->is_variable_argument = false;
 
@@ -1473,7 +1471,7 @@ static Node	*funcdef(Env *env, Type *ret_type, Token *ident)
 				error_at(env->token->str, "仮引数が必要です");
 			}
 			// LVarを作成
-			LVar *created = create_local_var(env, arg->str, arg->len, type, true);
+			create_local_var(env, arg->str, arg->len, type, true);
 			// arrayを読む
 			expect_type_after(env, &type);
 
@@ -1573,6 +1571,18 @@ static Node	*filescope(Env *env)
 		return (read_typedef(env));
 	}
 
+	// extern
+	if (consume_with_type(env, TK_EXTERN))
+	{
+		type = consume_type_before(env, true);
+		if (type == NULL)
+			error_at(env->token->str, "型が必要です");
+		ident = consume_ident(env);
+		if (ident == NULL)
+			error_at(env->token->str, "識別子が必要です");
+		return (global_var(env, type, ident, true));
+	}
+
 	is_static = false;
 	if (consume_with_type(env, TK_STATIC))
 	{
@@ -1594,8 +1604,8 @@ static Node	*filescope(Env *env)
 			if (consume(env, ";"))
 				return (node);
 		}
-		ret_type = new_struct_type(env, ident->str, ident->len);
-		consume_type_ptr(env, &ret_type);
+		type = new_struct_type(env, ident->str, ident->len);
+		consume_type_ptr(env, &type);
 	}
 	// enumの宣言か返り値がenumか
 	else if (consume_with_type(env, TK_ENUM))
@@ -1612,15 +1622,15 @@ static Node	*filescope(Env *env)
 			if (consume(env, ";"))
 				return (node);
 		}
-		ret_type = new_enum_type(env, ident->str, ident->len);
-		consume_type_ptr(env, &ret_type);
+		type = new_enum_type(env, ident->str, ident->len);
+		consume_type_ptr(env, &type);
 	}
 	else
-		ret_type = consume_type_before(env, true);
+		type = consume_type_before(env, true);
 
 	// TODO 一旦staticは無視
 	// グローバル変数か関数宣言か
-	if (ret_type != NULL)
+	if (type != NULL)
 	{
 		// ident
 		ident = consume_ident(env);
@@ -1629,9 +1639,9 @@ static Node	*filescope(Env *env)
 
 		// function definition
 		if (consume(env, "("))
-			return funcdef(env, ret_type, ident);
+			return funcdef(env, type, ident);
 		else
-			return global_var(env, ret_type, ident);
+			return global_var(env, type, ident, false);
 	}
 
 	error_at(env->token->str, "構文解析に失敗しました[filescope kind:%d]", env->token->kind);

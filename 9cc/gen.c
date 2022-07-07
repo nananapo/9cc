@@ -1303,6 +1303,8 @@ static void globaldef(Node *node)
 {
 	char	*name;
 
+	if (node->is_extern)
+		return ;
 	name = strndup(node->var_name, node->var_name_len);
 	printf(".globl %s\n", name);
 	printf("    .zerofill __DATA,__common,_%s,%d,2\n",
