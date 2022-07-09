@@ -370,10 +370,10 @@ static void	call(Node *node)
 			}
 			// size > 8なものは必ずstructであると願います( ;∀;)
 			// RAXにアドレスが入っていると想定
-			for (i = size - 8; i >= 0; i -= 8)
+			for (j = size - 8; j >= 0; j -= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV,
-					arg_regs[tmp->locals->arg_regindex - i / 8],
+					arg_regs[tmp->locals->arg_regindex - j / 8],
 					 RSP, pop_count++ * 8);
 			}
 			continue ;
