@@ -21,6 +21,8 @@ int	isxdigit(int c);
 int	tolower(int c);
 int	toupper(int c);
 
+int	isnumber(int c);
+
 /*
 int	isalnum(int c)
 {

@@ -15,7 +15,7 @@ static char	*g_reserved_words[39] = {
 	"/", "%", "&", "!","(",
 
 	")", "{", "}", "[", "]",
-	",", ";", ":",NULL
+	",", ";", ":", ""
 };
 
 // if str is reserved word, return strlen(reserved word).
@@ -26,7 +26,7 @@ int	is_reserved_word(char *str)
 	int	len;
 
 	i = -1;
-	while (g_reserved_words[++i] != NULL)
+	while (strlen(g_reserved_words[++i]) != 0)
 	{
 		len = strlen(g_reserved_words[i]);
 		if (strncmp(str, g_reserved_words[i], len) == 0)
