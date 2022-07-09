@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 int	start_with(char *haystack, char *needle)
 {
@@ -57,6 +58,7 @@ char	*strlit_to_str(char *str, int len)
 	i = -1;
 	bi = 0;
 	buf = calloc(len + 1, sizeof(char));
+
 	while (++i < len)
 	{
 		if (str[i] == '\\')
@@ -84,6 +86,7 @@ char	*strlit_to_str(char *str, int len)
 					c = '\\';
 				default:
 					error("不明なエスケープシーケンスです %c", str[i]);
+					c = 0;
 			}
 		}
 		else

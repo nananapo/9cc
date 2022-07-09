@@ -270,6 +270,7 @@ static Node	*parse_else(ParseEnv *env, int nest)
 	return (node);
 }
 
+/*
 static Node	*parse_elif(ParseEnv *env, int nest)
 {
 	(void) env;
@@ -277,6 +278,7 @@ static Node	*parse_elif(ParseEnv *env, int nest)
 	// TODO
 	return (NULL);
 }
+*/
 
 static Node	*parse_ifdef(ParseEnv *env, int nest)
 {
@@ -316,12 +318,14 @@ static Node	*parse_ifdef(ParseEnv *env, int nest)
 		return (node);
 	}
 	// elif
+	/*
 	ntmp = parse_elif(env, nest);
 	if (ntmp != NULL)
 	{
 		node->elif = ntmp;
 		return (node);
 	}
+	*/
 	error_at(env->token->str, "ifdefに対応するディレクティブが見つかりませんでした");
 	return NULL;
 }

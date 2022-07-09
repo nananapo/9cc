@@ -73,20 +73,21 @@ static void	print_line(void)
 	gen_env.print_count = 0;
 }
 
-static void	codes(Node *node)
+static void	codes(Node *node) // 8
 {
-	int		i;
-	Token	*code;
-	Macro	*mactmp;
+	int		i;		// 12
+	Token	*code;	// 24
+	Macro	*mactmp;// 32
 
-	fprintf(stderr, "# codes start %p\n", node->codes);
 	code = node->codes;
-	fprintf(stderr, "# code check %p -> %p\n", node->codes, code);
 
 	i = -1;
 	while (++i < node->codes_len)
 	{
-		fprintf(stderr, "#  WHILE IN %d %p\n", i, code);
+		//fprintf(stderr, "# node->codes %p\n", node->codes);
+		//fprintf(stderr, "# code %p\n", code);
+
+		//fprintf(stderr, "#  WHILE IN %d %p\n", i, code);
 		if (code->kind == TK_STR_LIT)
 		{
 			printf("\"%s\"", strndup(code->str, code->len));
@@ -97,7 +98,7 @@ static void	codes(Node *node)
 		}
 		else if (code->kind == TK_IDENT)
 		{
-			fprintf(stderr, "#   IS IDENT %s\n", strndup(code->str, code->len));
+			//fprintf(stderr, "#   IS IDENT %s\n", strndup(code->str, code->len));
 			mactmp = get_macro(strndup(code->str, code->len));
 			if (mactmp == NULL)
 			{
@@ -139,10 +140,9 @@ static void	codes(Node *node)
 		{
 			printf("%s", strndup(code->str, code->len));
 		}
-		
+
 		code = code->next;
 	}
-	fprintf(stderr, "# codes end\n");
 }
 
 static void	load(char *file_name)
@@ -166,8 +166,10 @@ static void	include(Node *node)
 {
 	char	*file_name;
 	char	str[10000];
+	int		len;
 
-	file_name = strlit_to_str(node->file_name, strlen(node->file_name));
+	len = strlen(node->file_name);
+	file_name = strlit_to_str(node->file_name, len);
 	if (node->is_std_include)
 	{
 		str[0] = '\0';
@@ -228,33 +230,34 @@ static void ifdef(Node *node, bool is_ifdef)
 
 void	gen(Node *node)
 {
-	fprintf(stderr, "# gen\n");
+	//fprintf(stderr, "# gen %p\n", node);
 	while (node)
 	{
 		switch (node->kind)
 		{
 			case ND_INIT:
-	fprintf(stderr, "# init\n");
+	//fprintf(stderr, "# init\n");
 				break ;
 			case ND_CODES:
-	fprintf(stderr, "# codes\n");
+	//fprintf(stderr, "# codes\n");
 				codes(node);
+	//fprintf(stderr, "# codes end\n");
 				break ;
 			case ND_INCLUDE:
-	fprintf(stderr, "# include\n");
+	//fprintf(stderr, "# include\n");
 				include(node);
 				break ;
 			case ND_DEFINE_MACRO:
-	fprintf(stderr, "# define macro\n");
+	//fprintf(stderr, "# define macro\n");
 				define_macro(node);
 				break ;
 			case ND_UNDEF:
-	fprintf(stderr, "# undef macro\n");
+	//fprintf(stderr, "# undef macro\n");
 				undef_macro(node);
 				break ;
 			case ND_IFDEF:
 			case ND_IFNDEF:
-	fprintf(stderr, "# ifdef ifndef\n");
+	//fprintf(stderr, "# ifdef ifndef\n");
 				ifdef(node, node->kind == ND_IFDEF);
 				break ;
 		}
