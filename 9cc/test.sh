@@ -94,8 +94,8 @@ assert_gcc(){
 		exit 1
 	fi
 
-	./tmp2 > $actualfile
-	expected=`cat -e $actualfile`
+	./tmp2 > $expectedfile
+	expected=`cat -e $expectedfile`
 
 	rm -rf $tmpcfile tmp1 tmp2
 
