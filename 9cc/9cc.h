@@ -214,6 +214,7 @@ struct Node
 
 	// global var
 	bool		is_extern;
+	Node		*global_assign; // 初期化用
 
 	// num
 	int			val;

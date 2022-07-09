@@ -1211,6 +1211,7 @@ static void	funcdef(Node *node)
 	funcname = strndup(node->fname, node->flen);
 	stack_count = 0;
 
+	printf(".section	__TEXT,__text,regular,pure_instructions\n");
 	printf(".globl _%s\n", funcname);
 	printf("_%s:\n", funcname);	
 	prologue();
@@ -1306,6 +1307,34 @@ static void	funcdef(Node *node)
 		error("stack_countが0ではありません");
 }
 
+static void	print_global_constant(Node *node, Type *type)
+{
+	if (type_equal(type, new_primitive_type(INT)))
+	{
+		printf("    .long %d\n", node->val);
+	}
+	else if (type_equal(type, new_primitive_type(CHAR)))
+	{
+		printf("    .byte %d\n", node->val);
+	}
+ 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(CHAR)))
+			&& node->str_index >= 0)
+	{
+		// TODO arrayのchar
+		printf("    .quad %s\n",
+				get_str_literal_name(node->str_index));
+	}
+	else if (is_pointer_type(type))
+	{
+		// TODO 数のチェックはしてない
+		// array array
+		for (Node *tmp = node; tmp; tmp = tmp->next)
+			print_global_constant(tmp, type->ptr_to);
+	}
+	else
+		error("print_global_constant : 未対応の型 %s", get_type_name(type));
+}
+
 static void globaldef(Node *node)
 {
 	char	*name;
@@ -1313,10 +1342,18 @@ static void globaldef(Node *node)
 	if (node->is_extern)
 		return ;
 	name = strndup(node->var_name, node->var_name_len);
-	printf(".globl %s\n", name);
-	printf("    .zerofill __DATA,__common,_%s,%d,2\n",
-		name,
-		type_size(node->type));
+	printf(".globl _%s\n", name);
+	if (node->global_assign == NULL)
+	{
+		printf("    .zerofill __DATA,__common,_%s,%d,2\n",
+				name, type_size(node->type));
+	}
+	else
+	{
+		printf(".section	__DATA, __data\n");
+		printf("_%s:\n", name);
+		print_global_constant(node->global_assign, node->type);
+	}
 }
 
 static void	filescope(Node *node)

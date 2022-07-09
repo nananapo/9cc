@@ -688,4 +688,11 @@ assert_gcc "size1.c"
 assert_gcc "size2.c"
 assert_gcc "size3.c"
 
+assert_gcc "global1.c"
+assert_gcc "global2.c"
+assert_gcc "global3.c"
+assert_gcc "global4.c"
+assert_gcc "global5.c"
+assert_gcc "global6.c"
+
 echo OK

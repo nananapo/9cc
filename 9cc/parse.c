@@ -70,6 +70,10 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->args = NULL;
 
 	node->type = NULL;
+
+	// TODO とりあえずこれでprint_global_constantのchar*を区別
+	node->str_index = -1;
+
 	return node;
 }
 
@@ -1271,12 +1275,61 @@ static Node	*stmt(Env *env)
 	return node;
 }
 
+static Node	*expect_constant(Env *env, Type *type)
+{
+	Node	*node;
+	Node	**next;
+	int		number;
+	Token	*tok;
+
+	if (is_integer_type(type) && consume_number(env, &number))
+	{
+		node = new_node_num(number);
+	}
+	else if (type_equal(type, new_type_ptr_to(new_primitive_type(CHAR)))
+			&& (tok = consume_str_literal(env)) != NULL)
+	{
+		node = new_node(ND_STR_LITERAL, NULL, NULL);
+		node->str_index = get_str_literal_index(env, tok->str, tok->len);
+		node->type = new_type_ptr_to(new_primitive_type(CHAR));
+	}
+	else if (type_equal(type, new_primitive_type(CHAR)) 
+			&& (tok = consume_char_literal(env)) != NULL)
+	{
+		number = get_char_to_int(tok->str, tok->strlen_actual);
+		if (number == -1)
+			error_at(tok->str, "不明なエスケープシーケンスです");
+		node = new_node_num(number);
+	}
+	else if (is_pointer_type(type) && consume(env, "{"))
+	{
+		node = NULL;
+		next = &node;
+		for (;;)
+		{
+			*next = expect_constant(env, type->ptr_to);
+			next = &(*next)->next;
+			if (consume(env, "}"))
+				break ;
+			if (!consume(env, ","))
+				error_at(env->token->str, ",が必要です");
+		}
+	}
+	else
+	{
+		node = NULL;
+		error_at(env->token->str, "定数が必要です");
+	}
+	return (node);
+}
+
 static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern)
 {
 	int		i;
 	Node	*node;
 
 	// 後ろの型を読む
+	// TODO a[]とかでも許容したい
 	expect_type_after(env, &type);
 
 	node = new_node(ND_DEFVAR_GLOBAL, NULL, NULL);
@@ -1288,16 +1341,22 @@ static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern)
 	// TODO Voidチェックは違うパスでやりたい....
 	if (!is_declarable_type(type))
 		error_at(env->token->str, "宣言できない型の変数です");
-	
 
-	// TODO 代入文 , 定数じゃないとだめ
-	if (!consume(env, ";"))
-		error_at(env->token->str, ";が必要です。");
-
+	// 保存
 	i = -1;
 	while (env->global_vars[++i])
 		continue;
 	env->global_vars[i] = node;
+
+	// 代入を読む
+	node->global_assign = NULL;
+	if (!is_extern && consume(env, "="))
+	{
+		node->global_assign = expect_constant(env, node->type);
+	}
+
+	if (!consume(env, ";"))
+		error_at(env->token->str, ";が必要です。");
 
 	return node;
 }
