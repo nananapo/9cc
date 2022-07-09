@@ -158,6 +158,7 @@ typedef enum
 	ARRAY,
 	STRUCT,
 	ENUM,
+	BOOL,
 	VOID
 } PrimitiveType;
 
@@ -366,7 +367,7 @@ Type	*new_enum_type(ParseResult *env, char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
-bool	can_compared(Type *l, Type *r);
+bool	can_compared(Type *l, Type *r, Type **lt, Type **rt);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);

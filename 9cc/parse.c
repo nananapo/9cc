@@ -751,7 +751,11 @@ static Node *add(Env *env)
 
 static Node *relational(Env *env)
 {
-	Node *node = add(env);
+	Node	*node;
+	Type	*l_to;
+	Type	*r_to;
+
+	node = add(env);
 	for (;;)
 	{
 		if (consume(env, "<"))
@@ -767,16 +771,25 @@ static Node *relational(Env *env)
 
 		node->type = new_primitive_type(INT);
 
-		if (!can_compared(node->lhs->type, node->rhs->type))
-			error_at(env->token->str,
-					"%sと%sを比較することはできません",
+		// 比較できるか確認
+		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
+			error_at(env->token->str,"%sと%sを比較することはできません",
 					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
+		// キャストする必要があるならキャスト
+		if (!type_equal(node->lhs->type, l_to))
+			node->lhs = cast(env, node->lhs, l_to);
+		if (!type_equal(node->rhs->type, r_to))
+			node->rhs = cast(env, node->rhs, r_to);
 	}
 }
 
 static Node *equality(Env *env)
 {
-	Node *node = relational(env);
+	Node *node;
+	Type	*l_to;
+	Type	*r_to;
+
+	node = relational(env);
 	for (;;)
 	{
 		if (consume(env, "=="))
@@ -788,10 +801,15 @@ static Node *equality(Env *env)
 
 		node->type = new_primitive_type(INT);
 
-		if (!can_compared(node->lhs->type, node->rhs->type))
-			error_at(env->token->str,
-					"%sと%sを比較することはできません",
+		// 比較できるか確認
+		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
+			error_at(env->token->str,"%sと%sを比較することはできません",
 					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
+		// キャストする必要があるならキャスト
+		if (!type_equal(node->lhs->type, l_to))
+			node->lhs = cast(env, node->lhs, l_to);
+		if (!type_equal(node->rhs->type, r_to))
+			node->rhs = cast(env, node->rhs, r_to);
 	}
 }
 

@@ -81,7 +81,7 @@ void	cmp(Type *dst, Type *from)
 	{
 		if (dst->ty == PTR || dst->ty == ARRAY)
 			cmps(RAX, RDI);
-		else if (dst->ty == CHAR)
+		else if (dst->ty == CHAR || dst->ty == BOOL)
 			cmps(AL, DIL);
 		else if (dst->ty == INT || dst->ty == ENUM)
 			cmps(EAX, EDI);
@@ -233,7 +233,7 @@ static void	load(Type *type)
 		mov(RAX, "[rax]");
 		return ;
 	}
-	else if (type->ty == CHAR)
+	else if (type->ty == CHAR || type->ty == BOOL)
 	{
 		printf("    mov al, %s [%s]\n", BYTE_PTR, RAX);
 		printf("    movzx %s, %s\n", RAX, AL);
@@ -553,10 +553,9 @@ static void	arrow(Node *node, bool as_addr)
 	else
 		expr(node->lhs);
 
-	// offset分ずらす => 最適化で消えるので消さなくてもいいかも
+	// offsetを足す
 	offset = node->struct_elem->offset;
-	if (offset != 0)
-		printf("    add rax, %d\n", offset);
+	printf("    add rax, %d # offset\n", offset);
 
 	// 値として欲しいなら値にする
 	if (!as_addr)
@@ -588,6 +587,7 @@ static void unary(Node *node)
 				// 構造体からのアクセスなら、アドレスなのでそのまま返す
 				case ND_STRUCT_VALUE:
 				case ND_STRUCT_PTR_VALUE:
+					arrow(node->lhs, true);
 					break ;
 				// ND_DEREFならアドレスで止める
 				case ND_DEREF:

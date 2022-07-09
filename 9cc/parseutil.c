@@ -114,6 +114,8 @@ Type	*consume_type_before(Env *env, bool read_def)
 		type = new_primitive_type(INT);
 	else if (consume_ident_str(env, "char"))
 		type = new_primitive_type(CHAR);
+	else if (consume_ident_str(env, "_Bool"))
+		type = new_primitive_type(BOOL);
 	else if (consume_ident_str(env, "void"))
 		type = new_primitive_type(VOID);
 	else if (consume_with_type(env, TK_STRUCT))

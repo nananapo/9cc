@@ -516,6 +516,7 @@ assert_gcc "structsize1.c"
 assert_gcc "structsize2.c"
 assert_gcc "structsize3.c"
 assert_gcc "structsize4.c"
+assert_gcc "structsize5.c"
 
 assert_gcc "struct2.c"
 assert_gcc "struct3.c"
@@ -678,5 +679,9 @@ assert_gcc "enum3.c"
 assert_gcc "enum4.c"
 assert_gcc "enum5.c"
 assert_gcc "enum6.c"
+
+assert_gcc "size1.c"
+assert_gcc "size2.c"
+assert_gcc "size3.c"
 
 echo OK

@@ -99,6 +99,8 @@ int	type_size(Type *type)
 		return (4);
 	if (type->ty == CHAR)
 		return (1);
+	if (type->ty == BOOL)
+		return (1);
 	if (type->ty == PTR)
 		return (8);
 	if (type->ty == ARRAY)
@@ -108,7 +110,7 @@ int	type_size(Type *type)
 	if (type->ty == ENUM)
 		return (4);
 	if (type->ty == VOID)
-		return 0;
+		return (1);
 	return -1;
 }
 
@@ -117,7 +119,8 @@ bool	is_integer_type(Type *type)
 {
 	return (type->ty == INT
 			|| type->ty == CHAR
-			|| type->ty == ENUM);
+			|| type->ty == ENUM
+			|| type->ty == BOOL);
 }
 
 // 配列かどうか確認する
@@ -128,20 +131,35 @@ bool	is_pointer_type(Type *type)
 }
 
 // 比較可能か調べる
-bool	can_compared(Type *l, Type *r)
+bool	can_compared(Type *l, Type *r, Type **lt, Type **rt)
 {
 	if (l->ty == VOID || r->ty == VOID)
 		return (false);
+
+	*lt = l;
+	*rt = r;
+
 	if (type_equal(l, r))
-		return (true);
-	if (is_integer_type(l) && is_integer_type(r))
 		return (true);
 	if (is_pointer_type(l) && is_pointer_type(r))
 		return (true);
-	// TODO これいいの？
+
+	if (is_integer_type(l) && is_integer_type(r))
+	{
+		// とりあえずintにする
+		*lt = new_primitive_type(INT);
+		*rt = new_primitive_type(INT);
+		return (true);
+	}
+
 	if ((is_pointer_type(l) && is_integer_type(r))
 	|| (is_integer_type(l) && is_pointer_type(r)))
+	{
+		*lt = new_type_ptr_to(new_primitive_type(VOID));
+		*rt = new_type_ptr_to(new_primitive_type(VOID));
 		return (true);
+	}
+
 	return (false);
 }
 
@@ -184,6 +202,8 @@ static void	typename_loop(Type *type, char *str)
 		strcat(str, "int");
 	else if (type->ty == CHAR)
 		strcat(str, "char");
+	else if (type->ty == BOOL)
+		strcat(str, "_Bool");
 	else if (type->ty == VOID)
 		strcat(str, "void");
 	else if (type->ty == STRUCT)
@@ -232,8 +252,6 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 	// どちらも数字？
 	size1 = type_size(from);
 	size2 = type_size(to);
-	//if (size1 > size2)
-	//	return (is_explicit);
 
 	(void)is_explicit;
 	return (true);
@@ -251,6 +269,8 @@ char	*get_type_name(Type *type)
 {
 	char	*ret;
 
+	if (type == NULL)
+		fprintf(stderr, "typeがNULLです");
 	ret = calloc(1000, sizeof(char));
 	typename_loop(type, ret);
 	return ret;
