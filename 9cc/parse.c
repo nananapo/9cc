@@ -182,6 +182,7 @@ static Node *call(Env *env, Token *tok)
 	Node	*node;
 	Node	*args;
 	Node	*readarg;
+	Node	*ntmp;
 
 	printf("# CALL %s START\n", strndup(tok->str, tok->len));
 
@@ -212,11 +213,11 @@ static Node *call(Env *env, Token *tok)
 				args = readarg;
 			else
 			{
-				for (Node *tmp = args; tmp; tmp = tmp->next)
+				for (ntmp = args; ntmp; ntmp = ntmp->next)
 				{
-					if (tmp->next == NULL)
+					if (ntmp->next == NULL)
 					{
-						tmp->next = readarg;
+						ntmp->next = readarg;
 						break ;
 					}
 				}
@@ -244,6 +245,8 @@ static Node *call(Env *env, Token *tok)
 	LVar	*def;
 	LVar	*lastdef;
 	LVar	*firstdef;
+	int		i;
+	int		j;
 
 	if (refunc->locals != NULL)
 		def = copy_lvar(refunc->locals);
@@ -252,7 +255,7 @@ static Node *call(Env *env, Token *tok)
 	firstdef = def;
 	lastdef = NULL;
 
-	for (int i = 0; i < node->argdef_count; i++)
+	for (i = 0; i < node->argdef_count; i++)
 	{
 		printf("#  READ ARG(%d) START\n", i);
 
@@ -302,7 +305,7 @@ static Node *call(Env *env, Token *tok)
 		else
 		{
 			Node *tmp = node->args;
-			for (int j = 0; j < i - 1; j++)
+			for (j = 0; j < i - 1; j++)
 				tmp = tmp->next;
 			tmp->next = args;
 		}
@@ -478,7 +481,7 @@ static Node	*arrow_loop(Env *env, Node *node)
 		ident = consume_ident(env);
 
 		if (ident == NULL)
-			error_at(env->token->str, "識別子が必要です");
+			error_at(env->token->str, "識別子が必要です\n (arrow_loop)");
 		elem = struct_get_member(node->type->ptr_to->strct, ident->str, ident->len);
 		if (elem == NULL)
 			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
@@ -498,7 +501,7 @@ static Node	*arrow_loop(Env *env, Node *node)
 
 		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(env->token->str, "識別子が必要です");
+			error_at(env->token->str, "識別子が必要です\n (arrow_loop)");
 		elem = struct_get_member(node->type->strct, ident->str, ident->len);
 		if (elem == NULL)
 			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
@@ -1323,7 +1326,7 @@ static Node	*expect_constant(Env *env, Type *type)
 	return (node);
 }
 
-static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern)
+static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static)
 {
 	int		i;
 	Node	*node;
@@ -1337,6 +1340,10 @@ static Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern)
 	node->var_name = strndup(ident->str, ident->len);
 	node->var_name_len = ident->len;
 	node->is_extern = is_extern;
+	node->is_static = is_static;
+
+	if (is_static && is_extern)
+		error_at(env->token->str, "staticとexternは併用できません");
 
 	// TODO Voidチェックは違うパスでやりたい....
 	if (!is_declarable_type(type))
@@ -1388,12 +1395,12 @@ Node	*read_struct_block(Env *env, Token *ident)
 		if (consume(env, "}"))
 			break;
 
-		type = consume_type_before(env, false);
+		type = consume_type_before(env, true);
 		if (type == NULL)
-			error_at(env->token->str, "型宣言が必要です");
+			error_at(env->token->str, "型宣言が必要です\n (read_struct_block)");
 		ident = consume_ident(env);
 		if (ident == NULL)
-			error_at(env->token->str, "識別子が必要です");
+			error_at(env->token->str, "識別子が必要です\n (read_struct_block)");
 		expect_type_after(env, &type);
 		if (!consume(env, ";"))
 			error_at(env->token->str, ";が必要です");
@@ -1493,7 +1500,7 @@ Node	*read_enum_block(Env *env, Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-static Node	*funcdef(Env *env, Type *type, Token *ident)
+static Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 {
 	Node	*node;
 
@@ -1506,6 +1513,7 @@ static Node	*funcdef(Env *env, Type *type, Token *ident)
 	node->ret_type = type;
 	node->argdef_count = 0;
 	node->is_variable_argument = false;
+	node->is_static = is_static;
 
 	// args
 	if (!consume(env, ")"))
@@ -1524,7 +1532,7 @@ static Node	*funcdef(Env *env, Type *type, Token *ident)
 			// 型宣言の確認
 			Type *type = consume_type_before(env, false);
 			if (type == NULL)
-				error_at(env->token->str,"型宣言が必要です");
+				error_at(env->token->str,"型宣言が必要です\n (funcdef)");
 
 			// 仮引数名
 			Token *arg = consume_ident(env);
@@ -1606,7 +1614,7 @@ static Node	*read_typedef(Env *env)
 	// 型を読む
 	type = consume_type_before(env, true);
 	if (type == NULL)
-		error_at(env->token->str, "型宣言が必要です");
+		error_at(env->token->str, "型宣言が必要です\n (read_typedef)");
 	expect_type_after(env, &type);
 
 	// 識別子を読む
@@ -1649,7 +1657,7 @@ static Node	*filescope(Env *env)
 		ident = consume_ident(env);
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です");
-		return (global_var(env, type, ident, true));
+		return (global_var(env, type, ident, true, false));
 	}
 
 	is_static = false;
@@ -1657,7 +1665,7 @@ static Node	*filescope(Env *env)
 	{
 		is_static = true;
 	}
-	
+
 	// structの宣言か返り値がstructか
 	if (consume_with_type(env, TK_STRUCT))
 	{
@@ -1708,9 +1716,9 @@ static Node	*filescope(Env *env)
 
 		// function definition
 		if (consume(env, "("))
-			return funcdef(env, type, ident);
+			return funcdef(env, type, ident, is_static);
 		else
-			return global_var(env, type, ident, false);
+			return global_var(env, type, ident, false, is_static);
 	}
 
 	error_at(env->token->str, "構文解析に失敗しました[filescope kind:%d]", env->token->kind);
@@ -1727,25 +1735,13 @@ void	program(Env *env)
 	env->code[i] = NULL;
 }
 
-int	typealias_search(void *a, void *t)
-{
-	TypedefPair	*pair;
-	char		*target;
-
-	pair = (TypedefPair *)a;
-	target = (char *)t;
-	if (pair->name_len != (int)strlen(target))
-		return (-1);
-	return (strncmp(pair->name, target, pair->name_len));
-}
-
 Env	*parse(Token *tok)
 {
 	Env	*env;
 
 	env = calloc(1, sizeof(Env));
 	env->token = tok;
-	env->type_alias = linked_list_new(typealias_search);
+	env->type_alias = linked_list_new();
 	program(env);
 	return env;
 }

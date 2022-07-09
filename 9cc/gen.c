@@ -12,7 +12,7 @@ static void	expr(Node *node);
 static void unary(Node *node);
 
 static int	jumpLabelCount = 0;
-static char	*arg_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static char	*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int	stack_count = 0;
 
 extern t_str_elem	*str_literals;
@@ -68,14 +68,14 @@ void	movi(char *dst, int i)
 	printf("    %s %s, %d\n", ASM_MOV, dst, i);
 }
 
-void	cmps(char *dst, char *from)
+static void	cmps(char *dst, char *from)
 {
 	printf("    cmp %s, %s\n", dst, from);
 }
 
 // TODO 構造体の比較
 // rax, rdi
-void	cmp(Type *dst, Type *from)
+static void	cmp(Type *dst, Type *from)
 {
 	if (type_equal(dst, from))
 	{
@@ -132,6 +132,7 @@ static void store_ptr(int size, bool minus_step)
 	char	*dest;
 	char	*from;
 	char	*op;
+	int		i;
 
 	op = "+";
 	if (minus_step)
@@ -139,7 +140,7 @@ static void store_ptr(int size, bool minus_step)
 
 	dest = R10;
 	
-	for (int i = 0; i < size; i += 8)
+	for (i = 0; i < size; i += 8)
 	{
 		delta = size - i;
 		if (delta >= 8)
@@ -278,8 +279,11 @@ static void	call(Node *node)
 	int		arg_count = 0;
 	int		push_count = 0;
 	bool	is_aligned;
+	Node	*tmp;
+	int		i;
+	int		j;
 
-	for (Node *tmp = node->args; tmp; tmp = tmp->next)
+	for (tmp = node->args; tmp; tmp = tmp->next)
 	{
 		arg_count++;
 
@@ -303,7 +307,7 @@ static void	call(Node *node)
 			// size > 8なものは必ずstructであると願います( ;∀;)
 			// RAXにアドレスが入っていると想定
 			mov(RDI, RAX);
-			for (int i = 0; i < size; i += 8)
+			for (i = 0; i < size; i += 8)
 			{
 				if (i == 0)
 					printf("    %s %s, [%s]\n",
@@ -324,7 +328,7 @@ static void	call(Node *node)
 
 	// 16 byteアラインチェック
 	rbp_offset = 0;
-	for (Node *tmp = node->args; tmp; tmp = tmp->next)
+	for (tmp = node->args; tmp; tmp = tmp->next)
 	{
 		if (tmp->locals->arg_regindex != -1)
 			continue ;
@@ -343,11 +347,11 @@ static void	call(Node *node)
 
 	int	pop_count = 0;
 	// 後ろから格納していく
-	for (int i = arg_count; i > 0; i--)
+	for (i = arg_count; i > 0; i--)
 	{
 		// i番目のtmpを求める
 		Node *tmp = node->args;
-		for (int j = 1; j < i; j++)
+		for (j = 1; j < i; j++)
 			tmp = tmp->next;
 
 		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
@@ -366,7 +370,7 @@ static void	call(Node *node)
 			}
 			// size > 8なものは必ずstructであると願います( ;∀;)
 			// RAXにアドレスが入っていると想定
-			for (int i = size - 8; i >= 0; i -= 8)
+			for (i = size - 8; i >= 0; i -= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV,
 					arg_regs[tmp->locals->arg_regindex - i / 8],
@@ -491,6 +495,11 @@ static void	cast(Type *from, Type *to)
 		return ;
 	}
 
+	if (from != NULL)
+		fprintf(stderr, "from : %d\n", from->ty);
+	if (to != NULL)
+		fprintf(stderr, "to : %d\n", to->ty);
+		
 	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
@@ -1145,12 +1154,13 @@ static void stmt(Node *node)
 
 			// if
 			printf("    # switch def:%d, end:%d\n", lbegin, lend);
-			for (SwitchCase *tmp = node->switch_cases; tmp; tmp = tmp->next)
+			SwitchCase	*sw_tmp;
+			for (sw_tmp = node->switch_cases; sw_tmp; sw_tmp = sw_tmp->next)
 			{
 				printf("    mov rax, [rsp - 8]\n");
-				movi(RDI, tmp->value);
+				movi(RDI, sw_tmp->value);
 				cmp(node->lhs->type, node->lhs->type);
-				printf("    je .Lswitch%d\n", tmp->label);
+				printf("    je .Lswitch%d\n", sw_tmp->label);
 			}
 			// defaultかendに飛ばす
 			if (node->switch_has_default)
@@ -1207,12 +1217,14 @@ static void stmt(Node *node)
 static void	funcdef(Node *node)
 {
 	char	*funcname;
+	LVar	*lvtmp;
 
 	funcname = strndup(node->fname, node->flen);
 	stack_count = 0;
 
 	printf(".section	__TEXT,__text,regular,pure_instructions\n");
-	printf(".globl _%s\n", funcname);
+	if (!node->is_static)
+		printf(".globl _%s\n", funcname);
 	printf("_%s:\n", funcname);	
 	prologue();
 
@@ -1252,10 +1264,10 @@ static void	funcdef(Node *node)
 	if (node->locals != NULL)
 	{
 		int maxoff = 0;
-		for (LVar *tmp = node->locals; tmp; tmp = tmp->next)
+		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
-			printf("# VAR %s %d\n", strndup(tmp->name, tmp->len), tmp->offset);
-			maxoff = max(maxoff, tmp->offset);
+			printf("# VAR %s %d\n", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
+			maxoff = max(maxoff, lvtmp->offset);
 		}
 		node->stack_size = align_to(maxoff, 8);
 	}
@@ -1270,18 +1282,18 @@ static void	funcdef(Node *node)
 	{
 		printf("    sub rsp, %d\n", node->stack_size);// stack_size
 
-		for (LVar *tmp = node->locals; tmp; tmp = tmp->next)
+		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
-			if (!tmp->is_arg)
+			if (!lvtmp->is_arg)
 				continue ;
-			printf("# ARG %s\n", strndup(tmp->name, tmp->len));
-			if (tmp->arg_regindex != -1)
+			printf("# ARG %s\n", strndup(lvtmp->name, lvtmp->len));
+			if (lvtmp->arg_regindex != -1)
 			{
-				int index = tmp->arg_regindex;
-				int size = align_to(type_size(tmp->type), 8);
+				int index = lvtmp->arg_regindex;
+				int size = align_to(type_size(lvtmp->type), 8);
 
 				mov(R10, RBP);
-				printf("    sub %s, %d\n", R10, tmp->offset);
+				printf("    sub %s, %d\n", R10, lvtmp->offset);
 
 				// とりあえず、かならず8byte境界になっている
 				while (size >= 8)
@@ -1309,6 +1321,8 @@ static void	funcdef(Node *node)
 
 static void	print_global_constant(Node *node, Type *type)
 {
+	Node	*notmp;
+
 	if (type_equal(type, new_primitive_type(INT)))
 	{
 		printf("    .long %d\n", node->val);
@@ -1328,8 +1342,8 @@ static void	print_global_constant(Node *node, Type *type)
 	{
 		// TODO 数のチェックはしてない
 		// array array
-		for (Node *tmp = node; tmp; tmp = tmp->next)
-			print_global_constant(tmp, type->ptr_to);
+		for (notmp = node; notmp; notmp = notmp->next)
+			print_global_constant(notmp, type->ptr_to);
 	}
 	else
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
@@ -1342,7 +1356,8 @@ static void globaldef(Node *node)
 	if (node->is_extern)
 		return ;
 	name = strndup(node->var_name, node->var_name_len);
-	printf(".globl _%s\n", name);
+	if (!node->is_static)
+		printf(".globl _%s\n", name);
 	if (node->global_assign == NULL)
 	{
 		printf("    .zerofill __DATA,__common,_%s,%d,2\n",

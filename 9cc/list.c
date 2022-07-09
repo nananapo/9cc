@@ -1,8 +1,22 @@
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include "list.h"
+#include "9cc.h"
 
-t_linked_list	*linked_list_new(listcmp cmp)
+static int	cmp(void *a, void *t)
+{
+	TypedefPair	*pair;
+	char		*target;
+
+	pair = (TypedefPair *)a;
+	target = (char *)t;
+	if (pair->name_len != (int)strlen(target))
+		return (-1);
+	return (strncmp(pair->name, target, pair->name_len));
+}
+
+t_linked_list	*linked_list_new()
 {
 	t_linked_list	*tmp;
 
@@ -11,7 +25,6 @@ t_linked_list	*linked_list_new(listcmp cmp)
 	tmp->sentinel->next = tmp->sentinel;
 	tmp->sentinel->prev = tmp->sentinel;
 	tmp->sentinel->is_sentinel = true;
-	tmp->cmp = cmp;
 	return (tmp);
 }
 
@@ -48,7 +61,7 @@ void	*linked_list_search(t_linked_list *list, void *value)
 	tmp = list->sentinel->next;
 	while (!tmp->is_sentinel)
 	{
-		if (list->cmp(tmp->value, value) == 0)
+		if (cmp(tmp->value, value) == 0)
 			return  (tmp->value);
 		tmp = tmp->next;
 	}

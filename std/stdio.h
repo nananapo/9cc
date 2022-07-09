@@ -2,9 +2,10 @@
 # define STDIO_H
 
 void	perror(char *s);
-void	printf(char *fmt, ...);
-void	fprintf(void *fp, char *fmt, ...);
+int		printf(char *fmt, ...);
+int		fprintf(void *fp, char *fmt, ...);
 void	*fopen(char *path, char *mode);
+int		sprintf(char *str, char *fmt, ...);
 
 extern	void *__stdinp;
 extern	void *__stdoutp;

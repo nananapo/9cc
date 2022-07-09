@@ -1,7 +1,6 @@
 #ifndef LIST_H
 # define LIST_H
 
-typedef int (* listcmp)(void *, void *);
 
 typedef struct s_linked_list_elem
 {
@@ -14,10 +13,9 @@ typedef struct s_linked_list_elem
 typedef struct s_linked_list
 {
 	t_linked_list_elem	*sentinel;
-	listcmp				cmp;
 }	t_linked_list;
 
-t_linked_list	*linked_list_new(listcmp cmp);
+t_linked_list	*linked_list_new();
 void	linked_list_insert(t_linked_list *list, void *value);
 void	*linked_list_search(t_linked_list *list, void *value);
 void	linked_list_delete(t_linked_list_elem *elem);

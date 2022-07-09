@@ -8,17 +8,15 @@
 
 extern char		*user_input;
 
-static char *reserved_words[] = {
-	"...",
-	"++", "--", "->", ".",
-	">=", "<=", "==", "!=",
-	"||", "&&",
-	"+=", "-=", "*=", "/=", "%=",
-	">", "<", "=",
-	"+", "-", "*", "/", "%", "&", "!",
-	"(", ")", "{", "}", "[", "]",
-	",", ";", ":",
-	NULL
+static char *reserved_words[36] = {
+	"...","++", "--", "->", ".",
+	">=", "<=", "==", "!=","||",
+	"&&","+=", "-=", "*=", "/=",
+	"%=",">", "<", "=","+",
+	"-","*", "/", "%", "&",
+	"!","(",")", "{", "}",
+	"[", "]",",", ";", ":",
+	""
 };
 
 static Token *new_token(TokenKind kind, Token *cur, char *str)
@@ -33,7 +31,9 @@ static Token *new_token(TokenKind kind, Token *cur, char *str)
 
 static char	*match_reserved_word(char *str)
 {
-	for(int i=0;reserved_words[i];i++)
+	int	i;
+
+	for(i=0;strlen(reserved_words[i]) > 0;i++)
 		if (strncmp(reserved_words[i], str, strlen(reserved_words[i])) == 0)
 			return reserved_words[i];
 	return NULL;
@@ -69,6 +69,8 @@ int	match_word(char *str, char *needle)
 	if (strncmp(str, needle, len) != 0)
 		return 0;
 	if (isalnum(str[len]))
+		return 0;
+	if (!isspace(str[len]))
 		return 0;
 	return len;
 }

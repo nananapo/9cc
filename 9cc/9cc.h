@@ -40,16 +40,7 @@
 
 # define ARGREG_SIZE 6
 
-typedef struct Token Token;
-typedef struct Node Node;
-typedef struct LVar LVar;
-
-typedef struct Type	Type;
-typedef struct s_struct_definition StructDef;
-typedef struct s_struct_members StructMemberElem;
-typedef struct s_enum_definition EnumDef;
-
-typedef enum
+typedef enum TokenKind
 {
 	TK_RESERVED,
 	TK_IDENT,
@@ -80,17 +71,17 @@ typedef enum
 	TK_EXTERN
 } TokenKind;
 
-struct Token
+typedef struct Token
 {
-	TokenKind	kind;
-	Token		*next;
-	int			val;
-	char		*str;
-	int			len;
-	int			strlen_actual;
-};
+	TokenKind		kind;
+	struct Token	*next;
+	int				val;
+	char			*str;
+	int				len;
+	int				strlen_actual;
+} Token;
 
-typedef enum
+typedef enum NodeKind
 {
 	ND_FUNCDEF,
 	ND_PROTOTYPE,
@@ -150,7 +141,7 @@ typedef enum
 	ND_DEFAULT,
 } NodeKind;
 
-typedef enum
+typedef enum PrimitiveType
 {
 	INT,
 	CHAR,
@@ -161,6 +152,46 @@ typedef enum
 	BOOL,
 	VOID
 } PrimitiveType;
+
+typedef struct s_enum_definition
+{
+	char	*name;
+	int		name_len;
+
+	char	*kinds[1000];
+	int		kind_len;
+}	EnumDef;
+
+typedef struct Type
+{
+	PrimitiveType	ty;
+	struct Type		*ptr_to;
+
+	int 			array_size;
+
+	// arg用
+	struct Type		*next;
+
+	struct s_struct_definition
+	{
+		char				*name;
+		int					name_len;
+		int					mem_size; // -1ならまだ定義されていない
+		struct s_struct_members
+		{
+			struct Type				*type;
+			char					*name;
+			int						name_len;
+			int						offset;
+			struct s_struct_members	*next;
+		} *members;
+	}	*strct;
+
+	EnumDef			*enm;
+} Type;
+
+typedef struct s_struct_members		StructMemberElem;
+typedef struct s_struct_definition	StructDef;
 
 typedef struct	s_switchcase
 {
@@ -189,32 +220,34 @@ SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
 
-struct Type
+typedef struct	LVar
 {
-	PrimitiveType	ty;
-	Type		*ptr_to;
+	struct LVar	*next;
 
-	int array_size;
+	char		*name;
+	int			len;
+	int			offset;
 
-	// arg用
-	Type		*next;
+	bool		is_arg;
+	int			arg_regindex;
 
-	StructDef	*strct;
-	EnumDef		*enm;
-};
+	Type		*type;
+} LVar;
 
-struct Node
+typedef struct Node
 {
 	NodeKind	kind;
-	Node		*lhs;
-	Node		*rhs;
+	struct Node	*lhs;
+	struct Node	*rhs;
 
 	char		*var_name;
 	int			var_name_len;
 
+	bool		is_static;
+
 	// global var
 	bool		is_extern;
-	Node		*global_assign; // 初期化用
+	struct Node	*global_assign; // 初期化用
 
 	// num
 	int			val;
@@ -227,13 +260,13 @@ struct Node
 	Type		*type;
 
 	// else of if
-	Node		*elsif;
-	Node		*els;
+	struct Node	*elsif;
+	struct Node	*els;
 
 	// for
-	Node		*for_init;
-	Node		*for_if;
-	Node		*for_next;
+	struct Node	*for_init;
+	struct Node	*for_if;
+	struct Node	*for_next;
 
 	// call & func
 	char		*fname;
@@ -241,7 +274,7 @@ struct Node
 	int			argdef_count;
 	
 	// call
-	Node		*args;
+	struct Node	*args;
 	
 	// func
 	Type		*arg_type;
@@ -251,31 +284,16 @@ struct Node
 	bool		is_variable_argument;
 
 	// general
-	Node		*next;
+	struct Node	*next;
 
 	StructMemberElem	*struct_elem;
-
 	bool		is_struct_address;
 
 	// valとlabelでswicth-case
 	int			switch_label;
 	SwitchCase	*switch_cases;
 	bool		switch_has_default;
-};
-
-struct	LVar
-{
-	LVar	*next;
-
-	char	*name;
-	int		len;
-	int		offset;
-
-	bool	is_arg;
-	int		arg_regindex;
-
-	Type	*type;
-};
+}	Node;
 
 typedef struct s_str_literal_elem
 {
@@ -284,32 +302,6 @@ typedef struct s_str_literal_elem
 	struct s_str_literal_elem	*next;
 	int							index;
 }	t_str_elem;
-
-struct s_struct_members
-{
-	Type					*type;
-	char					*name;
-	int						name_len;
-	int						offset;
-	struct s_struct_members	*next;
-};
-
-struct s_struct_definition
-{
-	char				*name;
-	int					name_len;
-	int					mem_size; // -1ならまだ定義されていない
-	StructMemberElem	*members;
-};
-
-struct s_enum_definition
-{
-	char	*name;
-	int		name_len;
-
-	char	*kinds[1000];
-	int		kind_len;
-};
 
 typedef struct	s_find_enum_res
 {

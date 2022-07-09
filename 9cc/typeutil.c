@@ -5,7 +5,9 @@
 
 static int max(int a, int b)
 {
-	return a > b ? a : b;
+	if (a > b)
+		return (a);
+	return (b);
 }
 
 Type	*new_primitive_type(PrimitiveType pri)
@@ -165,9 +167,11 @@ bool	can_compared(Type *l, Type *r, Type **lt, Type **rt)
 
 StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 {
+	StructMemberElem	*mem;
+
 	if (strct == NULL)
 		return (NULL);
-	for (StructMemberElem *mem = strct->members; mem != NULL; mem = mem->next)
+	for (mem = strct->members; mem != NULL; mem = mem->next)
 	{
 		if (mem->name_len == len && strncmp(name, mem->name, len) == 0)
 			return (mem);
@@ -220,6 +224,10 @@ static void	typename_loop(Type *type, char *str)
 		typename_loop(type->ptr_to, str);
 		strcat(str, "*");
 	}
+	else
+	{
+		error("未対応の型 %d", type->ty);
+	}
 }
 
 // 宣言可能な型かを確かめる
@@ -253,7 +261,8 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 	size1 = type_size(from);
 	size2 = type_size(to);
 
-	(void)is_explicit;
+	is_explicit = false;
+
 	return (true);
 }
 

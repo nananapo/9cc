@@ -16,10 +16,13 @@ Type	*type_cast_forarg(Type *type);
 
 FindEnumRes	*find_enum(Env *env, char *str, int len)
 {
-	for (int i = 0; env->enum_defs[i]; i++)
+	int	i;
+	int	j;
+
+	for (i = 0; env->enum_defs[i]; i++)
 	{
 		EnumDef	*def = env->enum_defs[i];
-		for (int j = 0; j < def->kind_len; j++)
+		for (j = 0; j < def->kind_len; j++)
 		{
 			char *var = def->kinds[j];
 			if ((int)strlen(var) == len
@@ -38,7 +41,9 @@ FindEnumRes	*find_enum(Env *env, char *str, int len)
 
 LVar	*find_lvar(Env *env, char *str, int len)
 {
-	for (LVar *var = env->locals; var; var = var->next)
+	LVar	*var;
+
+	for (var = env->locals; var; var = var->next)
 		if (var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
 	return NULL;
@@ -46,7 +51,9 @@ LVar	*find_lvar(Env *env, char *str, int len)
 
 Node	*find_global(Env *env, char *str, int len)
 {
-	for (int i = 0; env->global_vars[i]; i++)
+	int	i;
+
+	for (i = 0; env->global_vars[i]; i++)
 		if (len == env->global_vars[i]->var_name_len
 			&& memcmp(str,
 					env->global_vars[i]->var_name,
@@ -146,6 +153,7 @@ static void alloc_local_var(Env *env, LVar *lvar)
 LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 {
 	LVar	*lvar;
+	LVar	*tmp;
 
 	lvar = calloc(1, sizeof(LVar));
 	lvar->name = name;
@@ -168,7 +176,7 @@ LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 		env->locals = lvar;
 	else
 	{
-		for(LVar *tmp = env->locals; tmp; tmp = tmp->next)
+		for(tmp = env->locals; tmp; tmp = tmp->next)
 		{
 			if (tmp->next == NULL)
 			{
