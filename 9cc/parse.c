@@ -73,7 +73,7 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	return node;
 }
 
-Node*new_node_num(int val)
+Node	*new_node_num(int val)
 {
 	Node *node = new_node(ND_NUM, NULL, NULL);
 	node->val = val;
@@ -161,6 +161,16 @@ static int	get_str_literal_index(Env *env, char *str, int len)
 	env->str_literals = tmp;
 
 	return (tmp->index);
+}
+
+static Node *cast(Env *env, Node *node, Type *to)
+{
+	node = new_node(ND_CAST, node, NULL);
+	if (!type_can_cast(node->lhs->type, to, true))
+		error_at(env->token->str, "%sを%sにキャストできません",
+					get_type_name(node->lhs->type), get_type_name(to));
+	node->type = to;
+	return (node);
 }
 
 static Node *call(Env *env, Token *tok)
@@ -256,10 +266,8 @@ static Node *call(Env *env, Token *tok)
 							get_type_name(def->type),
 							get_type_name(args->type));
 
-				Node *cast = new_node(ND_CAST, args, NULL);
-				cast->type = def->type;
-				cast->next = args->next;
-				args = cast;
+				args = cast(env, args, def->type);
+				args->next = args->lhs->next;
 			}
 		}
 		else
@@ -333,27 +341,14 @@ static Node	*read_suffix_increment(Env *env, Node *node)
 }
 
 // 添字によるDEREF
+// TODO エラーメッセージが足し算用になってしまう
 static Node	*read_deref_index(Env *env, Node *node)
 {
+	Node	*add;
+
 	while (consume(env, "["))
 	{
-		Node	*add = new_node(ND_ADD, node, expr(env));
-
-		// 左にポインタを寄せる
-		if (is_pointer_type(add->rhs->type))
-		{
-			Node	*tmp;
-			tmp = add->lhs;
-			add->lhs = add->rhs;
-			add->rhs = tmp;
-		}
-
-		if (!is_pointer_type(add->lhs->type))
-			error_at(env->token->str, "ポインタ型ではありません");
-		if (!is_integer_type(add->rhs->type))
-			error_at(env->token->str, "添字の型が整数ではありません");
-		add->type = add->lhs->type;
-
+		add = create_add(true, node, expr(env), env->token);
 		node = new_node(ND_DEREF, add, NULL);
 		node->type = node->lhs->type->ptr_to;
 
@@ -388,10 +383,7 @@ static Node *primary(Env *env)
 		// 明示的なキャスト
 		// TODO キャストの優先順位が違う
 		expect(env, ")");
-		node = new_node(ND_CAST, unary(env), NULL);
-		if (!type_can_cast(node->lhs->type, type_cast, true))
-			error_at(env->token->str, "%sを%sにキャストできません", get_type_name(node->lhs->type), get_type_name(type_cast));
-		node->type = type_cast;
+		node = cast(env, unary(env), type_cast);
 		return read_deref_index(env, node);
 	}
 
@@ -840,7 +832,7 @@ static Node	*conditional(Env *env)
 	return (node);
 }
 
-static Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
+static Node	*create_assign(Env *env, Node *lhs, Node *rhs, Token *tok)
 {
 	Node	*node;
 
@@ -858,9 +850,8 @@ static Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
 			printf("#assign (%s) <- (%s)\n",
 					get_type_name(lhs->type),
 					get_type_name(rhs->type));
-			node->rhs = new_node(ND_CAST, rhs, NULL);
+			node->rhs = cast(env, rhs, lhs->type);
 			rhs = node->rhs;
-			rhs->type = lhs->type;
 		}
 		else
 		{
@@ -879,7 +870,7 @@ static Node	*assign(Env *env)
 
 	node = conditional(env);
 	if (consume(env, "="))
-		node = create_assign(node, assign(env), env->token);
+		node = create_assign(env, node, assign(env), env->token);
 	else if (consume(env, "+="))
 	{
 		node = create_add(true, node, assign(env), env->token);
@@ -1266,7 +1257,7 @@ static Node	*stmt(Env *env)
 				node = new_node(ND_LVAR, NULL, NULL);
 				node->offset = created->offset;
 				node->type = created->type;
-				node = create_assign(node, expr(env), env->token);
+				node = create_assign(env, node, expr(env), env->token);
 			}
 		}
 		else

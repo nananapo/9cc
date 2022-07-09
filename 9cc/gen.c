@@ -425,14 +425,18 @@ static void	call(Node *node)
 // raxに入っている型fromをtoに変換する
 static void	cast(Type *from, Type *to)
 {
-	int	size1;
-	int	size2;
+	int		size1;
+	int		size2;
+	char	*name1;
+	char	*name2;
 
 	// 型が同じなら何もしない
 	if (type_equal(from, to))
 		return ;
 
-	printf("# cast %s -> %s\n", get_type_name(from), get_type_name(to));
+	name1 = get_type_name(from);
+	name2 = get_type_name(to);
+	printf("# cast %s -> %s\n", name1, name2);
 
 	// ポインタからポインタのキャストは何もしない
 	if (is_pointer_type(from)
@@ -487,7 +491,7 @@ static void	cast(Type *from, Type *to)
 		return ;
 	}
 
-	error("%sから%sへのキャストが定義されていません", get_type_name(from), get_type_name(to));
+	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
 static void	primary(Node *node)
@@ -548,7 +552,7 @@ static void	arrow(Node *node, bool as_addr)
 
 	// arrowかその他の可能性がある
 	if (node->lhs->kind == ND_STRUCT_VALUE
-			|| node->lhs->kind == ND_STRUCT_PTR_VALUE)
+	|| node->lhs->kind == ND_STRUCT_PTR_VALUE)
 		arrow(node->lhs, node->kind == ND_STRUCT_VALUE);
 	else
 		expr(node->lhs);
@@ -654,74 +658,90 @@ static void	mul(Node *node)
 static void add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
 {
 	// 結果がポインタ型なら
-	if (restype->ty == PTR || restype->ty == ARRAY)
-	{
-		// 左辺をポインタ型にする
-		if (can_replace &&
-			((*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY))
-		{
-			Node *tmp = *lhs;
-			*lhs = *rhs;
-			*rhs = tmp;
-		}
+	if (restype->ty != PTR && restype->ty != ARRAY)
+		return ;
 
-		// 右辺が整数型なら掛け算に置き換える
-		if (is_integer_type((*rhs)->type))
-		{
-			Node *size_node = new_node(ND_NUM, NULL, NULL);
-			size_node->val = type_size((*lhs)->type->ptr_to);
-			size_node->type = new_primitive_type(INT);
-			// 掛け算
-			*rhs = new_node(ND_MUL, *rhs, size_node);
-			(*rhs)->type = (*lhs)->type; // TODO
-			// INT
-			size_node->type = new_primitive_type(INT);
-		}
+	// 左辺をポインタ型にする
+	if (can_replace &&
+		((*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY))
+	{
+		Node *tmp = *lhs;
+		*lhs = *rhs;
+		*rhs = tmp;
 	}
+
+	// 右辺が整数型なら掛け算に置き換える
+	if (is_integer_type((*rhs)->type))
+	{
+		// ポインタの先のサイズを掛ける
+		*rhs = new_node(ND_MUL, *rhs,
+						new_node_num(type_size((*lhs)->type->ptr_to)));
+		(*rhs)->type = new_primitive_type(INT);
+	}
+}
+
+// rax, rdi
+static void	create_add(bool is_add, Type *l, Type *r)
+{
+	int	size;
+
+	printf("    # add(%d) %s(%d) + %s(%d)\n", is_add,
+			get_type_name(l), type_size(l),
+			get_type_name(r), type_size(r));
+
+	// とりあえずinteger以外は無視
+	if (is_integer_type(l))
+	{
+		size = type_size(l);
+		if (size == 4)
+			printf("    movsxd rax, eax # sizeup\n");
+		else if (size == 2)
+			printf("    movsx rax, ax # sizeup\n");
+		else if (size == 1)
+			printf("    movsx rax, al # sizeup\n");
+	}
+
+	if (is_integer_type(r))
+	{
+		size = type_size(r);
+		if (size == 4)
+			printf("    movsxd rdi, edi # sizeup\n");
+		else if (size == 2)
+			printf("    movsx rdi, di # sizeup\n");
+		else if (size == 1)
+			printf("    movsx rdi, dil # sizeup\n");
+	}
+
+	if (is_add)
+		printf("    add rax, rdi\n");
+	else
+		printf("    sub rax, rdi\n");
 }
 
 static void	add(Node *node)
 {
-	switch (node->kind)
+	if (node->kind != ND_ADD && node->kind != ND_SUB)
 	{
-		case ND_ADD:
-		case ND_SUB:
-			break;
-		default:
-			mul(node);
-			return;
+		mul(node);
+		return ;
 	}
 
-	add_check_pointer(node->type, &node->lhs, &node->rhs, node->kind == ND_ADD);
+	add_check_pointer(node->type, &node->lhs, &node->rhs, true);
 
 	expr(node->rhs);
 	push();
 	expr(node->lhs);
 	pop("rdi");
 
-	switch (node->kind)
-	{
-		case ND_ADD:
-			printf("    add rax, rdi\n");
-			break;
-		case ND_SUB:
-			printf("    sub rax, rdi\n");
-			break;
-		default:
-			break;
-	}
+	create_add(node->kind == ND_ADD, node->lhs->type, node->rhs->type);
 }
 
 static void relational(Node *node)
 {
-	switch (node->kind)
+	if (node->kind != ND_LESS && node->kind != ND_LESSEQ)
 	{
-		case ND_LESS:
-		case ND_LESSEQ:
-			break;
-		default:
-			add(node);
-			return;
+		add(node);
+		return ;
 	}
 
 	expr(node->rhs);
@@ -748,14 +768,10 @@ static void relational(Node *node)
 
 static void	equality(Node *node)
 {
-	switch (node->kind)
+	if (node->kind != ND_EQUAL && node->kind != ND_NEQUAL)
 	{
-		case ND_EQUAL:
-		case ND_NEQUAL:
-			break;
-		default:
-			relational(node);
-			return;
+		relational(node);
+		return ;
 	}
 
 	expr(node->rhs);
@@ -784,14 +800,11 @@ static void	conditional(Node *node)
 {
 	int	lend;
 
-	if (node->kind != ND_COND_AND
-		&& node->kind != ND_COND_OR)
+	if (node->kind != ND_COND_AND && node->kind != ND_COND_OR)
 	{
 		equality(node);
 		return ;
 	}
-
-	//printf("condand : %d, %d:%d\n", node->kind == ND_COND_AND, node->lhs->kind, node->rhs->kind);
 
 	if (node->kind == ND_COND_AND)
 	{
@@ -813,7 +826,8 @@ static void	conditional(Node *node)
 		printf("    setne al\n"); // 0と等しくないかをalに格納
 
 		pop(RDI);
-		printf("    add %s, %s\n", RAX, RDI);
+		
+		create_add(true, new_primitive_type(INT), new_primitive_type(INT));
 		printf("    movzx rax, al\n"); // alをゼロ拡張
 
 		// 最後の比較
@@ -878,7 +892,7 @@ static void	assign(Node *node)
 			return;
 	}
 
-	//printf("#ASSIGN %d\n", node->lhs->kind);
+	printf("#ASSIGN %d\n", node->lhs->kind);
 	load_lval(node->lhs);	
 	push();
 
@@ -891,12 +905,11 @@ static void	assign(Node *node)
 		case ND_COMP_ADD:
 			push();
 
-			//fprintf(stderr, "from %d\n", node->rhs->kind);
 			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
-			//fprintf(stderr, "kind %d\n", node->rhs->kind);
 
 			expr(node->rhs);
 			pop(RDI);
+
 			if (node->type->ty == ARRAY)
 				printf("    add rax, rdi\n");
 			else

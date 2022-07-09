@@ -354,6 +354,7 @@ void	error_at(char *loc, char *fmt, ...);
 Token	*tokenize(char *p);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+Node	*new_node_num(int val);
 
 
 // Type
