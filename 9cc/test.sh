@@ -533,6 +533,7 @@ assert_gcc "arg5.c"
 assert_gcc "arg6.c"
 assert_gcc "arg7.c"
 assert_gcc "arg8.c"
+assert_gcc "arg9.c"
 
 assert_gcc "str1.c"
 
@@ -687,6 +688,9 @@ assert_gcc "enum6.c"
 assert_gcc "size1.c"
 assert_gcc "size2.c"
 assert_gcc "size3.c"
+assert_gcc "size4.c"
+
+assert_gcc "stack.c"
 
 assert_gcc "global1.c"
 assert_gcc "global2.c"
@@ -694,5 +698,7 @@ assert_gcc "global3.c"
 assert_gcc "global4.c"
 assert_gcc "global5.c"
 assert_gcc "global6.c"
+assert_gcc "global7.c"
+assert_gcc "global8.c"
 
 echo OK
