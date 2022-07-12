@@ -6,18 +6,53 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define ARG_REG_COUNT 6
-
+int	max(int a, int b);
+int	min(int a, int b);
+int	align_to(int n, int align);
+static void	push(void);
+static void	pushi(int data);
+static void	pop(char *reg);
+static void	mov(char *dst, char *from);
+static void	movi(char *dst, int i);
+static void	cmps(char *dst, char *from);
+static void	cmp(Type *dst, Type *from);
+char	*get_str_literal_name(int index);
+static void	comment(char *c);
+static void	store_value(int size);
+static void	store_ptr(int size, bool minus_step);
+static void	prologue(void);
+static void	epilogue(void);
+static void	load(Type *type);
+static void	lval(Node *node);
+static void	call(Node *node);
+static void	cast(Type *from, Type *to);
+static void	primary(Node *node);
+static void	arrow(Node *node, bool as_addr);
+static void	unary(Node *node);
+static void	mul(Node *node);
+static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace);
+static void	create_add(bool is_add, Type *l, Type *r);
+static void	add(Node *node);
+static void	relational(Node *node);
+static void	equality(Node *node);
+static void	conditional(Node *node);
+static void	load_lval_addr(Node *node);
+static void	assign(Node *node);
 static void	expr(Node *node);
-static void unary(Node *node);
-
-static int	jumpLabelCount = 0;
-static char	*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-static int	stack_count = 0;
+static void	stmt(Node *node);
+static void	funcdef(Node *node);
+static void	print_global_constant(Node *node, Type *type);
+static void	globaldef(Node *node);
+static void	filescope(Node *node);
+void	gen(Node *node);
 
 extern t_str_elem	*str_literals;
+extern int			switchCaseCount;
+extern Stack		*sbstack;
 
-extern Stack	*sbstack;
+int					jumpLabelCount = 0;
+char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+int					stack_count = 0;
 
 int	max(int a, int b)
 {
@@ -40,30 +75,30 @@ int	align_to(int n, int align)
 	return ((n + align - 1) / align * align);
 }
 
-void	push()
+static void	push()
 {
 	stack_count += 8;
 	printf("    %s %s # stack= %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
 }
 
-void	pushi(int data)
+static void	pushi(int data)
 {
 	stack_count += 8;
 	printf("    %s %d # stack= %d -> %d\n", ASM_PUSH, data, stack_count - 8, stack_count);
 }
 
-void	pop(char *reg)
+static void	pop(char *reg)
 {
 	stack_count -= 8;
 	printf("    pop %s # stack= %d -> %d\n", reg, stack_count + 8, stack_count);
 }
 
-void	mov(char *dst, char *from)
+static void	mov(char *dst, char *from)
 {
 	printf("    %s %s, %s\n", ASM_MOV, dst, from);
 }
 
-void	movi(char *dst, int i)
+static void	movi(char *dst, int i)
 {
 	printf("    %s %s, %d\n", ASM_MOV, dst, i);
 }
@@ -90,14 +125,9 @@ static void	cmp(Type *dst, Type *from)
 	cmps(RAX, RDI);
 }
 
-void	load_global(Node *node)
-{
-	printf("    mov rax, [rip + _%s@GOTPCREL]\n",
-		strndup(node->var_name, node->var_name_len));
-}
-
 char	*get_str_literal_name(int index)
 {
+
 	char	*tmp;
 
 	tmp = calloc(100, sizeof(char));
@@ -105,7 +135,7 @@ char	*get_str_literal_name(int index)
 	return (tmp);
 }
 
-void	comment(char *c)
+static void	comment(char *c)
 {
 	printf("# %s\n", c);
 }
@@ -261,15 +291,21 @@ static void	load(Type *type)
 // 変数のアドレスをraxに移動する
 static void	lval(Node *node)
 {
-	if (node->kind != ND_LVAR
-	&& node->kind != ND_LVAR_GLOBAL)
+	if (node->kind != ND_LVAR && node->kind != ND_LVAR_GLOBAL)
 		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
-	
-	mov(RAX, RBP);
-	if (node->offset > 0)
-		printf("    sub %s, %d\n", RAX, node->offset);
-	else if (node->offset < 0)
-		printf("    add %s, %d\n", RAX, - node->offset);
+
+	if (node->kind == ND_LVAR)
+	{
+		mov(RAX, RBP);
+		if (node->offset > 0)
+			printf("    sub %s, %d\n", RAX, node->offset);
+		else if (node->offset < 0)
+			printf("    add %s, %d\n", RAX, - node->offset);
+	}
+	else if (node->kind == ND_LVAR_GLOBAL)
+	{
+		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_name, node->var_name_len));
+	}
 }
 
 static void	call(Node *node)
@@ -282,6 +318,7 @@ static void	call(Node *node)
 	Node	*tmp;
 	int		i;
 	int		j;
+	int		pop_count;
 
 	for (tmp = node->args; tmp; tmp = tmp->next)
 	{
@@ -345,12 +382,12 @@ static void	call(Node *node)
 
 	printf("# RBP_OFFSET %d (is_aligned : %d)\n", rbp_offset, is_aligned);
 
-	int	pop_count = 0;
+	pop_count = 0;
 	// 後ろから格納していく
 	for (i = arg_count; i > 0; i--)
 	{
 		// i番目のtmpを求める
-		Node *tmp = node->args;
+		tmp = node->args;
 		for (j = 1; j < i; j++)
 			tmp = tmp->next;
 
@@ -422,7 +459,6 @@ static void	call(Node *node)
 	printf("    add rsp, %d # pop_count\n", pop_count * 8);
 	printf("# POP ALL %d -> %d\n", stack_count, stack_count - pop_count * 8);
 	stack_count -= pop_count * 8;
-
 	return;
 }
 
@@ -514,9 +550,9 @@ static void	primary(Node *node)
 		case ND_LVAR:
 			lval(node);
 			load(node->type);
-			return;
+			return ;
 		case ND_LVAR_GLOBAL:
-			load_global(node);
+			lval(node);
 			load(node->type);
 			return;
 		case ND_STR_LITERAL:
@@ -612,7 +648,7 @@ static void unary(Node *node)
 			}
 			break ;
 		case ND_DEREF:
-			expr(node->lhs);// ここと同じ！！！！！変えるときは注意！！！！！！
+			expr(node->lhs);// ここと同じ
 			load(node->type);
 			break ;
 		default:
@@ -664,7 +700,7 @@ static void	mul(Node *node)
 	}
 }
 
-static void add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
+static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
 {
 	// 結果がポインタ型なら
 	if (restype->ty != PTR && restype->ty != ARRAY)
@@ -745,7 +781,7 @@ static void	add(Node *node)
 	create_add(node->kind == ND_ADD, node->lhs->type, node->rhs->type);
 }
 
-static void relational(Node *node)
+static void	relational(Node *node)
 {
 	if (node->kind != ND_LESS && node->kind != ND_LESSEQ)
 	{
@@ -869,12 +905,12 @@ static void	conditional(Node *node)
 	}
 }
 
-static void	load_lval(Node *node)
+static void	load_lval_addr(Node *node)
 {
 	if (node->kind == ND_LVAR)
 		lval(node);
 	else if (node->kind == ND_LVAR_GLOBAL)
-		load_global(node);
+		lval(node);
 	else if (node->kind == ND_DEREF)
 		expr(node->lhs);// ここもDEREFと同じようにやってる！！！！！
 	else if (node->kind == ND_STRUCT_VALUE)
@@ -902,7 +938,7 @@ static void	assign(Node *node)
 	}
 
 	printf("#ASSIGN %d\n", node->lhs->kind);
-	load_lval(node->lhs);	
+	load_lval_addr(node->lhs);	
 	push();
 
 	// TODO もっといい感じにやりたい
@@ -990,13 +1026,12 @@ static void	expr(Node *node)
 	assign(node);
 }
 
-extern int	switchCaseCount;
-
 static void stmt(Node *node)
 {
 	int		lend;
 	int		lbegin;
 	int		lbegin2;
+	int		lelse;
 	SBData	*sbdata;
 
 	switch (node->kind)
@@ -1036,7 +1071,7 @@ static void stmt(Node *node)
 
 			if (node->elsif != NULL)
 			{	
-				int lelse = jumpLabelCount++;
+				lelse = jumpLabelCount++;
 				printf("    je .Lelse%d\n", lelse);
 				stmt(node->rhs);
 				printf("    jmp .Lend%d\n", lend);
@@ -1052,7 +1087,7 @@ static void stmt(Node *node)
 			}
 			else
 			{
-				int lelse = jumpLabelCount++;
+				lelse = jumpLabelCount++;
 				printf("    je .Lelse%d\n", lelse);
 				stmt(node->rhs);
 				printf("    jmp .Lend%d\n", lend);
@@ -1360,7 +1395,7 @@ static void globaldef(Node *node)
 		printf(".globl _%s\n", name);
 	if (node->global_assign == NULL)
 	{
-		printf("    .zerofill __DATA,__common,_%s,%d,2\n",
+		printf("    .comm _%s,%d,2\n",
 				name, type_size(node->type));
 	}
 	else
