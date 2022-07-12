@@ -1,11 +1,10 @@
 prpr:
-	cd prpr && make re && make
+	cd prpr  && make
 
 9cc:
-	cd 9cc && make re && make
+	cd 9cc && make
 
 prpr1: 9cc prpr
-	# 9ccでprprをビルドする
 	./prtest.sh
 
 prpr3: prpr1
@@ -23,6 +22,8 @@ prpr3: prpr1
 	./cctest.sh
 	cd 9cc && make test
 
-re: prpr 9cc
+re:
+	cd prpr && make re
+	cd 9cc && make re
 
 .PHONY: prpr 9cc prpr1 9cc1 re
