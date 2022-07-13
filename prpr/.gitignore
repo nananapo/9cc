@@ -2,3 +2,5 @@ prpr
 a.out
 *.s
 test1/*
+test2/*
+test3/*
