@@ -7,20 +7,22 @@ prpr:
 prpr1: 9cc prpr
 	./prtest.sh
 
-prpr3: prpr1
-	./prtest.sh
-	./prtest.sh
-	./prtest.sh
+prpr3: 9cc prpr
+	./prtest1.sh
+	./prtest2.sh
+	./prtest3.sh
 	cd 9cc && make test
+	./diffprpr.sh
 
 9cc1: 9cc prpr
-	./cctest.sh
+	./cctest1.sh
 
-9cc3: 9cc1
-	./cctest.sh
-	./cctest.sh
-	./cctest.sh
+9cc3: 9cc prpr
+	./cctest1.sh
+	./cctest2.sh
+	./cctest3.sh
 	cd 9cc && make test
+	./diffcc.sh
 
 re:
 	cd prpr && make re

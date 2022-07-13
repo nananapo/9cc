@@ -1,10 +1,10 @@
-cd 9cc
+cd prpr
 echo "`pwd`"
 
 NCC="../9cc/9cc"
-PRPR="../prpr/prpr --stddir ../std/"
+PRPR="./prpr --stddir ../std/"
 
-DIR="test1/"
+DIR="test2/"
 rm -rf $DIR
 mkdir $DIR
 
@@ -34,31 +34,23 @@ mgcc() {
 }
 
 
-compile "charutil"
 compile "fileutil"
 compile "gen"
-compile "list"
 compile "main"
 compile "parse"
-compile "parseutil"
-compile "stack"
+compile "strutil"
 compile "tokenize"
-compile "typeutil"
-compile "varutil"
-#compile "error"
+compile "tokenutil"
+compile "error"
 
-#mgcc "charutil"
 #mgcc "fileutil"
 #mgcc "gen"
-#mgcc "list"
 #mgcc "main"
 #mgcc "parse"
-#mgcc "parseutil"
-#mgcc "stack"
+#mgcc "strutil"
 #mgcc "tokenize"
-#mgcc "typeutil"
-#mgcc "varutil"
-mgcc "error"
+#mgcc "tokenutil"
+#mgcc "error"
 
 cd $DIR
-gcc -o ../9cc charutil.s fileutil.s gen.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s error.s
+gcc -o ../prpr fileutil.s gen.s main.s parse.s strutil.s tokenize.s tokenutil.s error.s
