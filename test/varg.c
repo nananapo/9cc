@@ -8,9 +8,7 @@ int	test(char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-//	p(1,2,3,4,5,6);
-
-	vfprintf(stderr, fmt, ap);
+	vfprintf(stdout, fmt, ap);
 }
 
 int	main(void)
