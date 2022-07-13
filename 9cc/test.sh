@@ -535,6 +535,9 @@ assert_gcc "arg7.c"
 assert_gcc "arg8.c"
 assert_gcc "arg9.c"
 
+assert_gcc "varg.c"
+assert_gcc "varg2.c"
+
 assert_gcc "str1.c"
 
 assert "125" "struct t1 {char a;};
