@@ -291,21 +291,31 @@ static void	load(Type *type)
 // 変数のアドレスをraxに移動する
 static void	lval(Node *node)
 {
+	int	offset;
+
 	if (node->kind != ND_LVAR && node->kind != ND_LVAR_GLOBAL)
 		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
 
 	if (node->kind == ND_LVAR)
 	{
+		offset = node->lvar->offset;
 		mov(RAX, RBP);
-		if (node->offset > 0)
-			printf("    sub %s, %d\n", RAX, node->offset);
-		else if (node->offset < 0)
-			printf("    add %s, %d\n", RAX, - node->offset);
+		if (offset > 0)
+			printf("    sub %s, %d\n", RAX, offset);
+		else if (offset < 0)
+			printf("    add %s, %d\n", RAX, - offset);
 	}
 	else if (node->kind == ND_LVAR_GLOBAL)
 	{
 		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_name, node->var_name_len));
 	}
+}
+
+bool	is_va_list(Type *type)
+{
+	return (type->ty == STRUCT
+			&& type->strct->name_len == 7
+			&& strncmp(type->strct->name, "va_list", 7) == 0);
 }
 
 static void	call(Node *node)
@@ -320,12 +330,25 @@ static void	call(Node *node)
 	int		j;
 	int		pop_count;
 
+	if (node->flen == 8
+	&& strncmp(node->fname, "va_start", 8) == 0)
+	{
+		printf("    # SKIP va_start\n");
+		return ;
+	}
+
 	for (tmp = node->args; tmp; tmp = tmp->next)
 	{
 		arg_count++;
 
-		// TODO int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
+		// TODO
+		// int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
 		size = type_size(tmp->locals->type);
+
+		// TODO va_listを特別扱い
+		if (is_va_list(tmp->locals->type))
+			size = 8;
+
 		printf("# PUSH ARG %s (%d)\n",
 			strndup(tmp->locals->name, tmp->locals->len),
 			size);
@@ -393,8 +416,13 @@ static void	call(Node *node)
 
 		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
 	
-		// TODO int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
+		// TODO
+		// int[1000]とかにしたら1000 * 4byteコピーしてしまう問題の修正
 		size = type_size(tmp->locals->type);
+
+		// TODO va_listを特別扱い
+		if (is_va_list(tmp->locals->type))
+			size = 8;
 
 		// レジスタに入れる
 		if (tmp->locals->arg_regindex != -1)
@@ -548,6 +576,12 @@ static void	primary(Node *node)
 			cast(node->lhs->type, node->type);
 			return;
 		case ND_LVAR:
+			// TODO va_listを特別扱い
+			if (is_va_list(node->type))
+			{
+				printf("    lea rax, [rbp - %d]\n", node->lvar->offset);
+				return ;
+			}
 			lval(node);
 			load(node->type);
 			return ;
@@ -1253,6 +1287,8 @@ static void	funcdef(Node *node)
 {
 	char	*funcname;
 	LVar	*lvtmp;
+	int		stack_size;
+	int		maxoff;
 
 	funcname = strndup(node->fname, node->flen);
 	stack_count = 0;
@@ -1264,58 +1300,85 @@ static void	funcdef(Node *node)
 	prologue();
 
 
-	if (node->is_variable_argument)
+if (node->is_variable_argument)
+{
+	maxoff = 40;
+	for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 	{
-		printf("sub rsp, 400\n");
-		printf("movaps	xmmword ptr [rbp - 400], xmm7\n");
-		printf("movaps	xmmword ptr [rbp - 384], xmm6\n");
-		printf("movaps	xmmword ptr [rbp - 368], xmm5\n");
-		printf("movaps	xmmword ptr [rbp - 352], xmm4\n");
-		printf("movaps	xmmword ptr [rbp - 336], xmm3\n");
-		printf("movaps	xmmword ptr [rbp - 320], xmm2\n");
-		printf("movaps	xmmword ptr [rbp - 304], xmm1\n");
-		printf("movaps	xmmword ptr [rbp - 288], xmm0\n");
-		printf("mov	qword ptr [rbp - 272], r9\n ");
-		printf("mov	qword ptr [rbp - 264], r8\n");
-		printf("mov	qword ptr [rbp - 256], rcx\n");
-		printf("mov	qword ptr [rbp - 248], rdx\n");
-		printf("mov	qword ptr [rbp - 240], rsi\n");
-		printf("mov	qword ptr [rbp - 232], rdi\n");
-    	
-		printf("mov	rcx, qword ptr [rbp - 232]\n");
-		printf("mov	rax, qword ptr [rbp - 240]\n");
-		printf("mov	rdx, qword ptr [rbp - 248]\n");
-		printf("mov	rsi, qword ptr [rbp - 256]\n");
-		printf("mov	rdi, qword ptr [rbp - 264]\n");
-		printf("mov	r8, qword ptr [rbp - 272] \n");
-		printf("mov	qword ptr [rbp - 184], r8\n");
-		printf("mov	qword ptr [rbp - 192], rdi\n");
-		printf("mov	qword ptr [rbp - 200], rsi\n");
-		printf("mov	qword ptr [rbp - 208], rdx\n");
-		printf("mov	qword ptr [rbp - 216], rax\n");
+		if (lvtmp->type->ty == STRUCT
+		&& lvtmp->type->strct->name_len == 7
+		&& strncmp(lvtmp->type->strct->name, "va_list", 7) == 0)
+			lvtmp->offset = 32;
+		else
+			lvtmp->offset = maxoff += type_size(lvtmp->type);
+		
+		printf("# VAR %s %d\n", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
+	}
 
-    }
+	stack_size = align_to(400 + maxoff - 40, 16);
+	stack_count += stack_size;
 
+	printf("sub	rsp, %d\n", stack_size);
+	printf("movaps	xmmword ptr [rbp - 400], xmm7   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 384], xmm6   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 368], xmm5   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 352], xmm4   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 336], xmm3   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 320], xmm2   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 304], xmm1   ## 16-byte Spill\n");
+	printf("movaps	xmmword ptr [rbp - 288], xmm0   ## 16-byte Spill\n");
+	printf("mov	qword ptr [rbp - 272], r9       ## 8-byte Spill\n");
+	printf("mov	qword ptr [rbp - 264], r8       ## 8-byte Spill\n");
+	printf("mov	qword ptr [rbp - 256], rcx      ## 8-byte Spill\n");
+	printf("mov	qword ptr [rbp - 248], rdx      ## 8-byte Spill\n");
+	printf("mov	qword ptr [rbp - 240], rsi      ## 8-byte Spill\n");
+	printf("mov	qword ptr [rbp - 232], rdi      ## 8-byte Spill\n");
+	printf("mov	rcx, qword ptr [rbp - 232]      ## 8-byte Reload\n");
+	printf("mov	rax, qword ptr [rbp - 240]      ## 8-byte Reload\n");
+	printf("mov	rdx, qword ptr [rbp - 248]      ## 8-byte Reload\n");
+	printf("mov	rsi, qword ptr [rbp - 256]      ## 8-byte Reload\n");
+	printf("mov rdi, qword ptr [rbp - 264]      ## 8-byte Reload\n");
+	printf("mov	r8, qword ptr [rbp - 272]       ## 8-byte Reload\n");
+	printf("mov	qword ptr [rbp - 184], r8\n");
+	printf("mov	qword ptr [rbp - 192], rdi\n");
+	printf("mov	qword ptr [rbp - 200], rsi\n");
+	printf("mov	qword ptr [rbp - 208], rdx\n");
+	printf("mov	qword ptr [rbp - 216], rax\n");
+	printf("lea	rax, [rbp - 32]\n");
+	printf("mov	rdx, qword ptr [rip + ___stack_chk_guard@GOTPCREL]\n");
+	printf("mov	rdx, qword ptr [rdx]\n");
+	printf("mov	qword ptr [rbp - 8], rdx\n");
+	printf("mov	qword ptr [rbp - 48], rcx\n");
+	printf("lea	rcx, [rbp - 224]\n");
+	printf("mov	qword ptr [rax + 16], rcx\n");
+	printf("lea	rcx, [rbp + 16]\n");
+	printf("mov	qword ptr [rax + 8], rcx\n");
+	printf("mov	dword ptr [rax + 4], 48\n");
+	printf("mov	dword ptr [rax], 8\n");
+	printf("mov	al, 0\n");
+}
+else
+{
 	if (node->locals != NULL)
 	{
-		int maxoff = 0;
+		maxoff = 0;
 		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
 			printf("# VAR %s %d\n", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
 			maxoff = max(maxoff, lvtmp->offset);
 		}
-		node->stack_size = align_to(maxoff, 8);
+		stack_size = align_to(maxoff, 8);
 	}
 	else
-		node->stack_size = 0;
+		stack_size = 0;
 
-	stack_count += node->stack_size; // stack_sizeを初期化
+	stack_count += stack_size; // stack_sizeを初期化
 
-	printf("# STACKSIZE : %d\n", node->stack_size);
+	printf("# STACKSIZE : %d\n", stack_size);
 
-	if (node->stack_size != 0)
+	if (stack_size != 0)
 	{
-		printf("    sub rsp, %d\n", node->stack_size);// stack_size
+		printf("    sub rsp, %d\n", stack_size);// stack_size
 
 		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
@@ -1343,11 +1406,12 @@ static void	funcdef(Node *node)
 		}
 		printf("# ARG_END\n");
 	}
+}
 
 	stmt(node->lhs);
 	epilogue();
 
-	stack_count -= node->stack_size;
+	stack_count -= stack_size;
 	printf("#count %d\n", stack_count);
 	
 	if (stack_count != 0)

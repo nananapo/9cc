@@ -242,6 +242,7 @@ typedef struct Node
 
 	char		*var_name;
 	int			var_name_len;
+	Type		*type;
 
 	bool		is_static;
 
@@ -249,15 +250,14 @@ typedef struct Node
 	bool		is_extern;
 	struct Node	*global_assign; // 初期化用
 
+	// local var
+	LVar		*lvar;
+
 	// num
 	int			val;
 
 	// str
 	int			str_index;
-
-	// ident
-	int			offset;
-	Type		*type;
 
 	// else of if
 	struct Node	*elsif;
@@ -279,7 +279,6 @@ typedef struct Node
 	// func
 	Type		*arg_type;
 	Type		*ret_type;
-	int			stack_size;
 	LVar 		*locals;
 	bool		is_variable_argument;
 
@@ -322,6 +321,7 @@ typedef struct s_parseresult
 	StructDef		*struct_defs[1000];
 	EnumDef			*enum_defs[1000];
 	LVar			*locals;
+
 
 	t_linked_list	*type_alias;
 }	ParseResult;

@@ -11,4 +11,6 @@ void	free(void *ptr);
 
 int		strtol(char *str, char **endptr, int base);
 
+void	exit(int status);
+
 #endif

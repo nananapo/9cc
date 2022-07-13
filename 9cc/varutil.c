@@ -71,6 +71,8 @@ LVar	*copy_lvar(LVar *f)
 	return (lvar);
 }
 
+bool	is_va_list(Type *type);
+
 void	alloc_argument_simu(LVar *first, LVar *lvar)
 {
 	int		size;
@@ -96,6 +98,9 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 	}
 
 	size = type_size(lvar->type);
+	// TODO va_Listを特別扱い
+	if (is_va_list(lvar->type))
+		size = 8;
 
 	// レジスタに入れるか決定する
 	if (regindex_max < ARGREG_SIZE - 1

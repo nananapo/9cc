@@ -469,7 +469,7 @@ Node *primary(Env *env)
 		if (lvar != NULL)
 		{
 			node = new_node(ND_LVAR, NULL, NULL);
-			node->offset = lvar->offset;
+			node->lvar = lvar;
 			node->type = lvar->type;
 			return read_deref_index(env, node);
 		}
@@ -1316,14 +1316,12 @@ Node	*stmt(Env *env)
 
 			node = new_node(ND_DEFVAR, NULL, NULL);
 			node->type = type;
-			node->offset = created->offset;
+			node->lvar = created;
 
 			// 宣言と同時に代入
 			if (consume(env, "="))
 			{
-				node = new_node(ND_LVAR, NULL, NULL);
-				node->offset = created->offset;
-				node->type = created->type;
+				node->kind = ND_LVAR;
 				node = create_assign(env, node, expr(env), env->token);
 			}
 		}
