@@ -1,7 +1,7 @@
 NAME=prpr
 TEST_SCRIPT=test.sh
 
-CC=gcc
+CC=gcc -fsanitize=address -fno-omit-frame-pointer
 CFLAGS=-std=c11 -g -static -Wall -Werror -Wextra
 
 SRCS=${wildcard *.c}
