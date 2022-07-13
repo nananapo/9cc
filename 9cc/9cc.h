@@ -369,6 +369,7 @@ StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
 int	max_type_size(Type *type);
 char	*get_type_name(Type *type);
 bool	type_can_cast(Type *from, Type *to, bool is_explicit);
+Type	*type_array_to_ptr(Type *type);
 
 char	*get_str_literal_name(int index);
 

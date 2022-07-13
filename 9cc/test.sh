@@ -537,6 +537,7 @@ assert_gcc "arg9.c"
 
 assert_gcc "varg.c"
 assert_gcc "varg2.c"
+assert_gcc "varg3.c"
 
 assert_gcc "str1.c"
 

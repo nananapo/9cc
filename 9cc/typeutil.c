@@ -284,3 +284,10 @@ char	*get_type_name(Type *type)
 	typename_loop(type, ret);
 	return ret;
 }
+
+Type	*type_array_to_ptr(Type *type)
+{
+	if (type->ty != ARRAY)
+		return (type);
+	return (new_type_ptr_to(type->ptr_to));
+}

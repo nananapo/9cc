@@ -71,8 +71,6 @@ LVar	*copy_lvar(LVar *f)
 	return (lvar);
 }
 
-bool	is_va_list(Type *type);
-
 void	alloc_argument_simu(LVar *first, LVar *lvar)
 {
 	int		size;
@@ -89,6 +87,7 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 	{
 		if (!tmp->is_arg)
 			continue ;
+
 		regindex_max = max(regindex_max, tmp->arg_regindex);
 		if (tmp->arg_regindex == -1)
 		{
@@ -97,10 +96,7 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 		offset_max = max(offset_max, max(0, tmp->offset));
 	}
 
-	size = type_size(lvar->type);
-	// TODO va_Listを特別扱い
-	if (is_va_list(lvar->type))
-		size = 8;
+	size = type_size(type_array_to_ptr(lvar->type)); // 配列はポインタにする
 
 	// レジスタに入れるか決定する
 	if (regindex_max < ARGREG_SIZE - 1

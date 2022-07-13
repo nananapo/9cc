@@ -253,6 +253,7 @@ Node *call(Env *env, Token *tok)
 				error_at(env->token->str, "トークンが,ではありません");
 			
 			readarg = expr(env);
+			readarg->type = readarg->type; // 配列からポインタにする
 			readarg->next = NULL;
 			if (args == NULL)
 				args = readarg;
@@ -290,6 +291,7 @@ Node *call(Env *env, Token *tok)
 	LVar	*def;
 	LVar	*lastdef;
 	LVar	*firstdef;
+	LVar	*lvtmp;
 	int		i;
 	int		j;
 
@@ -338,6 +340,8 @@ Node *call(Env *env, Token *tok)
 
 			alloc_argument_simu(firstdef, def); 
 
+			printf("#ASSIGNED %d\n", def->arg_regindex);
+
 			lastdef->next = def;
 		}
 
@@ -358,7 +362,11 @@ Node *call(Env *env, Token *tok)
 		// 進める
 		lastdef = def;
 		if (def->next != NULL)
-			def = copy_lvar(def->next);
+		{
+			lvtmp = copy_lvar(def->next);
+			def->next = lvtmp;
+			def = lvtmp;
+		}
 		else
 			def = NULL;
 		args = args->next;
@@ -1611,6 +1619,8 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 			create_local_var(env, arg->str, arg->len, type, true);
 			// arrayを読む
 			expect_type_after(env, &type);
+
+			type = type_array_to_ptr(type); // 配列からポインタにする
 
 			// TODO Voidチェックは違うパスでやりたい....
 			if (!is_declarable_type(type))
