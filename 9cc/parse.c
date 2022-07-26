@@ -55,6 +55,7 @@ Node	*expect_constant(Env *env, Type *type);
 Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static);
 Node	*read_struct_block(Env *env, Token *ident);
 Node	*read_enum_block(Env *env, Token *ident);
+Node	*read_union_block(Env *env, Token *ident);
 Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static);
 Node	*read_typedef(Env *env);
 Node	*filescope(Env *env);
@@ -64,6 +65,12 @@ Env		*parse(Token *tok);
 int		switchCaseCount = 0;
 Stack	*sbstack;
 
+static int max(int a, int b)
+{
+	if (a < b)
+		return (b);
+	return (a);
+}
 
 Node	*get_function_by_name(Env *env, char *name, int len)
 {
@@ -528,24 +535,28 @@ Node *primary(Env *env)
 
 Node	*arrow_loop(Env *env, Node *node)
 {
-	Token				*ident;
-	StructMemberElem	*elem;
+	Token		*ident;
+	MemberElem	*elem;
+	Type		*type;
 
 	if (consume(env, "->"))
 	{
-		if (!is_pointer_type(node->type) || node->type->ptr_to->ty != STRUCT)
-			error_at(env->token->str, "struct*ではありません");
+		type = node->type;
+
+		if (!can_use_arrow(type))
+			error_at(env->token->str, "%sに->を適用できません", get_type_name(type));
 		
 		ident = consume_ident(env);
 
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です\n (arrow_loop)");
-		elem = struct_get_member(node->type->ptr_to->strct, ident->str, ident->len);
+
+		elem = get_member_by_name(type->ptr_to, ident->str, ident->len);
 		if (elem == NULL)
 			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
 		
-		node = new_node(ND_STRUCT_PTR_VALUE, node, NULL);
-		node->struct_elem = elem;
+		node = new_node(ND_MEMBER_PTR_VALUE, node, NULL);
+		node->elem = elem;
 		node->type = elem->type;
 
 		node = read_deref_index(env, node);
@@ -554,18 +565,21 @@ Node	*arrow_loop(Env *env, Node *node)
 	}
 	else if (consume(env, "."))
 	{
-		if (node->type->ty != STRUCT)
-			error_at(env->token->str, "structではありません");
+		type = node->type;
+
+		if (!can_use_dot(type))
+			error_at(env->token->str, "%sに.を適用できません", get_type_name(type));
 
 		ident = consume_ident(env);
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です\n (arrow_loop)");
-		elem = struct_get_member(node->type->strct, ident->str, ident->len);
+
+		elem = get_member_by_name(type, ident->str, ident->len);
 		if (elem == NULL)
 			error_at(env->token->str, "識別子が存在しません", strndup(ident->str, ident->len));
 
-		node = new_node(ND_STRUCT_VALUE, node, NULL);
-		node->struct_elem = elem;
+		node = new_node(ND_MEMBER_VALUE, node, NULL);
+		node->elem = elem;
 		node->type = elem->type;
 
 		node = read_deref_index(env, node);
@@ -621,8 +635,8 @@ Node *unary(Env *env)
 		// 変数と構造体、ND_DEREFに対する&
 		if (node->lhs->kind != ND_LVAR
 		&& node->lhs->kind != ND_LVAR_GLOBAL
-		&& node->lhs->kind != ND_STRUCT_VALUE
-		&& node->lhs->kind != ND_STRUCT_PTR_VALUE
+		&& node->lhs->kind != ND_MEMBER_VALUE
+		&& node->lhs->kind != ND_MEMBER_PTR_VALUE
 		&& node->lhs->kind != ND_DEREF) // TODO 文字列リテラルは？
 			error_at(env->token->str, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
 
@@ -1304,6 +1318,24 @@ Node	*stmt(Env *env)
 			type = new_enum_type(env, ident->str, ident->len);
 			consume_type_ptr(env, &type);
 		}
+		// unionの可能性
+		else if (consume_with_type(env, TK_UNION))
+		{
+			ident = consume_ident(env);
+			if (ident == NULL)
+				error_at(env->token->str, "unionの識別子が必要です");
+
+			if (consume(env, "{"))
+			{
+				node = read_union_block(env, ident);
+				// ;ならunionの宣言
+				// そうでないなら型宣言
+				if (consume(env, ";"))
+					return (node);
+			}
+			type = new_union_type(env, ident->str, ident->len);
+			consume_type_ptr(env, &type);
+		}
 		else
 			type = consume_type_before(env, false);
 
@@ -1437,21 +1469,22 @@ Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_sta
 // {以降を読む
 Node	*read_struct_block(Env *env, Token *ident)
 {
-	Type				*type;
-	StructDef			*def;
-	StructMemberElem	*tmp;
-	int					i;
-	int					typesize;
-	int					maxsize;
-
-	for (i = 0; env->struct_defs[i]; i++)
-		continue ;
+	Type		*type;
+	StructDef	*def;
+	MemberElem	*tmp;
+	int			typesize;
+	int			maxsize;
+	int			i;
 
 	def = calloc(1, sizeof(StructDef));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->mem_size = -1;
 	def->members = NULL;
+
+	// 保存
+	for (i = 0; env->struct_defs[i]; i++)
+		continue ;
 	env->struct_defs[i] = def;
 
 	printf("# READ STRUCT %s\n", strndup(ident->str, ident->len));
@@ -1471,7 +1504,7 @@ Node	*read_struct_block(Env *env, Token *ident)
 		if (!consume(env, ";"))
 			error_at(env->token->str, ";が必要です");
 
-		tmp = calloc(1, sizeof(StructMemberElem));
+		tmp = calloc(1, sizeof(MemberElem));
 		tmp->name = ident->str;
 		tmp->name_len = ident->len;
 		tmp->type = type;
@@ -1533,13 +1566,14 @@ Node	*read_enum_block(Env *env, Token *ident)
 	int		i;
 	EnumDef	*def;
 
-	for (i = 0; env->enum_defs[i]; i++)
-		continue ;
-
 	def = calloc(1, sizeof(EnumDef));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->kind_len = 0;
+
+	// 保存
+	for (i = 0; env->enum_defs[i]; i++)
+		continue ;
 	env->enum_defs[i] = def;
 
 	printf("# READ ENUM %s\n", strndup(ident->str, ident->len));
@@ -1562,6 +1596,65 @@ Node	*read_enum_block(Env *env, Token *ident)
 	}
 	return (new_node(ND_ENUM_DEF, NULL, NULL));
 }
+
+// {以降を読む
+Node	*read_union_block(Env *env, Token *ident)
+{
+	UnionDef	*def;
+	MemberElem	*tmp;
+	Type		*type;
+	int			i;
+	int			typesize;
+
+	def = calloc(1, sizeof(UnionDef));
+	def->name = ident->str;
+	def->name_len = ident->len;
+	def->mem_size = 0;
+	def->members = NULL;
+
+	// 保存
+	for (i = 0; env->union_defs[i]; i++)
+		continue ;
+	env->union_defs[i] = def;
+
+	printf("# READ UNION %s\n", strndup(ident->str, ident->len));
+
+	// 要素を追加 & 最大のサイズを取得
+	while (1)
+	{
+		if (consume(env, "}"))
+			break;
+
+		type = consume_type_before(env, true);
+		if (type == NULL)
+			error_at(env->token->str, "型宣言が必要です\n (read_union_block)");
+		ident = consume_ident(env);
+		if (ident == NULL)
+			error_at(env->token->str, "識別子が必要です\n (read_union_block)");
+		expect_type_after(env, &type);
+		if (!consume(env, ";"))
+			error_at(env->token->str, ";が必要です");
+
+		tmp = calloc(1, sizeof(MemberElem));
+		tmp->name = ident->str;
+		tmp->name_len = ident->len;
+		tmp->type = type;
+		tmp->next = def->members;
+		tmp->offset = 0;
+
+		// 型のサイズを取得
+		typesize = type_size(type);
+		if (typesize == -1)
+			error_at(ident->str, "型のサイズが確定していません");
+		def->mem_size = max(def->mem_size, typesize);
+
+		def->members = tmp;
+	}
+
+	printf("#  MEMSIZE = %d\n", def->mem_size);
+	return (new_node(ND_UNION_DEF, NULL, NULL));
+}
+
 
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
@@ -1770,6 +1863,24 @@ Node	*filescope(Env *env)
 				return (node);
 		}
 		type = new_enum_type(env, ident->str, ident->len);
+		consume_type_ptr(env, &type);
+	}
+	// unionの宣言か返り値がunionか
+	else if (consume_with_type(env, TK_UNION))
+	{
+		ident = consume_ident(env);
+		if (ident == NULL)
+			error_at(env->token->str, "識別子が必要です");
+			
+		if (consume(env, "{"))
+		{
+			node = read_union_block(env, ident);
+			// ;ならunionの宣言
+			// そうでないなら返り値かグローバル変数
+			if (consume(env, ";"))
+				return (node);
+		}
+		type = new_union_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &type);
 	}
 	else

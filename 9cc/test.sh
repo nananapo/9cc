@@ -705,4 +705,9 @@ assert_gcc "global6.c"
 assert_gcc "global7.c"
 assert_gcc "global8.c"
 
+assert_gcc "union1.c"
+assert_gcc "union2.c"
+assert_gcc "union3.c"
+assert_gcc "union4.c"
+
 echo OK

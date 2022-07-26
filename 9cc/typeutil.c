@@ -73,6 +73,26 @@ Type	*new_struct_type(ParseResult *env, char *name, int len)
 	return (type);
 }
 
+Type	*new_union_type(ParseResult *env, char *name, int len)
+{
+	Type	*type;
+	int		i;
+
+	type = new_primitive_type(UNION);
+	for (i = 0; env->union_defs[i]; i++)
+	{
+		if (env->union_defs[i]->name_len == len
+		&& strncmp(env->union_defs[i]->name, name, len) == 0)
+		{
+			type->unon = env->union_defs[i];
+			break ;
+		}
+	}
+	if (type->unon == NULL)
+		return (NULL);
+	return (type);
+}
+
 // 2つのTypeが一致するかどうか
 bool	type_equal(Type *t1, Type *t2)
 {
@@ -89,6 +109,8 @@ bool	type_equal(Type *t1, Type *t2)
 		return type_equal(t1->ptr_to, t2->ptr_to);
 	if (t1->ty == STRUCT)
 		return (t1->strct == t2->strct);
+	if (t2->ty == UNION)
+		return (t1->unon == t2->unon);
 	if (t1->ty == ENUM)
 		return (t1->enm == t2->enm);
 	return true;
@@ -111,6 +133,8 @@ int	type_size(Type *type)
 		return (type->strct->mem_size);
 	if (type->ty == ENUM)
 		return (4);
+	if (type->ty == UNION)
+		return (type->unon->mem_size);
 	if (type->ty == VOID)
 		return (1);
 	return -1;
@@ -165,9 +189,9 @@ bool	can_compared(Type *l, Type *r, Type **lt, Type **rt)
 	return (false);
 }
 
-StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
+MemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 {
-	StructMemberElem	*mem;
+	MemberElem	*mem;
 
 	if (strct == NULL)
 		return (NULL);
@@ -179,9 +203,34 @@ StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 	return (NULL);
 }
 
+// struct_get_memberのunion版
+MemberElem	*union_get_member(UnionDef *strct, char *name, int len)
+{
+	MemberElem	*mem;
+
+	if (strct == NULL)
+		return (NULL);
+	for (mem = strct->members; mem != NULL; mem = mem->next)
+	{
+		if (mem->name_len == len && strncmp(name, mem->name, len) == 0)
+			return (mem);
+	}
+	return (NULL);
+}
+
+// structかunionの時にstruct_get_memberかunion_get_memberを呼ぶ
+MemberElem	*get_member_by_name(Type *type, char *name, int len)
+{
+	if (type->ty == STRUCT)
+		return (struct_get_member(type->strct, name, len));
+	if (type->ty == UNION)
+		return (union_get_member(type->unon, name, len));
+	return (NULL);
+}
+
 int	max_type_size(Type *type)
 {
-	StructMemberElem	*tmp;
+	MemberElem	*tmp;
 	int					size;
 
 	if (type->ty == STRUCT)
@@ -214,6 +263,8 @@ static void	typename_loop(Type *type, char *str)
 		strcat(str, "struct"); // TODO struct name
 	else if (type->ty == ENUM)
 		strcat(str, "enum");
+	else if (type->ty == UNION)
+		strcat(str, "union");
 	else if (type->ty == ARRAY)
 	{
 		typename_loop(type->ptr_to, str);
@@ -247,6 +298,10 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 
 	// structはダメ
 	if (from->ty == STRUCT || to->ty == STRUCT)
+		return (false);
+
+	// unionもダメ
+	if (from->ty == UNION || to->ty == UNION)
 		return (false);
 
 	// どちらもポインタ
@@ -290,4 +345,14 @@ Type	*type_array_to_ptr(Type *type)
 	if (type->ty != ARRAY)
 		return (type);
 	return (new_type_ptr_to(type->ptr_to));
+}
+
+bool	can_use_arrow(Type *type)
+{
+	return (is_pointer_type(type) && can_use_dot(type->ptr_to));
+}
+
+bool	can_use_dot(Type *type)
+{
+	return (type->ty == STRUCT || type->ty == UNION);
 }

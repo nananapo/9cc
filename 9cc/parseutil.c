@@ -6,6 +6,7 @@
 
 Node	*read_struct_block(Env *env, Token *ident);
 Node	*read_enum_block(Env *env, Token *ident);
+Node	*read_union_block(Env *env, Token *ident);
 
 bool	consume(Env *env, char *op)
 {
@@ -139,6 +140,18 @@ Type	*consume_type_before(Env *env, bool read_def)
 			read_enum_block(env, ident);
 
 		type = new_enum_type(env, ident->str, ident->len);
+		if (type == NULL)
+			return (NULL);
+	}
+	else if (consume_with_type(env, TK_UNION))
+	{
+		ident = consume_ident(env);
+		if (ident == NULL)
+			return (NULL);
+		if (read_def && consume(env, "{"))
+			read_union_block(env, ident);
+
+		type = new_union_type(env, ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
 	}

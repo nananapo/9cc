@@ -280,7 +280,7 @@ static void	load(Type *type)
 	{
 		return ;
 	}
-	else if (type->ty == STRUCT)
+	else if (type->ty == STRUCT || type->ty == UNION)
 	{
 		// TODO とりあえず8byteまで
 		// mov(RAX, "[rax]");
@@ -482,10 +482,11 @@ static void	call(Node *node)
 				(tmp->locals->offset + 16) + rbp_offset);
 
 		// ptr先を渡すのはSTRUCTだけ
-		if (tmp->type->ty != STRUCT)
-			store_value(size);
-		else
+		if (tmp->type->ty == STRUCT
+			|| tmp->type->ty == UNION)
 			store_ptr(size, false);
+		else
+			store_value(size);
 	}
 
 	// rspを移動する
@@ -626,6 +627,7 @@ static void	primary(Node *node)
 			break;
 		case ND_STRUCT_DEF:
 		case ND_ENUM_DEF:
+		case ND_UNION_DEF:
 			return;
 		default:
 			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
@@ -639,8 +641,8 @@ static void	arrow(Node *node, bool as_addr)
 
 	switch (node->kind)
 	{
-		case ND_STRUCT_VALUE:
-		case ND_STRUCT_PTR_VALUE:
+		case ND_MEMBER_VALUE:
+		case ND_MEMBER_PTR_VALUE:
 			break;
 		default:
 			return primary(node);
@@ -649,19 +651,19 @@ static void	arrow(Node *node, bool as_addr)
 	//printf("#ARROW %d->%d\n", node->kind, node->lhs->kind);
 
 	// arrowかその他の可能性がある
-	if (node->lhs->kind == ND_STRUCT_VALUE
-	|| node->lhs->kind == ND_STRUCT_PTR_VALUE)
-		arrow(node->lhs, node->kind == ND_STRUCT_VALUE);
+	if (node->lhs->kind == ND_MEMBER_VALUE
+	|| node->lhs->kind == ND_MEMBER_PTR_VALUE)
+		arrow(node->lhs, node->kind == ND_MEMBER_VALUE);
 	else
 		expr(node->lhs);
 
 	// offsetを足す
-	offset = node->struct_elem->offset;
+	offset = node->elem->offset;
 	printf("    add rax, %d # offset\n", offset);
 
 	// 値として欲しいなら値にする
 	if (!as_addr)
-		load(node->struct_elem->type);
+		load(node->elem->type);
 }
 
 static void unary(Node *node)
@@ -686,9 +688,9 @@ static void unary(Node *node)
 				case ND_LVAR_GLOBAL:
 					lval(node->lhs);
 					break ;
-				// 構造体からのアクセスなら、アドレスなのでそのまま返す
-				case ND_STRUCT_VALUE:
-				case ND_STRUCT_PTR_VALUE:
+				// 構造体, unionからのアクセスなら、アドレスなのでそのまま返す
+				case ND_MEMBER_VALUE:
+				case ND_MEMBER_PTR_VALUE:
 					arrow(node->lhs, true);
 					break ;
 				// ND_DEREFならアドレスで止める
@@ -966,9 +968,9 @@ static void	load_lval_addr(Node *node)
 		lval(node);
 	else if (node->kind == ND_DEREF)
 		expr(node->lhs);// ここもDEREFと同じようにやってる！！！！！
-	else if (node->kind == ND_STRUCT_VALUE)
+	else if (node->kind == ND_MEMBER_VALUE)
 		arrow(node, true);
-	else if (node->kind == ND_STRUCT_PTR_VALUE)
+	else if (node->kind == ND_MEMBER_PTR_VALUE)
 		arrow(node, true);
 	else
 		error("左辺値が識別子かアドレスではありません");
@@ -1068,7 +1070,8 @@ static void	assign(Node *node)
 		// TODO これOKなの？
 		// ARRAYに対する代入がうまくいかない気がする
 		store_value(8);
-	else if(node->type->ty == STRUCT)
+	else if(node->type->ty == STRUCT
+			|| node->type->ty == UNION)
 		store_ptr(type_size(node->type), false);
 	else
 		store_value(type_size(node->type));
@@ -1444,6 +1447,7 @@ void	gen(Node *node)
 	if (node->kind == ND_PROTOTYPE
 	|| node->kind == ND_DEFVAR
 	|| node->kind == ND_STRUCT_DEF
+	|| node->kind == ND_UNION_DEF
 	|| node->kind == ND_TYPEDEF
 	|| node->kind == ND_ENUM_DEF)
 		return;

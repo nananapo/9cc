@@ -154,6 +154,13 @@ Token	*tokenize(char *p)
 			p += 6;
 			continue ;
 		}
+		if (match_word(p, "union"))
+		{
+			cur = new_token(TK_UNION, cur, p);
+			cur->len = 5;
+			p += 5;
+			continue ;
+		}
 		if (match_word(p, "break"))
 		{
 			cur = new_token(TK_BREAK, cur, p);

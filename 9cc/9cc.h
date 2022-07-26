@@ -66,6 +66,8 @@ typedef enum TokenKind
 
 	TK_STRUCT,
 	TK_ENUM,
+	TK_UNION,
+
 	TK_STATIC,
 	TK_TYPEDEF,
 	TK_EXTERN
@@ -130,9 +132,11 @@ typedef enum NodeKind
 	ND_STR_LITERAL,
 
 	ND_STRUCT_DEF,
-	ND_STRUCT_VALUE,
-	ND_STRUCT_PTR_VALUE,
+	ND_UNION_DEF,
 	ND_ENUM_DEF,
+
+	ND_MEMBER_VALUE, // .
+	ND_MEMBER_PTR_VALUE, // ->
 
 	ND_CAST,
 	ND_PARENTHESES,
@@ -149,6 +153,7 @@ typedef enum PrimitiveType
 	ARRAY,
 	STRUCT,
 	ENUM,
+	UNION,
 	BOOL,
 	VOID
 } PrimitiveType;
@@ -177,21 +182,31 @@ typedef struct Type
 		char				*name;
 		int					name_len;
 		int					mem_size; // -1ならまだ定義されていない
-		struct s_struct_members
+		struct s_members
 		{
-			struct Type				*type;
-			char					*name;
-			int						name_len;
-			int						offset;
-			struct s_struct_members	*next;
+			struct Type			*type;
+			char				*name;
+			int					name_len;
+			int					offset;
+			struct s_members	*next;
 		} *members;
 	}	*strct;
 
 	EnumDef			*enm;
+
+	struct s_union_definition
+	{
+		char				*name;
+		int					name_len;
+		int					mem_size;
+		struct s_members	*members;
+	}	*unon;
 } Type;
 
-typedef struct s_struct_members		StructMemberElem;
 typedef struct s_struct_definition	StructDef;
+typedef struct s_members			MemberElem;
+
+typedef struct s_union_definition	UnionDef;
 
 typedef struct	s_switchcase
 {
@@ -285,7 +300,7 @@ typedef struct Node
 	// general
 	struct Node	*next;
 
-	StructMemberElem	*struct_elem;
+	MemberElem	*elem;
 	bool		is_struct_address;
 
 	// valとlabelでswicth-case
@@ -320,6 +335,7 @@ typedef struct s_parseresult
 	t_str_elem		*str_literals;
 	StructDef		*struct_defs[1000];
 	EnumDef			*enum_defs[1000];
+	UnionDef		*union_defs[1000];
 	LVar			*locals;
 
 
@@ -358,18 +374,20 @@ Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
 Type	*new_struct_type(ParseResult *env, char *name, int len);
 Type	*new_enum_type(ParseResult *env, char *name, int len);
+Type	*new_union_type(ParseResult *env, char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
 bool	can_compared(Type *l, Type *r, Type **lt, Type **rt);
 bool	type_equal(Type *t1, Type *t2);
 char	*type_regname(Type *type);
-StructMemberElem	*struct_get_member(StructDef *strct, char *name, int len);
-//void	determine_struct_size(StructDef **ptr);
-int	max_type_size(Type *type);
+MemberElem	*get_member_by_name(Type *type, char *name, int len);
+int		max_type_size(Type *type);
 char	*get_type_name(Type *type);
 bool	type_can_cast(Type *from, Type *to, bool is_explicit);
 Type	*type_array_to_ptr(Type *type);
+bool	can_use_arrow(Type *type);
+bool	can_use_dot(Type *type);
 
 char	*get_str_literal_name(int index);
 
