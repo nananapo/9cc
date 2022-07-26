@@ -179,7 +179,11 @@ static void	include(Node *node)
 	}
 	else
 	{
-		load(file_name);
+		str[0] = '\0';
+		strcat(str, currentdir);
+		strcat(str, "/");
+		strcat(str, file_name);
+		load(str);
 	}
 }
 
