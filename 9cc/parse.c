@@ -668,6 +668,15 @@ Node *unary(Env *env)
 		node->type = new_primitive_type(INT);
 		return (node);
 	}
+	else if (consume(env, "~"))
+	{
+		node = new_node(ND_BITWISE_NOT, unary(env), NULL);
+		node->type = node->lhs->type;
+
+		if (!is_integer_type(node->lhs->type))
+			error_at(env->token->str, "整数ではない型に~を適用できません");
+		return (node);
+	}
 	else if (consume_with_type(env, TK_SIZEOF))
 	{
 		// とりあえずsizeof (型)を読めるように

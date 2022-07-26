@@ -670,16 +670,6 @@ static void unary(Node *node)
 	switch (node->kind)
 	{
 		case ND_ADDR:
-		case ND_DEREF:
-			break ;
-		default:
-			arrow(node, false);
-			return ;
-	}
-
-	switch(node->kind)
-	{
-		case ND_ADDR:
 			switch(node->lhs->kind)
 			{
 				// 変数ならアドレスを取り出す
@@ -700,13 +690,18 @@ static void unary(Node *node)
 					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
 					break ;
 			}
-			break ;
+			break;
 		case ND_DEREF:
 			stmt(node->lhs);// ここと同じ
 			load(node->type);
 			break ;
-		default:
+		case ND_BITWISE_NOT:
+			stmt(node->lhs);
+			printf("    xor %s, -1\n", RAX);
 			break ;
+		default:
+			arrow(node, false);
+			return ;
 	}
 }
 
