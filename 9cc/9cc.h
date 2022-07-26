@@ -32,9 +32,10 @@
 # define AL "al"
 # define DIL "dil"
 # define SIL "sil"
+# define CL "cl"
 # define R11B "r11b"
 
-# define BYTE_PTR "byte ptr"
+#define BYTE_PTR "byte ptr"
 # define WORD_PTR "word ptr"
 # define DWORD_PTR "dword ptr"
 
@@ -111,6 +112,9 @@ typedef enum NodeKind
 	ND_ASSIGN,
 
 	ND_LVAR,
+
+	ND_SHIFT_LEFT,
+	ND_SHIFT_RIGHT,
 
 	ND_BITWISE_OR,
 	ND_COND_AND,

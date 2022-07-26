@@ -713,4 +713,6 @@ assert_gcc "union4.c"
 assert_gcc "condop.c"
 
 assert_gcc "bitwise_or.c"
+
+assert_gcc "shift.c"
 echo OK

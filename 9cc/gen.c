@@ -901,7 +901,9 @@ static void	conditional(Node *node)
 
 	if (node->kind != ND_COND_AND
 		&& node->kind != ND_COND_OR
-		&& node->kind != ND_BITWISE_OR)
+		&& node->kind != ND_BITWISE_OR
+		&& node->kind != ND_SHIFT_LEFT
+		&& node->kind != ND_SHIFT_RIGHT)
 	{
 		equality(node);
 		return ;
@@ -967,6 +969,26 @@ static void	conditional(Node *node)
 		pop(RDI);
 
 		printf("    or %s, %s\n", RAX, RDI);
+	}
+	else if (node->kind == ND_SHIFT_RIGHT)
+	{
+		stmt(node->rhs);
+		push();
+		stmt(node->lhs);
+		pop(RDI);
+		mov(CL, DIL);
+
+		printf("    shr %s, %s\n", RAX, CL);
+	}
+	else if (node->kind == ND_SHIFT_LEFT)
+	{
+		stmt(node->rhs);
+		push();
+		stmt(node->lhs);
+		pop(RDI);
+		mov(CL, DIL);
+
+		printf("    shl %s, %s\n", RAX, CL);
 	}
 }
 

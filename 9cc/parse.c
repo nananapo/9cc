@@ -36,6 +36,7 @@ Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok);
 Node	*mul(Env *env);
 Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 Node	*add(Env *env);
+Node	*shift(Env *env);
 Node	*relational(Env *env);
 Node	*equality(Env *env);
 Node	*bitwise_or(Env *env);
@@ -813,9 +814,9 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 	return (NULL);
 }
 
-Node *add(Env *env)
+Node	*add(Env *env)
 {
-	Node *node;
+	Node	*node;
 
 	node = mul(env);
 	for (;;)
@@ -829,23 +830,54 @@ Node *add(Env *env)
 	}
 }
 
-Node *relational(Env *env)
+// TODO 型チェック
+Node	*shift(Env *env)
+{
+	Node	*node;
+
+	node = add(env);
+	if (consume(env, "<<"))
+	{
+		node = new_node(ND_SHIFT_LEFT, node, shift(env));
+		
+		if (!is_integer_type(node->lhs->type)
+			|| !is_integer_type(node->rhs->type))
+			error_at(env->token->str, "整数型ではない型にシフト演算子を適用できません");
+
+		// 左辺の型にする
+		node->type = node->lhs->type;
+	}
+	else if (consume(env, ">>"))
+	{
+		node = new_node(ND_SHIFT_RIGHT, node, shift(env));
+		
+		if (!is_integer_type(node->lhs->type)
+			|| !is_integer_type(node->rhs->type))
+			error_at(env->token->str, "整数型ではない型にシフト演算子を適用できません");
+
+		// 左辺の型にする
+		node->type = node->lhs->type;
+	}
+	return (node);
+}
+
+Node	*relational(Env *env)
 {
 	Node	*node;
 	Type	*l_to;
 	Type	*r_to;
 
-	node = add(env);
+	node = shift(env);
 	for (;;)
 	{
 		if (consume(env, "<"))
-			node = new_node(ND_LESS, node, add(env));
+			node = new_node(ND_LESS, node, shift(env));
 		else if (consume(env, "<="))
-			node = new_node(ND_LESSEQ, node, add(env));
+			node = new_node(ND_LESSEQ, node, shift(env));
 		else if (consume(env, ">"))
-			node = new_node(ND_LESS, add(env), node);
+			node = new_node(ND_LESS, shift(env), node);
 		else if (consume(env, ">="))
-			node = new_node(ND_LESSEQ, add(env), node);
+			node = new_node(ND_LESSEQ, shift(env), node);
 		else
 			return node;
 
@@ -903,7 +935,6 @@ Node	*bitwise_or(Env *env)
 	{
 		node = new_node(ND_BITWISE_OR, node, bitwise_or(env));
 
-		// TODO 整数以外もできるように
 		if (!is_integer_type(node->lhs->type)
 			|| !is_integer_type(node->rhs->type))
 			error_at(env->token->str, "整数型ではない型に|を適用できません");
