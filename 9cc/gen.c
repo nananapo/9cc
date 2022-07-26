@@ -38,7 +38,6 @@ static void	equality(Node *node);
 static void	conditional(Node *node);
 static void	load_lval_addr(Node *node);
 static void	assign(Node *node);
-static void	expr(Node *node);
 static void	stmt(Node *node);
 static void	funcdef(Node *node);
 static void	print_global_constant(Node *node, Type *type);
@@ -384,7 +383,7 @@ static void	call(Node *node)
 			strndup(tmp->locals->name, tmp->locals->len),
 			size);
 
-		expr(tmp);
+		stmt(tmp);
 
 		// TODO long doubleで動かなくなります....
 		if (tmp->locals->arg_regindex != -1)
@@ -598,7 +597,7 @@ static void	primary(Node *node)
 	switch (node->kind)
 	{
 		case ND_CAST:
-			expr(node->lhs);
+			stmt(node->lhs);
 			cast(node->lhs->type, node->type);
 			return;
 		case ND_LVAR:
@@ -623,7 +622,7 @@ static void	primary(Node *node)
 		case ND_DEFVAR:
 			return;
 		case ND_PARENTHESES:
-			expr(node->lhs);
+			stmt(node->lhs);
 			break;
 		case ND_STRUCT_DEF:
 		case ND_ENUM_DEF:
@@ -655,7 +654,7 @@ static void	arrow(Node *node, bool as_addr)
 	|| node->lhs->kind == ND_MEMBER_PTR_VALUE)
 		arrow(node->lhs, node->kind == ND_MEMBER_VALUE);
 	else
-		expr(node->lhs);
+		stmt(node->lhs);
 
 	// offsetを足す
 	offset = node->elem->offset;
@@ -695,7 +694,7 @@ static void unary(Node *node)
 					break ;
 				// ND_DEREFならアドレスで止める
 				case ND_DEREF:
-					expr(node->lhs->lhs);//ここ！！　↓
+					stmt(node->lhs->lhs);//ここ！！　↓
 					break ;
 				default:
 					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
@@ -703,7 +702,7 @@ static void unary(Node *node)
 			}
 			break ;
 		case ND_DEREF:
-			expr(node->lhs);// ここと同じ
+			stmt(node->lhs);// ここと同じ
 			load(node->type);
 			break ;
 		default:
@@ -724,9 +723,9 @@ static void	mul(Node *node)
 			return;
 	}
 
-	expr(node->rhs);
+	stmt(node->rhs);
 	push();
-	expr(node->lhs);
+	stmt(node->lhs);
 	pop("rdi");
 
 // TODO 型に対応
@@ -828,9 +827,9 @@ static void	add(Node *node)
 
 	add_check_pointer(node->type, &node->lhs, &node->rhs, true);
 
-	expr(node->rhs);
+	stmt(node->rhs);
 	push();
-	expr(node->lhs);
+	stmt(node->lhs);
 	pop("rdi");
 
 	create_add(node->kind == ND_ADD, node->lhs->type, node->rhs->type);
@@ -844,9 +843,9 @@ static void	relational(Node *node)
 		return ;
 	}
 
-	expr(node->rhs);
+	stmt(node->rhs);
 	push();
-	expr(node->lhs);
+	stmt(node->lhs);
 	pop("rdi");
 
 	switch (node->kind)
@@ -874,9 +873,9 @@ static void	equality(Node *node)
 		return ;
 	}
 
-	expr(node->rhs);
+	stmt(node->rhs);
 	push();
-	expr(node->lhs);
+	stmt(node->lhs);
 	pop("rdi");
 
 	switch (node->kind)
@@ -967,7 +966,7 @@ static void	load_lval_addr(Node *node)
 	else if (node->kind == ND_LVAR_GLOBAL)
 		lval(node);
 	else if (node->kind == ND_DEREF)
-		expr(node->lhs);// ここもDEREFと同じようにやってる！！！！！
+		stmt(node->lhs);// ここもDEREFと同じようにやってる！！！！！
 	else if (node->kind == ND_MEMBER_VALUE)
 		arrow(node, true);
 	else if (node->kind == ND_MEMBER_PTR_VALUE)
@@ -1000,14 +999,14 @@ static void	assign(Node *node)
 	switch (node->kind)
 	{
 		case ND_ASSIGN:
-			expr(node->rhs);
+			stmt(node->rhs);
 			break ;
 		case ND_COMP_ADD:
 			push();
 
 			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
 
-			expr(node->rhs);
+			stmt(node->rhs);
 			pop(RDI);
 
 			if (node->type->ty == ARRAY)
@@ -1019,7 +1018,7 @@ static void	assign(Node *node)
 			push();
 			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
 
-			expr(node->rhs);
+			stmt(node->rhs);
 			mov(RDI, RAX);
 			pop(RAX);
 			if (node->type->ty == ARRAY)
@@ -1032,7 +1031,7 @@ static void	assign(Node *node)
 			break ;
 		case ND_COMP_MUL:
 			push();
-			expr(node->rhs);
+			stmt(node->rhs);
 			mov(RDI, RAX);
 			pop(RAX);
 			// TODO 整数だけ？
@@ -1041,7 +1040,7 @@ static void	assign(Node *node)
 			break ;
 		case ND_COMP_DIV:
 			push();
-			expr(node->rhs);
+			stmt(node->rhs);
 			mov(RDI, RAX);
 			pop(RAX);
 			// TODO 整数だけ？
@@ -1051,7 +1050,7 @@ static void	assign(Node *node)
 			break ;
 		case ND_COMP_MOD:
 			push();
-			expr(node->rhs);
+			stmt(node->rhs);
 			mov(RDI, RAX);
 			pop(RAX);
 			// TODO 整数だけ？
@@ -1077,11 +1076,6 @@ static void	assign(Node *node)
 		store_value(type_size(node->type));
 }
 
-static void	expr(Node *node)
-{
-	assign(node);
-}
-
 static void stmt(Node *node)
 {
 	int		lend;
@@ -1105,7 +1099,7 @@ static void stmt(Node *node)
 		case ND_DEFAULT:
 			break;
 		default:
-			expr(node);
+			assign(node);
 			return;
 	}
 
@@ -1113,13 +1107,13 @@ static void stmt(Node *node)
 	{
 		case ND_RETURN:
 			if (node->lhs != NULL)
-				expr(node->lhs);
+				stmt(node->lhs);
 			epilogue();
 			stack_count += 8; // rbpをpopしたけれど、epilogueでもpopするので+8
 			return;
 		case ND_IF:
 			// if
-			expr(node->lhs);
+			stmt(node->lhs);
 			mov(RDI, "0");
 			cmp(node->lhs->type, new_primitive_type(INT));
 
@@ -1161,7 +1155,7 @@ static void stmt(Node *node)
 			printf(".Lbegin%d:\n", lbegin); // continue先
 			
 			// if
-			expr(node->lhs);
+			stmt(node->lhs);
 			mov(RDI, "0");
 			cmp(node->lhs->type, new_primitive_type(INT));
 			printf("    je .Lend%d\n", lend);
@@ -1193,7 +1187,7 @@ static void stmt(Node *node)
 
 			// if
 			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
-			expr(node->rhs);
+			stmt(node->rhs);
 			mov(RDI, "0");
 			cmp(node->rhs->type, new_primitive_type(INT));
 			printf("    jne .Lbegin%d\n", lbegin);
@@ -1206,14 +1200,14 @@ static void stmt(Node *node)
 			
 			// init
 			if (node->for_init != NULL)
-				expr(node->for_init);
+				stmt(node->for_init);
 
 			printf(".Lbegin%d:\n", lbegin);
 			
 			// if
 			if(node->for_if != NULL)
 			{
-				expr(node->for_if);
+				stmt(node->for_if);
 				mov(RDI, "0");
 				cmp(node->for_if->type, new_primitive_type(INT));
 				printf("    je .Lend%d\n", lend);
@@ -1228,7 +1222,7 @@ static void stmt(Node *node)
 			printf(".Lbegin%d:\n", lbegin2); // continue先
 			// next
 			if(node->for_next != NULL)
-				expr(node->for_next);
+				stmt(node->for_next);
 
 			printf("    jmp .Lbegin%d\n", lbegin);
 			
@@ -1240,7 +1234,7 @@ static void stmt(Node *node)
 			lend = jumpLabelCount++;
 
 			// 評価
-			expr(node->lhs);
+			stmt(node->lhs);
 			printf("    mov [rsp - 8], rax\n"); //結果を格納
 
 			// if

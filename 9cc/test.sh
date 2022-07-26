@@ -710,4 +710,5 @@ assert_gcc "union2.c"
 assert_gcc "union3.c"
 assert_gcc "union4.c"
 
+assert_gcc "condop.c"
 echo OK

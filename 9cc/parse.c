@@ -38,7 +38,9 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 Node	*add(Env *env);
 Node	*relational(Env *env);
 Node	*equality(Env *env);
-Node	*conditional(Env *env);
+Node	*conditional_and(Env *env);
+Node	*conditional_or(Env *env);
+Node	*conditional_op(Env *env);
 Node	*create_assign(Env *env, Node *lhs, Node *rhs, Token *tok);
 Node	*assign(Env *env);
 Node	*expr(Env *env);
@@ -891,20 +893,47 @@ Node *equality(Env *env)
 }
 
 // TODO 型チェック
-Node	*conditional(Env *env)
+Node	*conditional_and(Env *env)
 {
 	Node	*node;
 
 	node = equality(env);
 	if (consume(env, "&&"))
 	{
-		node = new_node(ND_COND_AND, node, conditional(env));
+		node = new_node(ND_COND_AND, node, conditional_op(env));
 		node->type = new_primitive_type(INT);
 	}
-	else if (consume(env, "||"))
+	return (node);
+}
+
+// TODO 型チェック
+Node	*conditional_or(Env *env)
+{
+	Node	*node;
+
+	node = conditional_and(env);
+	if (consume(env, "||"))
 	{
-		node = new_node(ND_COND_OR, node, conditional(env));
+		node = new_node(ND_COND_OR, node, conditional_op(env));
 		node->type = new_primitive_type(INT);
+	}
+	return (node);
+}
+
+Node	*conditional_op(Env *env)
+{
+	Node	*node;
+
+	node = conditional_or(env);
+	if (consume(env, "?"))
+	{
+		node = new_node(ND_IF, node, conditional_op(env));
+		if (!consume(env, ":"))
+			error_at(env->token->str, ":が必要です");
+		node->els = conditional_op(env);
+		if (!type_equal(node->rhs->type, node->els->type))
+			error_at(env->token->str, "条件演算子の型が一致しません");
+		node->type = node->rhs->type;
 	}
 	return (node);
 }
@@ -946,7 +975,7 @@ Node	*assign(Env *env)
 {
 	Node	*node;
 
-	node = conditional(env);
+	node = conditional_op(env);
 	if (consume(env, "="))
 		node = create_assign(env, node, assign(env), env->token);
 	else if (consume(env, "+="))
