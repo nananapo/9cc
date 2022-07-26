@@ -899,7 +899,9 @@ static void	conditional(Node *node)
 {
 	int	lend;
 
-	if (node->kind != ND_COND_AND && node->kind != ND_COND_OR)
+	if (node->kind != ND_COND_AND
+		&& node->kind != ND_COND_OR
+		&& node->kind != ND_BITWISE_OR)
 	{
 		equality(node);
 		return ;
@@ -956,6 +958,15 @@ static void	conditional(Node *node)
 		printf("    movzx rax, al\n"); // alをゼロ拡張
 
 		printf(".Lcond%d:\n", lend);
+	}
+	else if (node->kind == ND_BITWISE_OR)
+	{
+		stmt(node->lhs);
+		push();
+		stmt(node->rhs);
+		pop(RDI);
+
+		printf("    or %s, %s\n", RAX, RDI);
 	}
 }
 

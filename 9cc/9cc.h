@@ -112,6 +112,7 @@ typedef enum NodeKind
 
 	ND_LVAR,
 
+	ND_BITWISE_OR,
 	ND_COND_AND,
 	ND_COND_OR,
 	ND_RETURN,
