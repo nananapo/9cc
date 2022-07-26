@@ -227,6 +227,13 @@ Token	*tokenize(char *p)
 			p += 6;
 			continue ;
 		}
+		if (match_word(p, "inline"))
+		{
+			cur = new_token(TK_INLINE, cur, p);
+			cur->len = 6;
+			p += 6;
+			continue ;
+		}
 		if (can_use_beginning_of_var(*p))
 		{
 			cur = new_token(TK_IDENT, cur, p);

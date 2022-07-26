@@ -1897,6 +1897,7 @@ Node	*filescope(Env *env)
 	Token	*ident;
 	Type	*type;
 	bool	is_static;
+	bool	is_inline;
 	Node	*node;
 
 	// typedef
@@ -1921,6 +1922,13 @@ Node	*filescope(Env *env)
 	if (consume_with_type(env, TK_STATIC))
 	{
 		is_static = true;
+	}
+
+	// TODO とりあえず無視
+	is_inline = false;
+	if (consume_with_type(env, TK_INLINE))
+	{
+		is_inline = true;
 	}
 
 	// structの宣言か返り値がstructか

@@ -71,7 +71,8 @@ typedef enum TokenKind
 
 	TK_STATIC,
 	TK_TYPEDEF,
-	TK_EXTERN
+	TK_EXTERN,
+ 	TK_INLINE
 } TokenKind;
 
 typedef struct Token
