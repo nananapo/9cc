@@ -25,23 +25,13 @@ static void	load(Type *type);
 static void	lval(Node *node);
 static void	call(Node *node);
 static void	cast(Type *from, Type *to);
-static void	primary(Node *node);
 static void	arrow(Node *node, bool as_addr);
-static void	unary(Node *node);
-static void	mul(Node *node);
 static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace);
 static void	create_add(bool is_add, Type *l, Type *r);
-static void	add(Node *node);
-static void	relational(Node *node);
-static void	equality(Node *node);
-static void	conditional(Node *node);
 static void	load_lval_addr(Node *node);
-static void	assign(Node *node);
-static void	stmt(Node *node);
 static void	funcdef(Node *node);
 static void	print_global_constant(Node *node, Type *type);
 static void	globaldef(Node *node);
-static void	filescope(Node *node);
 void	gen(Node *node);
 
 extern t_str_elem	*str_literals;
@@ -375,7 +365,7 @@ static void	call(Node *node)
 			strndup(tmp->locals->name, tmp->locals->len),
 			size);
 
-		stmt(tmp);
+		gen(tmp);
 
 		if (tmp->locals->arg_regindex != -1)
 		{
@@ -606,69 +596,16 @@ static void	cast(Type *from, Type *to)
 	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
-static void	primary(Node *node)
-{
-	switch (node->kind)
-	{
-		case ND_CAST:
-			stmt(node->lhs);
-			cast(node->lhs->type, node->type);
-			return;
-		case ND_LVAR:
-			lval(node);
-			load(node->type);
-			return ;
-		case ND_LVAR_GLOBAL:
-			lval(node);
-			load(node->type);
-			return;
-		case ND_STR_LITERAL:
-			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX,
-					get_str_literal_name(node->str_index));
-			return;
-		case ND_CALL:
-			call(node);
-			return;
-		case ND_NUM:
-			movi(RAX, node->val);
-			return;
-		case ND_PROTOTYPE:
-		case ND_DEFVAR:
-			return;
-		case ND_PARENTHESES:
-			stmt(node->lhs);
-			break;
-		case ND_STRUCT_DEF:
-		case ND_ENUM_DEF:
-		case ND_UNION_DEF:
-			return;
-		default:
-			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
-			break;
-	}
-}
-
 static void	arrow(Node *node, bool as_addr)
 {
 	int offset;
-
-	switch (node->kind)
-	{
-		case ND_MEMBER_VALUE:
-		case ND_MEMBER_PTR_VALUE:
-			break;
-		default:
-			return primary(node);
-	}
-
-	//printf("#ARROW %d->%d\n", node->kind, node->lhs->kind);
 
 	// arrowかその他の可能性がある
 	if (node->lhs->kind == ND_MEMBER_VALUE
 	|| node->lhs->kind == ND_MEMBER_PTR_VALUE)
 		arrow(node->lhs, node->kind == ND_MEMBER_VALUE);
 	else
-		stmt(node->lhs);
+		gen(node->lhs);
 
 	// offsetを足す
 	offset = node->elem->offset;
@@ -679,88 +616,12 @@ static void	arrow(Node *node, bool as_addr)
 		load(node->elem->type);
 }
 
-static void unary(Node *node)
+static void	mul_prologue(Node *node)
 {
-	switch (node->kind)
-	{
-		case ND_ADDR:
-			switch(node->lhs->kind)
-			{
-				// 変数ならアドレスを取り出す
-				case ND_LVAR:
-				case ND_LVAR_GLOBAL:
-					lval(node->lhs);
-					break ;
-				// 構造体, unionからのアクセスなら、アドレスなのでそのまま返す
-				case ND_MEMBER_VALUE:
-				case ND_MEMBER_PTR_VALUE:
-					arrow(node->lhs, true);
-					break ;
-				// ND_DEREFならアドレスで止める
-				case ND_DEREF:
-					stmt(node->lhs->lhs);//ここ！！　↓
-					break ;
-				default:
-					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
-					break ;
-			}
-			break;
-		case ND_DEREF:
-			stmt(node->lhs);// ここと同じ
-			load(node->type);
-			break ;
-		case ND_BITWISE_NOT:
-			stmt(node->lhs);
-			printf("    xor %s, -1\n", RAX);
-			break ;
-		default:
-			arrow(node, false);
-			return ;
-	}
-}
-
-static void	mul(Node *node)
-{
-	switch (node->kind)
-	{
-		case ND_MUL:
-		case ND_DIV:
-		case ND_MOD:
-			break;
-		default:
-			unary(node);
-			return;
-	}
-
-	stmt(node->rhs);
+	gen(node->rhs);
 	push();
-	stmt(node->lhs);
+	gen(node->lhs);
 	pop("rdi");
-
-// TODO 型に対応
-	switch (node->kind)
-	{
-		case ND_MUL:
-			printf("    imul rax, rdi\n");	
-/*
-			if (node->type->ty == INT)
-			{
-				printf("    imul eax, edi\n");	
-			}
-*/
-			break ;
-		case ND_DIV:
-			printf("    cdq\n");
-			printf("    idiv edi\n");
-			break ;
-		case ND_MOD:
-			printf("    cdq\n"); // d -> q -> o
-			printf("    idiv edi\n");
-			mov(RAX, RDX);
-			break ;
-		default:
-			break ;
-	}
 }
 
 static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
@@ -826,179 +687,20 @@ static void	create_add(bool is_add, Type *l, Type *r)
 		printf("    sub rax, rdi\n");
 }
 
-static void	add(Node *node)
+static void	relational_prologue(Node *node)
 {
-	if (node->kind != ND_ADD && node->kind != ND_SUB)
-	{
-		mul(node);
-		return ;
-	}
-
-	add_check_pointer(node->type, &node->lhs, &node->rhs, true);
-
-	stmt(node->rhs);
+	gen(node->rhs);
 	push();
-	stmt(node->lhs);
+	gen(node->lhs);
 	pop("rdi");
-
-	create_add(node->kind == ND_ADD, node->lhs->type, node->rhs->type);
 }
 
-static void	relational(Node *node)
+static void	equality_prologue(Node *node)
 {
-	if (node->kind != ND_LESS && node->kind != ND_LESSEQ)
-	{
-		add(node);
-		return ;
-	}
-
-	stmt(node->rhs);
+	gen(node->rhs);
 	push();
-	stmt(node->lhs);
+	gen(node->lhs);
 	pop("rdi");
-
-	switch (node->kind)
-	{
-		case ND_LESS:
-			cmp(node->lhs->type, node->rhs->type);
-			printf("    setl al\n");
-			printf("    movzx rax, al\n");
-			break;
-		case ND_LESSEQ:
-			cmp(node->lhs->type, node->rhs->type);
-			printf("    setle al\n");
-			printf("    movzx rax, al\n");
-			break;
-		default:
-			break;
-	}
-}
-
-static void	equality(Node *node)
-{
-	if (node->kind != ND_EQUAL && node->kind != ND_NEQUAL)
-	{
-		relational(node);
-		return ;
-	}
-
-	stmt(node->rhs);
-	push();
-	stmt(node->lhs);
-	pop("rdi");
-
-	switch (node->kind)
-	{
-		case ND_EQUAL:
-			cmp(node->lhs->type, node->rhs->type);
-			printf("    sete al\n");
-			printf("    movzx rax, al\n");
-			break;
-		case ND_NEQUAL:
-			cmp(node->lhs->type, node->rhs->type);
-			printf("    setne al\n");
-			printf("    movzx rax, al\n");
-			break;
-		default:
-			break;
-	}
-}
-
-static void	conditional(Node *node)
-{
-	int	lend;
-
-	if (node->kind != ND_COND_AND
-		&& node->kind != ND_COND_OR
-		&& node->kind != ND_BITWISE_OR
-		&& node->kind != ND_SHIFT_LEFT
-		&& node->kind != ND_SHIFT_RIGHT)
-	{
-		equality(node);
-		return ;
-	}
-
-	if (node->kind == ND_COND_AND)
-	{
-		lend = jumpLabelCount++;
-
-		// 左辺を評価
-		equality(node->lhs);
-		mov(RDI, "0");
-		cmp(node->lhs->type, new_primitive_type(INT));
-		printf("    setne al\n"); // 0と等しくないかをalに格納
-		printf("    je .Lcond%d\n", lend); // 0ならスキップ
-
-		push();
-
-		// 右辺を評価
-		conditional(node->rhs);
-		mov(RDI, "0");
-		cmp(node->rhs->type, new_primitive_type(INT));
-		printf("    setne al\n"); // 0と等しくないかをalに格納
-
-		pop(RDI);
-		
-		create_add(true, new_primitive_type(INT), new_primitive_type(INT));
-		printf("    movzx rax, al\n"); // alをゼロ拡張
-
-		// 最後の比較
-		printf(".Lcond%d:\n", lend);
-		mov(RDI, "2");
-		cmp(new_primitive_type(INT), new_primitive_type(INT));
-		printf("    sete al\n"); // 2と等しいかをalに格納
-		printf("    movzx rax, al\n"); // alをゼロ拡張
-	}
-	else if (node->kind == ND_COND_OR)
-	{
-		lend = jumpLabelCount++;
-
-		// 左辺を評価
-		equality(node->lhs);
-		mov(RDI, "0");
-		cmp(node->lhs->type, new_primitive_type(INT));
-		printf("    setne al\n"); // 0と等しくないかをalに格納
-		printf("    movzx rax, al\n"); // alをゼロ拡張
-		printf("    jne .Lcond%d\n", lend); // 0以外ならスキップ
-
-		// 右辺を評価
-		conditional(node->rhs);
-		mov(RDI, "0");
-		cmp(node->rhs->type, new_primitive_type(INT));
-		printf("    setne al\n"); // 0と等しくないかをalに格納
-		printf("    movzx rax, al\n"); // alをゼロ拡張
-
-		printf(".Lcond%d:\n", lend);
-	}
-	else if (node->kind == ND_BITWISE_OR)
-	{
-		stmt(node->lhs);
-		push();
-		stmt(node->rhs);
-		pop(RDI);
-
-		printf("    or %s, %s\n", RAX, RDI);
-	}
-	else if (node->kind == ND_SHIFT_RIGHT)
-	{
-		stmt(node->rhs);
-		push();
-		stmt(node->lhs);
-		pop(RDI);
-		mov(CL, DIL);
-
-		printf("    shr %s, %s\n", RAX, CL);
-	}
-	else if (node->kind == ND_SHIFT_LEFT)
-	{
-		stmt(node->rhs);
-		push();
-		stmt(node->lhs);
-		pop(RDI);
-		mov(CL, DIL);
-
-		printf("    shl %s, %s\n", RAX, CL);
-	}
 }
 
 static void	load_lval_addr(Node *node)
@@ -1008,7 +710,7 @@ static void	load_lval_addr(Node *node)
 	else if (node->kind == ND_LVAR_GLOBAL)
 		lval(node);
 	else if (node->kind == ND_DEREF)
-		stmt(node->lhs);// ここもDEREFと同じようにやってる！！！！！
+		gen(node->lhs);// ここもDEREFと同じようにやってる！！！！！
 	else if (node->kind == ND_MEMBER_VALUE)
 		arrow(node, true);
 	else if (node->kind == ND_MEMBER_PTR_VALUE)
@@ -1017,328 +719,27 @@ static void	load_lval_addr(Node *node)
 		error("左辺値が識別子かアドレスではありません");
 }
 
-static void	assign(Node *node)
+static void	assign_prologue(Node *node)
 {
-	switch (node->kind)
-	{
-		case ND_ASSIGN:
-		case ND_COMP_ADD:
-		case ND_COMP_SUB:
-		case ND_COMP_MUL:
-		case ND_COMP_DIV:
-		case ND_COMP_MOD:
-			break;
-		default:
-			conditional(node);
-			return;
-	}
-
 	printf("#ASSIGN %d\n", node->lhs->kind);
 	load_lval_addr(node->lhs);	
 	push();
+}
 
-	// TODO もっといい感じにやりたい
-	switch (node->kind)
-	{
-		case ND_ASSIGN:
-			stmt(node->rhs);
-			break ;
-		case ND_COMP_ADD:
-			push();
-
-			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
-
-			stmt(node->rhs);
-			pop(RDI);
-
-			if (node->type->ty == ARRAY)
-				printf("    add rax, rdi\n");
-			else
-				printf("    add rax, [rdi]\n");
-			break ;
-		case ND_COMP_SUB:
-			push();
-			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
-
-			stmt(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			if (node->type->ty == ARRAY)
-				printf("    sub rax, rdi\n");
-			else
-			{
-				printf("    mov rax, [rax]\n");
-				printf("    sub rax, rdi\n");
-			}
-			break ;
-		case ND_COMP_MUL:
-			push();
-			stmt(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    imul rax, rdi\n");
-			break ;
-		case ND_COMP_DIV:
-			push();
-			stmt(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    cdq\n");
-			printf("    idiv edi\n");
-			break ;
-		case ND_COMP_MOD:
-			push();
-			stmt(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    cdq\n");
-			printf("    idiv edi\n");
-			mov(RAX, RDX);
-			break ;
-		default:
-			break;
-	}
+static void	assign_epilogue(Type *type)
+{
 	pop("r10");
 
 	// storeする
-	if (node->type->ty == ARRAY)
+	if (type->ty == ARRAY)
 		// TODO これOKなの？
 		// ARRAYに対する代入がうまくいかない気がする
 		store_value(8);
-	else if(node->type->ty == STRUCT
-			|| node->type->ty == UNION)
-		store_ptr(get_type_size(node->type), false);
+	else if(type->ty == STRUCT
+			|| type->ty == UNION)
+		store_ptr(get_type_size(type), false);
 	else
-		store_value(get_type_size(node->type));
-}
-
-static void stmt(Node *node)
-{
-	int		lend;
-	int		lbegin;
-	int		lbegin2;
-	int		lelse;
-	SBData	*sbdata;
-
-	switch (node->kind)
-	{
-		case ND_RETURN:
-		case ND_IF:
-		case ND_WHILE:
-		case ND_DOWHILE:
-		case ND_FOR:
-		case ND_SWITCH:
-		case ND_CASE:
-		case ND_BLOCK:
-		case ND_BREAK:
-		case ND_CONTINUE:
-		case ND_DEFAULT:
-			break;
-		default:
-			assign(node);
-			return;
-	}
-
-	switch (node->kind)
-	{
-		case ND_RETURN:
-			if (node->lhs != NULL)
-				stmt(node->lhs);
-			// TODO 型チェックをしておく
-			printf("    jmp .Lepi_%s\n", strndup(g_func_now->fname, g_func_now->flen));
-			return;
-		case ND_IF:
-			// if
-			stmt(node->lhs);
-			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
-
-			lend = jumpLabelCount++;
-
-			if (node->elsif != NULL)
-			{	
-				lelse = jumpLabelCount++;
-				printf("    je .Lelse%d\n", lelse);
-				stmt(node->rhs);
-				printf("    jmp .Lend%d\n", lend);
-
-				// else if
-				printf(".Lelse%d:\n", lelse);
-				stmt(node->elsif);
-			}
-			else if (node->els == NULL)
-			{
-				printf("    je .Lend%d\n", lend);
-				stmt(node->rhs);
-			}
-			else
-			{
-				lelse = jumpLabelCount++;
-				printf("    je .Lelse%d\n", lelse);
-				stmt(node->rhs);
-				printf("    jmp .Lend%d\n", lend);
-
-				// else
-				printf(".Lelse%d:\n", lelse);
-				stmt(node->els);
-			}
-			printf(".Lend%d:\n", lend);
-			return;
-		case ND_WHILE:
-			lbegin = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			printf(".Lbegin%d:\n", lbegin); // continue先
-			
-			// if
-			stmt(node->lhs);
-			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
-			printf("    je .Lend%d\n", lend);
-			
-			// while block
-			sb_forwhile_start(lbegin, lend);
-			if (node->rhs != NULL)
-				stmt(node->rhs);
-			sb_end();
-			
-			// next
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			// end
-			printf(".Lend%d:\n", lend); //break先
-			return;
-		case ND_DOWHILE:
-			lbegin = jumpLabelCount++;
-			lbegin2 = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			printf(".Lbegin%d:\n", lbegin);
-
-			// while block
-			sb_forwhile_start(lbegin2, lend);
-			if (node->lhs != NULL)
-				stmt(node->lhs);
-			sb_end();
-
-			// if
-			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
-			stmt(node->rhs);
-			mov(RDI, "0");
-			cmp(node->rhs->type, new_primitive_type(INT));
-			printf("    jne .Lbegin%d\n", lbegin);
-			printf(".Lend%d:\n", lend); // break先
-			return;
-		case ND_FOR:
-			lbegin = jumpLabelCount++;
-			lbegin2 = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			// init
-			if (node->for_init != NULL)
-				stmt(node->for_init);
-
-			printf(".Lbegin%d:\n", lbegin);
-			
-			// if
-			if(node->for_if != NULL)
-			{
-				stmt(node->for_if);
-				mov(RDI, "0");
-				cmp(node->for_if->type, new_primitive_type(INT));
-				printf("    je .Lend%d\n", lend);
-			}
-
-			// for-block
-			sb_forwhile_start(lbegin2, lend);
-			if (node->lhs != NULL)
-				stmt(node->lhs);
-			sb_end();
-
-			printf(".Lbegin%d:\n", lbegin2); // continue先
-			// next
-			if(node->for_next != NULL)
-				stmt(node->for_next);
-
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			//end
-			printf(".Lend%d:\n", lend); // break先
-			return;
-		case ND_SWITCH:
-			lbegin = switchCaseCount++;
-			lend = jumpLabelCount++;
-
-			// 評価
-			stmt(node->lhs);
-			printf("    mov [rsp - 8], rax\n"); //結果を格納
-
-			// if
-			printf("    # switch def:%d, end:%d\n", lbegin, lend);
-			SwitchCase	*sw_tmp;
-			for (sw_tmp = node->switch_cases; sw_tmp; sw_tmp = sw_tmp->next)
-			{
-				printf("    mov rax, [rsp - 8]\n");
-				movi(RDI, sw_tmp->value);
-				cmp(node->lhs->type, node->lhs->type);
-				printf("    je .Lswitch%d\n", sw_tmp->label);
-			}
-			// defaultかendに飛ばす
-			if (node->switch_has_default)
-				printf("    jmp .Lswitch%d\n", lbegin);
-			else
-				printf("    jmp .Lend%d\n", lend);
-
-			printf("    # switch in\n");
-			// 文を出力
-			sb_switch_start(node->lhs->type, lend, lbegin);
-			stmt(node->rhs);
-			sb_end();
-
-			printf(".Lend%d:\n", lend);
-			return ;
-		case ND_CASE:
-			printf(".Lswitch%d: # case %d\n", node->switch_label, node->val);
-			return ;
-		case ND_BREAK:
-			sbdata = sb_peek();
-			// 一応チェック
-			if (sbdata == NULL)
-				error("breakに対応する文が見つかりません");
-			printf("jmp .Lend%d # break\n", sbdata->endlabel);
-			return ;
-		case ND_CONTINUE:
-			sbdata = sb_search(false);
-			// 一応チェック
-			if (sbdata == NULL)
-				error("continueに対応する文が見つかりません");
-			printf("jmp .Lbegin%d # continue\n", sbdata->startlabel);
-			return ;
-		case ND_DEFAULT:
-			sbdata = sb_search(true);
-			// 一応チェック
-			if (sbdata == NULL)
-				error("defaultに対応する文が見つかりません");
-			printf(".Lswitch%d: # default\n", sbdata->defaultLabel);
-			return ;
-		case ND_BLOCK:
-			while(node != NULL)
-			{
-				if (node->lhs == NULL)
-					break;
-				stmt(node->lhs);
-				node = node->rhs;
-			}
-			return;
-		default:
-			break;
-	}
+		store_value(get_type_size(type));
 }
 
 static void	funcdef(Node *node)
@@ -1414,7 +815,7 @@ static void	funcdef(Node *node)
 		printf("    mov [rbp - %d], %s\n", node->locals->offset, RDI);
 	}
 
-	stmt(node->lhs);
+	gen(node->lhs);
 
 	// TODO 返り値の型がMEMORYのとき、最後の式がreturnじゃないとセグフォします
 
@@ -1505,18 +906,14 @@ static void globaldef(Node *node)
 	}
 }
 
-static void	filescope(Node *node)
-{
-	if (node->kind == ND_FUNCDEF)
-		funcdef(node);
-	else if (node->kind == ND_DEFVAR_GLOBAL)
-		globaldef(node);
-	else
-		stmt(node);
-}
-
 void	gen(Node *node)
 {
+	int		lend;
+	int		lbegin;
+	int		lbegin2;
+	int		lelse;
+	SBData	*sbdata;
+
 	if (node->kind == ND_PROTOTYPE
 	|| node->kind == ND_DEFVAR
 	|| node->kind == ND_STRUCT_DEF
@@ -1524,5 +921,565 @@ void	gen(Node *node)
 	|| node->kind == ND_TYPEDEF
 	|| node->kind == ND_ENUM_DEF)
 		return;
-	filescope(node);
+
+	switch(node->kind)
+	{
+		case ND_FUNCDEF:
+		{
+			funcdef(node);
+			return;
+		}
+		case ND_DEFVAR_GLOBAL:
+		{
+			globaldef(node);
+			return;
+		}
+		case ND_RETURN:
+		{
+			if (node->lhs != NULL)
+				gen(node->lhs);
+			// TODO 型チェックをしておく
+			printf("    jmp .Lepi_%s\n", strndup(g_func_now->fname, g_func_now->flen));
+			return;
+		}
+		case ND_IF:
+		{
+			// if
+			gen(node->lhs);
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
+
+			lend = jumpLabelCount++;
+
+			if (node->elsif != NULL)
+			{	
+				lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				gen(node->rhs);
+				printf("    jmp .Lend%d\n", lend);
+
+				// else if
+				printf(".Lelse%d:\n", lelse);
+				gen(node->elsif);
+			}
+			else if (node->els == NULL)
+			{
+				printf("    je .Lend%d\n", lend);
+				gen(node->rhs);
+			}
+			else
+			{
+				lelse = jumpLabelCount++;
+				printf("    je .Lelse%d\n", lelse);
+				gen(node->rhs);
+				printf("    jmp .Lend%d\n", lend);
+
+				// else
+				printf(".Lelse%d:\n", lelse);
+				gen(node->els);
+			}
+			printf(".Lend%d:\n", lend);
+			return;
+		}
+		case ND_WHILE:
+		{
+			lbegin = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			printf(".Lbegin%d:\n", lbegin); // continue先
+			
+			// if
+			gen(node->lhs);
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
+			printf("    je .Lend%d\n", lend);
+			
+			// while block
+			sb_forwhile_start(lbegin, lend);
+			if (node->rhs != NULL)
+				gen(node->rhs);
+			sb_end();
+			
+			// next
+			printf("    jmp .Lbegin%d\n", lbegin);
+			
+			// end
+			printf(".Lend%d:\n", lend); //break先
+			return;
+		}
+		case ND_DOWHILE:
+		{
+			lbegin = jumpLabelCount++;
+			lbegin2 = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			printf(".Lbegin%d:\n", lbegin);
+
+			// while block
+			sb_forwhile_start(lbegin2, lend);
+			if (node->lhs != NULL)
+				gen(node->lhs);
+			sb_end();
+
+			// if
+			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
+			gen(node->rhs);
+			mov(RDI, "0");
+			cmp(node->rhs->type, new_primitive_type(INT));
+			printf("    jne .Lbegin%d\n", lbegin);
+			printf(".Lend%d:\n", lend); // break先
+			return;
+		}
+		case ND_FOR:
+		{
+			lbegin = jumpLabelCount++;
+			lbegin2 = jumpLabelCount++;
+			lend = jumpLabelCount++;
+			
+			// init
+			if (node->for_init != NULL)
+				gen(node->for_init);
+
+			printf(".Lbegin%d:\n", lbegin);
+			
+			// if
+			if(node->for_if != NULL)
+			{
+				gen(node->for_if);
+				mov(RDI, "0");
+				cmp(node->for_if->type, new_primitive_type(INT));
+				printf("    je .Lend%d\n", lend);
+			}
+
+			// for-block
+			sb_forwhile_start(lbegin2, lend);
+			if (node->lhs != NULL)
+				gen(node->lhs);
+			sb_end();
+
+			printf(".Lbegin%d:\n", lbegin2); // continue先
+			// next
+			if(node->for_next != NULL)
+				gen(node->for_next);
+
+			printf("    jmp .Lbegin%d\n", lbegin);
+			
+			//end
+			printf(".Lend%d:\n", lend); // break先
+			return;
+		}
+		case ND_SWITCH:
+		{
+			lbegin = switchCaseCount++;
+			lend = jumpLabelCount++;
+
+			// 評価
+			gen(node->lhs);
+			printf("    mov [rsp - 8], rax\n"); //結果を格納
+
+			// if
+			printf("    # switch def:%d, end:%d\n", lbegin, lend);
+			SwitchCase	*sw_tmp;
+			for (sw_tmp = node->switch_cases; sw_tmp; sw_tmp = sw_tmp->next)
+			{
+				printf("    mov rax, [rsp - 8]\n");
+				movi(RDI, sw_tmp->value);
+				cmp(node->lhs->type, node->lhs->type);
+				printf("    je .Lswitch%d\n", sw_tmp->label);
+			}
+			// defaultかendに飛ばす
+			if (node->switch_has_default)
+				printf("    jmp .Lswitch%d\n", lbegin);
+			else
+				printf("    jmp .Lend%d\n", lend);
+
+			printf("    # switch in\n");
+			// 文を出力
+			sb_switch_start(node->lhs->type, lend, lbegin);
+			gen(node->rhs);
+			sb_end();
+
+			printf(".Lend%d:\n", lend);
+			return ;
+		}
+		case ND_CASE:
+		{
+			printf(".Lswitch%d: # case %d\n", node->switch_label, node->val);
+			return ;
+		}
+		case ND_BREAK:
+		{
+			sbdata = sb_peek();
+			// 一応チェック
+			if (sbdata == NULL)
+				error("breakに対応する文が見つかりません");
+			printf("jmp .Lend%d # break\n", sbdata->endlabel);
+			return ;
+		}
+		case ND_CONTINUE:
+		{
+			sbdata = sb_search(false);
+			// 一応チェック
+			if (sbdata == NULL)
+				error("continueに対応する文が見つかりません");
+			printf("jmp .Lbegin%d # continue\n", sbdata->startlabel);
+			return ;
+		}
+		case ND_DEFAULT:
+		{
+			sbdata = sb_search(true);
+			// 一応チェック
+			if (sbdata == NULL)
+				error("defaultに対応する文が見つかりません");
+			printf(".Lswitch%d: # default\n", sbdata->defaultLabel);
+			return ;
+		}
+		case ND_BLOCK:
+		{
+			while(node != NULL)
+			{
+				if (node->lhs == NULL)
+					return;
+				gen(node->lhs);
+				node = node->rhs;
+			}
+			return;
+		}
+		case ND_ASSIGN:
+		{
+			assign_prologue(node);
+			gen(node->rhs);
+			assign_epilogue(node->type);
+			return ;
+		}
+		case ND_COMP_ADD:
+		{
+			assign_prologue(node);
+
+			push();
+
+			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
+
+			gen(node->rhs);
+			pop(RDI);
+
+			if (node->type->ty == ARRAY)
+				printf("    add rax, rdi\n");
+			else
+				printf("    add rax, [rdi]\n");
+
+			assign_epilogue(node->type);
+			return ;
+		}
+		case ND_COMP_SUB:
+		{
+			assign_prologue(node);
+
+			push();
+			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
+
+			gen(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			if (node->type->ty == ARRAY)
+				printf("    sub rax, rdi\n");
+			else
+			{
+				printf("    mov rax, [rax]\n");
+				printf("    sub rax, rdi\n");
+			}
+
+			assign_epilogue(node->type);
+			return ;
+		}
+		case ND_COMP_MUL:
+		{
+			assign_prologue(node);
+
+			push();
+			gen(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    imul rax, rdi\n");
+
+			assign_epilogue(node->type);
+			return;
+		}
+		case ND_COMP_DIV:
+		{
+			assign_prologue(node);
+
+			push();
+			gen(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+
+			assign_epilogue(node->type);
+			return ;
+		}
+		case ND_COMP_MOD:
+		{
+			assign_prologue(node);
+
+			push();
+			gen(node->rhs);
+			mov(RDI, RAX);
+			pop(RAX);
+			// TODO 整数だけ？
+			printf("    mov rax, [rax]\n");
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+			mov(RAX, RDX);
+
+			assign_epilogue(node->type);
+			return ;
+		}
+		case ND_COND_AND:
+		{
+			lend = jumpLabelCount++;
+
+			// 左辺を評価
+			gen(node->lhs);
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
+			printf("    setne al\n"); // 0と等しくないかをalに格納
+			printf("    je .Lcond%d\n", lend); // 0ならスキップ
+
+			push();
+
+			// 右辺を評価
+			gen(node->rhs);
+			mov(RDI, "0");
+			cmp(node->rhs->type, new_primitive_type(INT));
+			printf("    setne al\n"); // 0と等しくないかをalに格納
+
+			pop(RDI);
+		
+			create_add(true, new_primitive_type(INT), new_primitive_type(INT));
+			printf("    movzx rax, al\n"); // alをゼロ拡張
+
+			// 最後の比較
+			printf(".Lcond%d:\n", lend);
+			mov(RDI, "2");
+			cmp(new_primitive_type(INT), new_primitive_type(INT));
+			printf("    sete al\n"); // 2と等しいかをalに格納
+			printf("    movzx rax, al\n"); // alをゼロ拡張
+			return ;
+		}
+		case ND_COND_OR:
+		{
+			lend = jumpLabelCount++;
+
+			// 左辺を評価
+			gen(node->lhs);
+			mov(RDI, "0");
+			cmp(node->lhs->type, new_primitive_type(INT));
+			printf("    setne al\n"); // 0と等しくないかをalに格納
+			printf("    movzx rax, al\n"); // alをゼロ拡張
+			printf("    jne .Lcond%d\n", lend); // 0以外ならスキップ
+
+			// 右辺を評価
+			gen(node->rhs);
+			mov(RDI, "0");
+			cmp(node->rhs->type, new_primitive_type(INT));
+			printf("    setne al\n"); // 0と等しくないかをalに格納
+			printf("    movzx rax, al\n"); // alをゼロ拡張
+
+			printf(".Lcond%d:\n", lend);
+			return ;
+		}
+		case ND_BITWISE_OR:
+		{
+			gen(node->lhs);
+			push();
+			gen(node->rhs);
+			pop(RDI);
+
+			printf("    or %s, %s\n", RAX, RDI);
+			return ;
+		}
+		case ND_SHIFT_RIGHT:
+		{
+			gen(node->rhs);
+			push();
+			gen(node->lhs);
+			pop(RDI);
+			mov(CL, DIL);
+
+			printf("    shr %s, %s\n", RAX, CL);
+			return;
+		}
+		case ND_SHIFT_LEFT:
+		{
+			gen(node->rhs);
+			push();
+			gen(node->lhs);
+			pop(RDI);
+			mov(CL, DIL);
+
+			printf("    shl %s, %s\n", RAX, CL);
+			return;
+		}
+		case ND_EQUAL:
+		{
+			equality_prologue(node);
+			cmp(node->lhs->type, node->rhs->type);
+			printf("    sete al\n");
+			printf("    movzx rax, al\n");
+			return;
+		}
+		case ND_NEQUAL:
+		{
+			equality_prologue(node);
+			cmp(node->lhs->type, node->rhs->type);
+			printf("    setne al\n");
+			printf("    movzx rax, al\n");
+			return;
+		}
+		case ND_LESS:
+		{
+			relational_prologue(node);
+			cmp(node->lhs->type, node->rhs->type);
+			printf("    setl al\n");
+			printf("    movzx rax, al\n");
+			return;
+		}
+		case ND_LESSEQ:
+		{
+			relational_prologue(node);
+			cmp(node->lhs->type, node->rhs->type);
+			printf("    setle al\n");
+			printf("    movzx rax, al\n");
+			return;
+		}
+		case ND_ADD:
+		case ND_SUB:
+		{
+			add_check_pointer(node->type, &node->lhs, &node->rhs, true);
+
+			gen(node->rhs);
+			push();
+			gen(node->lhs);
+			pop("rdi");
+
+			create_add(node->kind == ND_ADD, node->lhs->type, node->rhs->type);
+			return;
+		}
+		case ND_ADDR:
+		{
+			switch(node->lhs->kind)
+			{
+				// 変数ならアドレスを取り出す
+				case ND_LVAR:
+				case ND_LVAR_GLOBAL:
+					lval(node->lhs);
+					break ;
+				// 構造体, unionからのアクセスなら、アドレスなのでそのまま返す
+				case ND_MEMBER_VALUE:
+				case ND_MEMBER_PTR_VALUE:
+					arrow(node->lhs, true);
+					break ;
+				// ND_DEREFならアドレスで止める
+				case ND_DEREF:
+					gen(node->lhs->lhs);//ここ！！　↓
+					break ;
+				default:
+					error("ND_ADDRを使えない kind:%d", node->lhs->kind);
+					break ;
+			}
+			return;
+		}
+		case ND_DEREF:
+		{
+			gen(node->lhs);// ここと同じ
+			load(node->type);
+			return;
+		}
+		case ND_BITWISE_NOT:
+		{
+			gen(node->lhs);
+			printf("    xor %s, -1\n", RAX);
+			return;
+		}
+		case ND_MEMBER_VALUE:
+		case ND_MEMBER_PTR_VALUE:
+		{
+			arrow(node, false);
+			return;
+		}
+		case ND_MUL:
+		{
+			mul_prologue(node);
+			// TODO 型を考慮する
+			printf("    imul rax, rdi\n");	
+			return;
+		}
+		case ND_DIV:
+		{
+			mul_prologue(node);
+			// TODO 型を考慮する
+			printf("    cdq\n");
+			printf("    idiv edi\n");
+			return;
+		}
+		case ND_MOD:
+		{
+			mul_prologue(node);
+			// TODO 型を考慮する
+			printf("    cdq\n"); // d -> q -> o
+			printf("    idiv edi\n");
+			mov(RAX, RDX);
+			return;
+		}
+		case ND_CAST:
+		{
+			gen(node->lhs);
+			cast(node->lhs->type, node->type);
+			return;
+		}
+		case ND_LVAR:
+		{
+			lval(node);
+			load(node->type);
+			return ;
+		}
+		case ND_LVAR_GLOBAL:
+		{
+			lval(node);
+			load(node->type);
+			return;
+		}
+		case ND_STR_LITERAL:
+		{
+			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX,
+					get_str_literal_name(node->str_index));
+			return;
+		}
+		case ND_CALL:
+		{
+			call(node);
+			return;
+		}
+		case ND_NUM:
+		{
+			movi(RAX, node->val);
+			return;
+		}
+		case ND_PARENTHESES:
+		{
+			gen(node->lhs);
+			return;
+		}
+		default:
+		{
+			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
+			return;
+		}
+	}
 }
