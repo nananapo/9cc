@@ -39,6 +39,7 @@ Node	*add(Env *env);
 Node	*shift(Env *env);
 Node	*relational(Env *env);
 Node	*equality(Env *env);
+Node	*bitwise_and(Env *env);
 Node	*bitwise_or(Env *env);
 Node	*bitwise_xor(Env *env);
 Node	*conditional_and(Env *env);
@@ -953,11 +954,34 @@ Node *equality(Env *env)
 	}
 }
 
-Node	*bitwise_xor(Env *env)
+Node	*bitwise_and(Env *env)
 {
 	Node	*node;
 
 	node = equality(env);
+	if (consume(env, "&"))
+	{
+		node = new_node(ND_BITWISE_AND, node, bitwise_and(env));
+
+		if (!is_integer_type(node->lhs->type)
+			|| !is_integer_type(node->rhs->type))
+			error_at(env->token->str, "整数型ではない型に&を適用できません");
+
+		// TODO キャストしてから可能か考える
+		if (!type_equal(node->rhs->type, node->lhs->type))
+			error_at(env->token->str, "&の両辺の型が一致しません");
+
+		node->type = node->rhs->type;
+	}
+	return (node);
+}
+
+
+Node	*bitwise_xor(Env *env)
+{
+	Node	*node;
+
+	node = bitwise_and(env);
 	if (consume(env, "^"))
 	{
 		node = new_node(ND_BITWISE_XOR, node, bitwise_xor(env));

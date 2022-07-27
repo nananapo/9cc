@@ -712,6 +712,7 @@ assert_gcc "union4.c"
 
 assert_gcc "condop.c"
 
+assert_gcc "bitwise_and.c"
 assert_gcc "bitwise_or.c"
 assert_gcc "bitwise_not.c"
 assert_gcc "bitwise_xor.c"
