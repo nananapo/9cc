@@ -290,8 +290,7 @@ Node *call(Env *env, Token *tok)
 
 	// 引数の数を確認
 	if (refunc->argdef_count != -1
-		&& (
-			(!refunc->is_variable_argument && node->argdef_count != refunc->argdef_count)
+		&& ((!refunc->is_variable_argument && node->argdef_count != refunc->argdef_count)
 			|| (refunc->is_variable_argument && node->argdef_count < refunc->argdef_count)))
 		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
 
@@ -307,7 +306,17 @@ Node *call(Env *env, Token *tok)
 	int		j;
 
 	if (refunc->locals != NULL)
-		def = copy_lvar(refunc->locals);
+	{
+		// 返り値がMEMORYなら二個進める
+		if (is_memory_type(refunc->ret_type))
+		{
+			def = refunc->locals->next->next;
+			if (def != NULL)
+				def = copy_lvar(def);
+		}
+		else
+			def = copy_lvar(refunc->locals);
+	}
 	else
 		def = NULL;
 	firstdef = def;
@@ -348,6 +357,7 @@ Node *call(Env *env, Token *tok)
 			def->is_arg = true;
 			def->arg_regindex = -1;
 			def->next = NULL;
+			def->is_dummy = false;
 
 			alloc_argument_simu(firstdef, def); 
 
@@ -387,6 +397,14 @@ Node *call(Env *env, Token *tok)
 
 	// 型を返り値の型に設定
 	node->type = refunc->ret_type;
+
+	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
+	if (is_memory_type(refunc->ret_type)
+		|| refunc->ret_type->ty == STRUCT)
+	{
+		node->call_mem_stack = create_local_var(env, "", 0, refunc->ret_type, false);
+		node->call_mem_stack->is_dummy = true;
+	}
 
 	printf("# CALL END\n");
 
@@ -686,10 +704,10 @@ Node *unary(Env *env)
 			if (type == NULL)
 			{
 				node = unary(env);
-				node = new_node_num(type_size(node->type));
+				node = new_node_num(get_type_size(node->type));
 			}
 			else
-				node = new_node_num(type_size(type));
+				node = new_node_num(get_type_size(type));
 		
 			if (!consume(env, ")"))
 				error_at(env->token->str, ")が必要です");
@@ -698,7 +716,7 @@ Node *unary(Env *env)
 		else
 		{
 			node = unary(env);
-			node = new_node_num(type_size(node->type));
+			node = new_node_num(get_type_size(node->type));
 			return (node);
 		}
 	}
@@ -782,7 +800,7 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
 		node->type = new_primitive_type(INT);// TODO size_tにする
 
-		size = type_size(l->ptr_to);
+		size = get_type_size(l->ptr_to);
 		if (size == 0 || size > 1)
 		{
 			if (size == 0)
@@ -1605,7 +1623,7 @@ Node	*read_struct_block(Env *env, Token *ident)
 		tmp->next = def->members;
 
 		// 型のサイズを取得
-		typesize = type_size(type);
+		typesize = get_type_size(type);
 		if (typesize == -1)
 			error_at(ident->str, "型のサイズが確定していません");
 
@@ -1648,7 +1666,7 @@ Node	*read_struct_block(Env *env, Token *ident)
 	// offsetを修正
 	for (tmp = def->members; tmp != NULL; tmp = tmp->next)
 	{
-		tmp->offset -= type_size(tmp->type);
+		tmp->offset -= get_type_size(tmp->type);
 	}
 
 	return (new_node(ND_STRUCT_DEF, NULL, NULL));
@@ -1737,7 +1755,7 @@ Node	*read_union_block(Env *env, Token *ident)
 		tmp->offset = 0;
 
 		// 型のサイズを取得
-		typesize = type_size(type);
+		typesize = get_type_size(type);
 		if (typesize == -1)
 			error_at(ident->str, "型のサイズが確定していません");
 		def->mem_size = max(def->mem_size, typesize);
@@ -1758,6 +1776,8 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 	Node	*node;
 	Token	*arg;
 	int		i;
+	int		type_size;
+	LVar	*lvar;
 
 	env->locals = NULL;
 
@@ -1769,6 +1789,38 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 	node->argdef_count = 0;
 	node->is_variable_argument = false;
 	node->is_static = is_static;
+	env->func_now = node;
+
+	// 返り値がMEMORYならダミーの変数を追加する
+	if (is_memory_type(node->ret_type))
+	{
+		// RDIを保存する用	
+		lvar = calloc(1, sizeof(LVar));
+		lvar->name = "";
+		lvar->len = 0;
+		lvar->type = new_type_ptr_to(new_primitive_type(VOID));
+		lvar->is_arg = true;
+		lvar->arg_regindex = 0;
+		lvar->is_dummy = true;
+		lvar->offset = 8;
+		lvar->next = NULL;
+		env->locals = lvar;
+
+		// とりあえずalign(typesize,16) * 2だけ隙間を用意しておく
+		// しかし使わない
+		type_size = align_to(get_type_size(node->ret_type), 16);
+
+		lvar = calloc(1, sizeof(LVar));
+		lvar->name = "";
+		lvar->len = 0;
+		lvar->type = node->ret_type;
+		lvar->is_arg = false;
+		lvar->arg_regindex = -1;
+		lvar->is_dummy = true;
+		lvar->offset = 8 + type_size * 2;
+		lvar->next = NULL;
+		env->locals->next = lvar;
+	}
 
 	// args
 	if (!consume(env, ")"))
@@ -1856,6 +1908,8 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 		node->lhs = stmt(env);
 		node->locals = env->locals;
 	}
+
+	env->func_now = NULL;
 	
 	printf("# CREATED FUNC %s\n", strndup(node->fname, node->flen));
 

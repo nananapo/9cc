@@ -717,4 +717,7 @@ assert_gcc "bitwise_not.c"
 
 assert_gcc "shift.c"
 
+assert_gcc "ret_struct1.c"
+assert_gcc "ret_struct2.c"
+
 echo OK

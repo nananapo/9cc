@@ -117,7 +117,7 @@ bool	type_equal(Type *t1, Type *t2)
 }
 
 // typeのサイズを取得する
-int	type_size(Type *type)
+int	get_type_size(Type *type)
 {
 	if (type->ty == INT)
 		return (4);
@@ -128,7 +128,7 @@ int	type_size(Type *type)
 	if (type->ty == PTR)
 		return (8);
 	if (type->ty == ARRAY)
-		return (type_size(type->ptr_to) * type->array_size);
+		return (get_type_size(type->ptr_to) * type->array_size);
 	if (type->ty == STRUCT)
 		return (type->strct->mem_size);
 	if (type->ty == ENUM)
@@ -246,7 +246,7 @@ int	max_type_size(Type *type)
 	{
 		return (max_type_size(type->ptr_to));
 	}
-	return type_size(type);
+	return get_type_size(type);
 }
 
 static void	typename_loop(Type *type, char *str)
@@ -313,8 +313,8 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 		return (true);
 
 	// どちらも数字？
-	size1 = type_size(from);
-	size2 = type_size(to);
+	size1 = get_type_size(from);
+	size2 = get_type_size(to);
 
 	is_explicit = false;
 
@@ -355,4 +355,11 @@ bool	can_use_arrow(Type *type)
 bool	can_use_dot(Type *type)
 {
 	return (type->ty == STRUCT || type->ty == UNION);
+}
+
+bool	is_memory_type(Type *type)
+{
+	if (type->ty != STRUCT)
+		return (false);
+	return (get_type_size(type) > 16);
 }

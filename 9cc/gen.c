@@ -21,7 +21,6 @@ static void	comment(char *c);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	prologue(void);
-static void	epilogue(void);
 static void	load(Type *type);
 static void	lval(Node *node);
 static void	call(Node *node);
@@ -52,6 +51,8 @@ extern Stack		*sbstack;
 int					jumpLabelCount = 0;
 char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 int					stack_count = 0;
+
+static Node	*g_func_now;
 
 int	max(int a, int b)
 {
@@ -246,14 +247,6 @@ static void prologue()
 	mov(RBP, RSP);
 }
 
-static void	epilogue()
-{
-	// epilogue
-	mov(RSP, RBP);
-	pop(RBP);
-	printf("    ret\n");
-}
-
 // raxをraxに読み込む
 static void	load(Type *type)
 {
@@ -310,8 +303,6 @@ static void	lval(Node *node)
 	}
 }
 
-static Node	*g_func_now;
-
 static void	call(Node *node)
 {
 	int		size;
@@ -328,6 +319,7 @@ static void	call(Node *node)
 	int		min_offset;
 	int		max_argregindex;
 
+	// va_startマクロ
 	if (node->flen == 8
 	&& strncmp(node->fname, "va_start", 8) == 0)
 	{
@@ -377,7 +369,7 @@ static void	call(Node *node)
 	{
 		arg_count++;
 
-		size = type_size(type_array_to_ptr(tmp->locals->type));
+		size = get_type_size(type_array_to_ptr(tmp->locals->type));
 
 		printf("# PUSH ARG %s (%d)\n",
 			strndup(tmp->locals->name, tmp->locals->len),
@@ -385,7 +377,6 @@ static void	call(Node *node)
 
 		stmt(tmp);
 
-		// TODO long doubleで動かなくなります....
 		if (tmp->locals->arg_regindex != -1)
 		{
 			if (size <= 8)
@@ -423,7 +414,7 @@ static void	call(Node *node)
 		if (tmp->locals->arg_regindex != -1)
 			continue ;
 		rbp_offset = min(rbp_offset,
-						tmp->locals->offset - align_to(type_size(tmp->locals->type), 8) + 8);
+						tmp->locals->offset - align_to(get_type_size(tmp->locals->type), 8) + 8);
 	}
 
 	// マイナスなのでプラスにする
@@ -446,7 +437,7 @@ static void	call(Node *node)
 
 		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
 	
-		size = type_size(type_array_to_ptr(tmp->locals->type));
+		size = get_type_size(type_array_to_ptr(tmp->locals->type));
 
 		// レジスタに入れる
 		if (tmp->locals->arg_regindex != -1)
@@ -496,6 +487,12 @@ static void	call(Node *node)
 		printf("    sub rsp, %d # rbp_offset\n", rbp_offset);
 	}
 
+	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
+	if (is_memory_type(node->type))
+	{
+		printf("    lea rdi, [rbp - %d]\n", node->call_mem_stack->offset);
+	}
+
 	// call
 	printf("# CALL RBP_OFFSET: %d\n", rbp_offset);
 	if (node->is_variable_argument)
@@ -512,6 +509,23 @@ static void	call(Node *node)
 	printf("    add rsp, %d # pop_count\n", pop_count * 8);
 	printf("# POP ALL %d -> %d\n", stack_count, stack_count - pop_count * 8);
 	stack_count -= pop_count * 8;
+
+	// 返り値がMEMORYなら、raxにアドレスを入れる
+	if (is_memory_type(node->type))
+	{
+		printf("    lea rax, [rbp - %d]\n", node->call_mem_stack->offset);
+	}
+	// 返り値がstructなら、rax, rdxを移動する
+	else if (node->type->ty == STRUCT)
+	{
+		size = align_to(get_type_size(node->type), 8);
+		printf("    lea %s, [rbp - %d]\n", RDI, node->call_mem_stack->offset);
+		if (size > 0)
+			printf("    mov [%s], %s\n", RDI, RAX);
+		if (size > 8)
+			printf("    mov [%s + 8], %s\n", RDI, RDX);
+		mov(RAX, RDI);
+	}
 	return;
 }
 
@@ -536,8 +550,8 @@ static void	cast(Type *from, Type *to)
 	&& is_pointer_type(to))
 		return ;
 	
-	size1 = type_size(from);
-	size2 = type_size(to);
+	size1 = get_type_size(from);
+	size2 = get_type_size(to);
 
 	// ポインタから整数へのキャストは情報を落とす
 	if (is_pointer_type(from)
@@ -769,7 +783,7 @@ static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_re
 	{
 		// ポインタの先のサイズを掛ける
 		*rhs = new_node(ND_MUL, *rhs,
-						new_node_num(type_size((*lhs)->type->ptr_to)));
+						new_node_num(get_type_size((*lhs)->type->ptr_to)));
 		(*rhs)->type = new_primitive_type(INT);
 	}
 }
@@ -780,13 +794,13 @@ static void	create_add(bool is_add, Type *l, Type *r)
 	int	size;
 
 	printf("    # add(%d) %s(%d) + %s(%d)\n", is_add,
-			get_type_name(l), type_size(l),
-			get_type_name(r), type_size(r));
+			get_type_name(l), get_type_size(l),
+			get_type_name(r), get_type_size(r));
 
 	// とりあえずinteger以外は無視
 	if (is_integer_type(l))
 	{
-		size = type_size(l);
+		size = get_type_size(l);
 		if (size == 4)
 			printf("    movsxd rax, eax # sizeup\n");
 		else if (size == 2)
@@ -797,7 +811,7 @@ static void	create_add(bool is_add, Type *l, Type *r)
 
 	if (is_integer_type(r))
 	{
-		size = type_size(r);
+		size = get_type_size(r);
 		if (size == 4)
 			printf("    movsxd rdi, edi # sizeup\n");
 		else if (size == 2)
@@ -1099,9 +1113,9 @@ static void	assign(Node *node)
 		store_value(8);
 	else if(node->type->ty == STRUCT
 			|| node->type->ty == UNION)
-		store_ptr(type_size(node->type), false);
+		store_ptr(get_type_size(node->type), false);
 	else
-		store_value(type_size(node->type));
+		store_value(get_type_size(node->type));
 }
 
 static void stmt(Node *node)
@@ -1136,8 +1150,8 @@ static void stmt(Node *node)
 		case ND_RETURN:
 			if (node->lhs != NULL)
 				stmt(node->lhs);
-			epilogue();
-			stack_count += 8; // rbpをpopしたけれど、epilogueでもpopするので+8
+			// TODO 型チェックをしておく
+			printf("    jmp .Lepi_%s\n", strndup(g_func_now->fname, g_func_now->flen));
 			return;
 		case ND_IF:
 			// if
@@ -1333,6 +1347,8 @@ static void	funcdef(Node *node)
 	LVar	*lvtmp;
 	int		stack_size;
 	int		maxoff;
+	int		index;
+	int		size;
 
 	funcname = strndup(node->fname, node->flen);
 	stack_count = 0;
@@ -1372,8 +1388,8 @@ static void	funcdef(Node *node)
 			printf("# ARG %s\n", strndup(lvtmp->name, lvtmp->len));
 			if (lvtmp->arg_regindex != -1)
 			{
-				int index = lvtmp->arg_regindex;
-				int size = align_to(type_size(lvtmp->type), 8);
+				index = lvtmp->arg_regindex;
+				size = align_to(get_type_size(lvtmp->type), 8);
 
 				mov(R10, RBP);
 				printf("    sub %s, %d\n", R10, lvtmp->offset);
@@ -1392,14 +1408,49 @@ static void	funcdef(Node *node)
 		printf("# ARG_END\n");
 	}
 
+	// 返り値がMEMORYなら、rdiからアドレスを取り出す
+	if (is_memory_type(node->ret_type))
+	{
+		printf("    mov [rbp - %d], %s\n", node->locals->offset, RDI);
+	}
+
 	stmt(node->lhs);
-	epilogue();
+
+	// TODO 返り値の型がMEMORYのとき、最後の式がreturnじゃないとセグフォします
+
+	// epilogue
+	printf(".Lepi_%s:\n", funcname);
+
+	// MEMORYなら、rdiのアドレスに格納
+	if (is_memory_type(node->ret_type))
+	{
+		printf("    mov %s, [rbp - %d]\n", R10, node->locals->offset);
+		store_ptr(get_type_size(node->ret_type), false);
+
+		// RDIを復元する
+		printf("    mov %s, [rbp - %d]\n", RDI, node->locals->offset);
+	}
+	// STRUCTなら、rax, rdxに格納
+	else if (node->ret_type->ty == STRUCT)
+	{
+		size = align_to(get_type_size(node->ret_type), 8);
+		if (size > 8)
+			printf("    mov %s, [%s  - 8]\n", RDX, RAX);
+		if (size > 0)
+			printf("    mov %s, [%s]\n", RAX, RAX);
+	}
+
+	mov(RSP, RBP);
+	pop(RBP);
+	printf("    ret\n");
 
 	stack_count -= stack_size;
 	printf("#count %d\n", stack_count);
 	
 	if (stack_count != 0)
 		error("stack_countが0ではありません");
+
+	g_func_now = NULL;
 }
 
 static void	print_global_constant(Node *node, Type *type)
@@ -1444,7 +1495,7 @@ static void globaldef(Node *node)
 	if (node->global_assign == NULL)
 	{
 		printf("    .comm _%s,%d,2\n",
-				name, type_size(node->type));
+				name, get_type_size(node->type));
 	}
 	else
 	{

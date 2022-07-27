@@ -160,3 +160,184 @@ int	pcheck()
 	write(1, "check\n", 6);
 	return 0;
 }
+
+
+typedef struct s_struct1
+{
+	int a;
+}	s_struct1;
+
+
+typedef struct s_struct2
+{
+	int a;
+	int b;
+}	s_struct2;
+
+typedef struct s_struct3
+{
+	int a;
+	int b;
+	int c;
+}	s_struct3;
+
+typedef struct s_struct4
+{
+	int a;
+	int b;
+	int c;
+	int d;
+} s_struct4;
+
+typedef struct s_struct5
+{
+	int a;
+	int b;
+	int c;
+	int d;
+	int e;
+} s_struct5;
+
+typedef struct s_struct6
+{
+	int a;
+	int b;
+	int c;
+	int d;
+	int e;
+	int f;
+} s_struct6;
+
+s_struct1 retstruct1(void)
+{
+	s_struct1 *p;
+	p = calloc(1, sizeof(s_struct1));
+	p->a = 1000;
+	return (*p);
+}
+
+s_struct1 retstruct1_a(int a)
+{
+	s_struct1 *p;
+	p = calloc(1, sizeof(s_struct1));
+	p->a = a + 100;
+	return (*p);
+}
+
+
+s_struct2 retstruct2(void)
+{
+	s_struct2 *p;
+	p = calloc(1, sizeof(s_struct2));
+	p->a = 1000;
+	p->b = 2000;
+	return (*p);
+}
+
+s_struct2 retstruct2_a(int a)
+{
+	s_struct2 *p;
+	p = calloc(1, sizeof(s_struct2));
+	p->a = a + 100;
+	p->b = a + 200;
+	return (*p);
+}
+
+
+
+s_struct3 retstruct3(void)
+{
+	s_struct3 *p;
+	p = calloc(1, sizeof(s_struct3));
+	p->a = 1000;
+	p->b = 2000;
+	p->c = 3000;
+	return (*p);
+}
+
+s_struct3 retstruct3_a(int a)
+{
+	s_struct3 *p;
+	p = calloc(1, sizeof(s_struct3));
+	p->a = a + 100;
+	p->b = a + 200;
+	p->c = a + 300;
+	return (*p);
+}
+
+
+s_struct4 retstruct4(void)
+{
+	s_struct4 *p;
+	p = calloc(1, sizeof(s_struct4));
+	p->a = 1000;
+	p->b = 2000;
+	p->c = 3000;
+	p->d = 4000;
+	return (*p);
+}
+
+s_struct4 retstruct4_a(int a)
+{
+	s_struct4 *p;
+	p = calloc(1, sizeof(s_struct4));
+	p->a = a + 100;
+	p->b = a + 200;
+	p->c = a + 300;
+	p->d = a + 400;
+	return (*p);
+}
+
+
+
+s_struct5 retstruct5(void)
+{
+	s_struct5 *p;
+	p = calloc(1, sizeof(s_struct5));
+	p->a = 1000;
+	p->b = 2000;
+	p->c = 3000;
+	p->d = 4000;
+	p->e = 5000;
+	return (*p);
+}
+
+s_struct5 retstruct5_a(int a)
+{
+	s_struct5 *p;
+	p = calloc(1, sizeof(s_struct5));
+	p->a = a + 100;
+	p->b = a + 200;
+	p->c = a + 300;
+	p->d = a + 400;
+	p->e = a + 500;
+	return (*p);
+}
+
+
+
+s_struct6 retstruct6(void)
+{
+	s_struct6 *p;
+	p = calloc(1, sizeof(s_struct6));
+	p->a = 1000;
+	p->b = 2000;
+	p->c = 3000;
+	p->d = 4000;
+	p->e = 5000;
+	p->f = 6000;
+	return (*p);
+}
+
+s_struct6 retstruct6_a(int a)
+{
+	s_struct6 *p;
+	p = calloc(1, sizeof(s_struct6));
+	p->a = a + 100;
+	p->b = a + 200;
+	p->c = a + 300;
+	p->d = a + 400;
+	p->e = a + 500;
+	p->f = a + 600;
+	return (*p);
+}

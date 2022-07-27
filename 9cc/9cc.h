@@ -252,6 +252,7 @@ typedef struct	LVar
 
 	bool		is_arg;
 	int			arg_regindex;
+	bool		is_dummy;
 
 	Type		*type;
 } LVar;
@@ -304,6 +305,9 @@ typedef struct Node
 	LVar 		*locals;
 	bool		is_variable_argument;
 
+	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
+	LVar		*call_mem_stack;
+
 	// general
 	struct Node	*next;
 
@@ -345,6 +349,7 @@ typedef struct s_parseresult
 	UnionDef		*union_defs[1000];
 	LVar			*locals;
 
+	Node			*func_now;
 
 	t_linked_list	*type_alias;
 }	ParseResult;
@@ -375,7 +380,7 @@ Node	*new_node_num(int val);
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
-int		type_size(Type *type);
+int		get_type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
@@ -395,6 +400,7 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit);
 Type	*type_array_to_ptr(Type *type);
 bool	can_use_arrow(Type *type);
 bool	can_use_dot(Type *type);
+bool	is_memory_type(Type *type);
 
 char	*get_str_literal_name(int index);
 

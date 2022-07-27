@@ -44,7 +44,7 @@ LVar	*find_lvar(Env *env, char *str, int len)
 	LVar	*var;
 
 	for (var = env->locals; var; var = var->next)
-		if (var->len == len && memcmp(str, var->name, var->len) == 0)
+		if (!var->is_dummy && var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
 	return NULL;
 }
@@ -91,12 +91,12 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 		regindex_max = max(regindex_max, tmp->arg_regindex);
 		if (tmp->arg_regindex == -1)
 		{
-			offset_min = min(offset_min, tmp->offset - align_to(type_size(tmp->type), 8));
+			offset_min = min(offset_min, tmp->offset - align_to(get_type_size(tmp->type), 8));
 		}
 		offset_max = max(offset_max, max(0, tmp->offset));
 	}
 
-	size = type_size(type_array_to_ptr(lvar->type)); // 配列はポインタにする
+	size = get_type_size(type_array_to_ptr(lvar->type)); // 配列はポインタにする
 
 	// レジスタに入れるか決定する
 	if (regindex_max < ARGREG_SIZE - 1
@@ -133,7 +133,7 @@ static void alloc_local_var(Env *env, LVar *lvar)
 	{
 		offset_max = max(offset_max, max(0, tmp->offset));
 	}
-	size = type_size(lvar->type);
+	size = get_type_size(lvar->type);
 
 	// offsetの最大値を基準に配置する
 	if (size < 4)
@@ -164,6 +164,7 @@ LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 	lvar->type = type;
 	lvar->is_arg = is_arg;
 	lvar->arg_regindex = -1;
+	lvar->is_dummy = false;
 
 	// メモリを割り当て
 	if (is_arg)
