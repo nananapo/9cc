@@ -40,6 +40,7 @@ Node	*shift(Env *env);
 Node	*relational(Env *env);
 Node	*equality(Env *env);
 Node	*bitwise_or(Env *env);
+Node	*bitwise_xor(Env *env);
 Node	*conditional_and(Env *env);
 Node	*conditional_or(Env *env);
 Node	*conditional_op(Env *env);
@@ -952,12 +953,34 @@ Node *equality(Env *env)
 	}
 }
 
+Node	*bitwise_xor(Env *env)
+{
+	Node	*node;
+
+	node = equality(env);
+	if (consume(env, "^"))
+	{
+		node = new_node(ND_BITWISE_XOR, node, bitwise_xor(env));
+
+		if (!is_integer_type(node->lhs->type)
+			|| !is_integer_type(node->rhs->type))
+			error_at(env->token->str, "整数型ではない型に^を適用できません");
+
+		// TODO キャストしてから可能か考える
+		if (!type_equal(node->rhs->type, node->lhs->type))
+			error_at(env->token->str, "^の両辺の型が一致しません");
+
+		node->type = node->rhs->type;
+	}
+	return (node);
+}
+
 // TODO 型チェック
 Node	*bitwise_or(Env *env)
 {
 	Node	*node;
 
-	node = equality(env);
+	node = bitwise_xor(env);
 	if (consume(env, "|"))
 	{
 		node = new_node(ND_BITWISE_OR, node, bitwise_or(env));

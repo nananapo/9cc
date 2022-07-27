@@ -1289,6 +1289,16 @@ void	gen(Node *node)
 			printf(".Lcond%d:\n", lend);
 			return ;
 		}
+		case ND_BITWISE_XOR:
+		{
+			gen(node->lhs);
+			push();
+			gen(node->rhs);
+			pop(RDI);
+
+			printf("   xor %s, %s\n", RAX, RDI);
+			return ;
+		}
 		case ND_BITWISE_OR:
 		{
 			gen(node->lhs);

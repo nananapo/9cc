@@ -714,6 +714,7 @@ assert_gcc "condop.c"
 
 assert_gcc "bitwise_or.c"
 assert_gcc "bitwise_not.c"
+assert_gcc "bitwise_xor.c"
 
 assert_gcc "shift.c"
 

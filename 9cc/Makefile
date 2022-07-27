@@ -14,7 +14,7 @@ test: $(NAME)
 	env LC_ALL="C" ./$(TEST_SCRIPT)
 
 clean:
-	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output
+	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3
 
 fclean: clean
 	rm -rf $(NAME)
