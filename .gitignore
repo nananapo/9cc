@@ -10,3 +10,4 @@ a
 *.swp
 *.output
 9cc/test/gcc/*
+atcoder/*

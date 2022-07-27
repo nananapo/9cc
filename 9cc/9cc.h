@@ -154,15 +154,15 @@ typedef enum NodeKind
 
 typedef enum PrimitiveType
 {
-	INT,
-	CHAR,
-	PTR,
-	ARRAY,
-	STRUCT,
-	ENUM,
-	UNION,
-	BOOL,
-	VOID
+	TY_INT,
+	TY_CHAR,
+	TY_PTR,
+	TY_ARRAY,
+	TY_STRUCT,
+	TY_ENUM,
+	TY_UNION,
+	TY_BOOL,
+	TY_VOID
 } PrimitiveType;
 
 typedef struct s_enum_definition

@@ -138,9 +138,9 @@ Node	*new_node_num(int val)
 	node->val = val;
 
 	//if (val < 127 && val > -128)
-	//	node->type = new_primitive_type(CHAR);
+	//	node->type = new_primitive_type(TY_CHAR);
 	//else
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 	return node;
 }
 
@@ -400,7 +400,7 @@ Node *call(Env *env, Token *tok)
 
 	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
 	if (is_memory_type(refunc->ret_type)
-		|| refunc->ret_type->ty == STRUCT)
+		|| refunc->ret_type->ty == TY_STRUCT)
 	{
 		node->call_mem_stack = create_local_var(env, "", 0, refunc->ret_type, false);
 		node->call_mem_stack->is_dummy = true;
@@ -530,7 +530,7 @@ Node *primary(Env *env)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
 		node->str_index = get_str_literal_index(env, tok->str, tok->len);
-		node->type = new_type_ptr_to(new_primitive_type(CHAR));
+		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 		return read_deref_index(env, node);
 	}
 
@@ -542,7 +542,7 @@ Node *primary(Env *env)
 		if (number == -1)
 			error_at(tok->str, "不明なエスケープシーケンスです");
 		node = new_node_num(number);
-		node->type = new_primitive_type(CHAR);
+		node->type = new_primitive_type(TY_CHAR);
 		return read_deref_index(env, node); // charの後ろに[]はおかしいけれど、とりあえず許容
 	}
 
@@ -683,7 +683,7 @@ Node *unary(Env *env)
 		// TODO 生成する関数を作る
 		node = unary(env);
 		node = new_node(ND_EQUAL, node, new_node_num(0));
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 		return (node);
 	}
 	else if (consume(env, "~"))
@@ -746,7 +746,7 @@ Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
 	|| !is_integer_type(node->rhs->type))
 		error_at(tok->str, "ポインタ型に* か / を適用できません");
 
-	node->type = new_primitive_type(INT);
+	node->type = new_primitive_type(TY_INT);
 	return (node);
 }
 
@@ -798,7 +798,7 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 	{
 		if (!type_equal(l, r))
 			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
-		node->type = new_primitive_type(INT);// TODO size_tにする
+		node->type = new_primitive_type(TY_INT);// TODO size_tにする
 
 		size = get_type_size(l->ptr_to);
 		if (size == 0 || size > 1)
@@ -806,7 +806,7 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 			if (size == 0)
 				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
 			node = new_node(ND_DIV, node, new_node_num(size));
-			node->type = new_primitive_type(INT);
+			node->type = new_primitive_type(TY_INT);
 		}
 		return (node);
 	}
@@ -824,7 +824,7 @@ Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
 	|| is_integer_type(r))
 	{
 		// Intを左に寄せる
-		if (r->ty == INT)
+		if (r->ty == TY_INT)
 		{
 			Type	*tmp;
 			tmp = l;
@@ -908,7 +908,7 @@ Node	*relational(Env *env)
 		else
 			return node;
 
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 
 		// 比較できるか確認
 		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
@@ -938,7 +938,7 @@ Node *equality(Env *env)
 		else
 			return node;
 
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 
 		// 比較できるか確認
 		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
@@ -984,7 +984,7 @@ Node	*conditional_and(Env *env)
 	if (consume(env, "&&"))
 	{
 		node = new_node(ND_COND_AND, node, conditional_and(env));
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 	}
 	return (node);
 }
@@ -998,7 +998,7 @@ Node	*conditional_or(Env *env)
 	if (consume(env, "||"))
 	{
 		node = new_node(ND_COND_OR, node, conditional_or(env));
-		node->type = new_primitive_type(INT);
+		node->type = new_primitive_type(TY_INT);
 	}
 	return (node);
 }
@@ -1029,8 +1029,8 @@ Node	*create_assign(Env *env, Node *lhs, Node *rhs, Token *tok)
 	node = new_node(ND_ASSIGN, lhs, rhs);
 
 	// 代入可能な型かどうか確かめる。
-	if (lhs->type->ty == VOID
-	|| rhs->type->ty == VOID)
+	if (lhs->type->ty == TY_VOID
+	|| rhs->type->ty == TY_VOID)
 		error_at(tok->str, "voidを宣言、代入できません");
 
 	if (!type_equal(rhs->type, lhs->type))
@@ -1499,14 +1499,14 @@ Node	*expect_constant(Env *env, Type *type)
 	{
 		node = new_node_num(number);
 	}
-	else if (type_equal(type, new_type_ptr_to(new_primitive_type(CHAR)))
+	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& (tok = consume_str_literal(env)) != NULL)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
 		node->str_index = get_str_literal_index(env, tok->str, tok->len);
-		node->type = new_type_ptr_to(new_primitive_type(CHAR));
+		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 	}
-	else if (type_equal(type, new_primitive_type(CHAR)) 
+	else if (type_equal(type, new_primitive_type(TY_CHAR)) 
 			&& (tok = consume_char_literal(env)) != NULL)
 	{
 		number = get_char_to_int(tok->str, tok->strlen_actual);
@@ -1798,7 +1798,7 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 		lvar = calloc(1, sizeof(LVar));
 		lvar->name = "";
 		lvar->len = 0;
-		lvar->type = new_type_ptr_to(new_primitive_type(VOID));
+		lvar->type = new_type_ptr_to(new_primitive_type(TY_VOID));
 		lvar->is_arg = true;
 		lvar->arg_regindex = 0;
 		lvar->is_dummy = true;
@@ -1846,7 +1846,7 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 			if (arg == NULL)
 			{
 				// voidなら引数0個
-				if (type->ty == VOID && node->argdef_count == 0)
+				if (type->ty == TY_VOID && node->argdef_count == 0)
 				{
 					if (!consume(env, ")"))
 						error_at(env->token->str, ")が見つかりませんでした。");

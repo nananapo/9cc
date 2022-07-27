@@ -83,7 +83,7 @@ void	consume_type_ptr(Env *env, Type **type)
 
 	while (consume(env, "*"))
 	{
-		tmp = new_primitive_type(PTR);
+		tmp = new_primitive_type(TY_PTR);
 		tmp->ptr_to = *type;
 		*type = tmp;
 	}
@@ -112,13 +112,13 @@ Type	*consume_type_before(Env *env, bool read_def)
 
 	// type name
 	if (consume_ident_str(env, "int"))
-		type = new_primitive_type(INT);
+		type = new_primitive_type(TY_INT);
 	else if (consume_ident_str(env, "char"))
-		type = new_primitive_type(CHAR);
+		type = new_primitive_type(TY_CHAR);
 	else if (consume_ident_str(env, "_Bool"))
-		type = new_primitive_type(BOOL);
+		type = new_primitive_type(TY_BOOL);
 	else if (consume_ident_str(env, "void"))
-		type = new_primitive_type(VOID);
+		type = new_primitive_type(TY_VOID);
 	else if (consume_with_type(env, TK_STRUCT))
 	{
 		ident = consume_ident(env);

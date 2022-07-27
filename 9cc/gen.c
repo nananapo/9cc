@@ -20,7 +20,6 @@ char	*get_str_literal_name(int index);
 static void	comment(char *c);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
-static void	prologue(void);
 static void	load(Type *type);
 static void	lval(Node *node);
 static void	call(Node *node);
@@ -104,11 +103,11 @@ static void	cmp(Type *dst, Type *from)
 {
 	if (type_equal(dst, from))
 	{
-		if (dst->ty == PTR || dst->ty == ARRAY)
+		if (dst->ty == TY_PTR || dst->ty == TY_ARRAY)
 			cmps(RAX, RDI);
-		else if (dst->ty == CHAR || dst->ty == BOOL)
+		else if (dst->ty == TY_CHAR || dst->ty == TY_BOOL)
 			cmps(AL, DIL);
-		else if (dst->ty == INT || dst->ty == ENUM)
+		else if (dst->ty == TY_INT || dst->ty == TY_ENUM)
 			cmps(EAX, EDI);
 		return ;
 	}
@@ -229,40 +228,32 @@ static void store_ptr(int size, bool minus_step)
 	}
 }
 
-static void prologue()
-{
-	// prologue
-	mov(RAX, RBP);
-	push();
-	mov(RBP, RSP);
-}
-
 // raxをraxに読み込む
 static void	load(Type *type)
 {
 	
-	if (type->ty == PTR)
+	if (type->ty == TY_PTR)
 	{
 		mov(RAX, "[rax]");
 		return ;
 	}
-	else if (type->ty == CHAR || type->ty == BOOL)
+	else if (type->ty == TY_CHAR || type->ty == TY_BOOL)
 	{
 		printf("    mov al, %s [%s]\n", BYTE_PTR, RAX);
 		printf("    movzx %s, %s\n", RAX, AL);
 		return ;
 	}
-	else if (type->ty == INT || type->ty == ENUM)
+	else if (type->ty == TY_INT || type->ty == TY_ENUM)
 	{
 		printf("    mov %s, %s [%s]\n", EAX, DWORD_PTR, RAX);
 		//printf("    movzx %s, %s\n", RAX, EAX);
 		return ;
 	}
-	else if (type->ty == ARRAY)
+	else if (type->ty == TY_ARRAY)
 	{
 		return ;
 	}
-	else if (type->ty == STRUCT || type->ty == UNION)
+	else if (type->ty == TY_STRUCT || type->ty == TY_UNION)
 	{
 		// TODO とりあえず8byteまで
 		// mov(RAX, "[rax]");
@@ -462,8 +453,8 @@ static void	call(Node *node)
 				(tmp->locals->offset + 16) + rbp_offset);
 
 		// ptr先を渡すのはSTRUCTだけ
-		if (tmp->type->ty == STRUCT
-			|| tmp->type->ty == UNION)
+		if (tmp->type->ty == TY_STRUCT
+			|| tmp->type->ty == TY_UNION)
 			store_ptr(size, false);
 		else
 			store_value(size);
@@ -506,7 +497,7 @@ static void	call(Node *node)
 		printf("    lea rax, [rbp - %d]\n", node->call_mem_stack->offset);
 	}
 	// 返り値がstructなら、rax, rdxを移動する
-	else if (node->type->ty == STRUCT)
+	else if (node->type->ty == TY_STRUCT)
 	{
 		size = align_to(get_type_size(node->type), 8);
 		printf("    lea %s, [rbp - %d]\n", RDI, node->call_mem_stack->offset);
@@ -627,12 +618,12 @@ static void	mul_prologue(Node *node)
 static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
 {
 	// 結果がポインタ型なら
-	if (restype->ty != PTR && restype->ty != ARRAY)
+	if (restype->ty != TY_PTR && restype->ty != TY_ARRAY)
 		return ;
 
 	// 左辺をポインタ型にする
 	if (can_replace &&
-		((*rhs)->type->ty == PTR || (*rhs)->type->ty == ARRAY))
+		((*rhs)->type->ty == TY_PTR || (*rhs)->type->ty == TY_ARRAY))
 	{
 		Node *tmp = *lhs;
 		*lhs = *rhs;
@@ -645,7 +636,7 @@ static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_re
 		// ポインタの先のサイズを掛ける
 		*rhs = new_node(ND_MUL, *rhs,
 						new_node_num(get_type_size((*lhs)->type->ptr_to)));
-		(*rhs)->type = new_primitive_type(INT);
+		(*rhs)->type = new_primitive_type(TY_INT);
 	}
 }
 
@@ -731,12 +722,12 @@ static void	assign_epilogue(Type *type)
 	pop("r10");
 
 	// storeする
-	if (type->ty == ARRAY)
+	if (type->ty == TY_ARRAY)
 		// TODO これOKなの？
 		// ARRAYに対する代入がうまくいかない気がする
 		store_value(8);
-	else if(type->ty == STRUCT
-			|| type->ty == UNION)
+	else if(type->ty == TY_STRUCT
+			|| type->ty == TY_UNION)
 		store_ptr(get_type_size(type), false);
 	else
 		store_value(get_type_size(type));
@@ -759,7 +750,11 @@ static void	funcdef(Node *node)
 	if (!node->is_static)
 		printf(".globl _%s\n", funcname);
 	printf("_%s:\n", funcname);	
-	prologue();
+
+	// prologue
+	mov(RAX, RBP);
+	push();
+	mov(RBP, RSP);
 
 	if (node->locals != NULL)
 	{
@@ -832,7 +827,7 @@ static void	funcdef(Node *node)
 		printf("    mov %s, [rbp - %d]\n", RDI, node->locals->offset);
 	}
 	// STRUCTなら、rax, rdxに格納
-	else if (node->ret_type->ty == STRUCT)
+	else if (node->ret_type->ty == TY_STRUCT)
 	{
 		size = align_to(get_type_size(node->ret_type), 8);
 		if (size > 8)
@@ -858,15 +853,15 @@ static void	print_global_constant(Node *node, Type *type)
 {
 	Node	*notmp;
 
-	if (type_equal(type, new_primitive_type(INT)))
+	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
 		printf("    .long %d\n", node->val);
 	}
-	else if (type_equal(type, new_primitive_type(CHAR)))
+	else if (type_equal(type, new_primitive_type(TY_CHAR)))
 	{
 		printf("    .byte %d\n", node->val);
 	}
- 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(CHAR)))
+ 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& node->str_index >= 0)
 	{
 		// TODO arrayのchar
@@ -947,7 +942,7 @@ void	gen(Node *node)
 			// if
 			gen(node->lhs);
 			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
+			cmp(node->lhs->type, new_primitive_type(TY_INT));
 
 			lend = jumpLabelCount++;
 
@@ -991,7 +986,7 @@ void	gen(Node *node)
 			// if
 			gen(node->lhs);
 			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
+			cmp(node->lhs->type, new_primitive_type(TY_INT));
 			printf("    je .Lend%d\n", lend);
 			
 			// while block
@@ -1025,7 +1020,7 @@ void	gen(Node *node)
 			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
 			gen(node->rhs);
 			mov(RDI, "0");
-			cmp(node->rhs->type, new_primitive_type(INT));
+			cmp(node->rhs->type, new_primitive_type(TY_INT));
 			printf("    jne .Lbegin%d\n", lbegin);
 			printf(".Lend%d:\n", lend); // break先
 			return;
@@ -1047,7 +1042,7 @@ void	gen(Node *node)
 			{
 				gen(node->for_if);
 				mov(RDI, "0");
-				cmp(node->for_if->type, new_primitive_type(INT));
+				cmp(node->for_if->type, new_primitive_type(TY_INT));
 				printf("    je .Lend%d\n", lend);
 			}
 
@@ -1163,7 +1158,7 @@ void	gen(Node *node)
 			gen(node->rhs);
 			pop(RDI);
 
-			if (node->type->ty == ARRAY)
+			if (node->type->ty == TY_ARRAY)
 				printf("    add rax, rdi\n");
 			else
 				printf("    add rax, [rdi]\n");
@@ -1181,7 +1176,7 @@ void	gen(Node *node)
 			gen(node->rhs);
 			mov(RDI, RAX);
 			pop(RAX);
-			if (node->type->ty == ARRAY)
+			if (node->type->ty == TY_ARRAY)
 				printf("    sub rax, rdi\n");
 			else
 			{
@@ -1247,7 +1242,7 @@ void	gen(Node *node)
 			// 左辺を評価
 			gen(node->lhs);
 			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
+			cmp(node->lhs->type, new_primitive_type(TY_INT));
 			printf("    setne al\n"); // 0と等しくないかをalに格納
 			printf("    je .Lcond%d\n", lend); // 0ならスキップ
 
@@ -1256,18 +1251,18 @@ void	gen(Node *node)
 			// 右辺を評価
 			gen(node->rhs);
 			mov(RDI, "0");
-			cmp(node->rhs->type, new_primitive_type(INT));
+			cmp(node->rhs->type, new_primitive_type(TY_INT));
 			printf("    setne al\n"); // 0と等しくないかをalに格納
 
 			pop(RDI);
 		
-			create_add(true, new_primitive_type(INT), new_primitive_type(INT));
+			create_add(true, new_primitive_type(TY_INT), new_primitive_type(TY_INT));
 			printf("    movzx rax, al\n"); // alをゼロ拡張
 
 			// 最後の比較
 			printf(".Lcond%d:\n", lend);
 			mov(RDI, "2");
-			cmp(new_primitive_type(INT), new_primitive_type(INT));
+			cmp(new_primitive_type(TY_INT), new_primitive_type(TY_INT));
 			printf("    sete al\n"); // 2と等しいかをalに格納
 			printf("    movzx rax, al\n"); // alをゼロ拡張
 			return ;
@@ -1279,7 +1274,7 @@ void	gen(Node *node)
 			// 左辺を評価
 			gen(node->lhs);
 			mov(RDI, "0");
-			cmp(node->lhs->type, new_primitive_type(INT));
+			cmp(node->lhs->type, new_primitive_type(TY_INT));
 			printf("    setne al\n"); // 0と等しくないかをalに格納
 			printf("    movzx rax, al\n"); // alをゼロ拡張
 			printf("    jne .Lcond%d\n", lend); // 0以外ならスキップ
@@ -1287,7 +1282,7 @@ void	gen(Node *node)
 			// 右辺を評価
 			gen(node->rhs);
 			mov(RDI, "0");
-			cmp(node->rhs->type, new_primitive_type(INT));
+			cmp(node->rhs->type, new_primitive_type(TY_INT));
 			printf("    setne al\n"); // 0と等しくないかをalに格納
 			printf("    movzx rax, al\n"); // alをゼロ拡張
 
