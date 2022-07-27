@@ -15,6 +15,17 @@ void	error(char *fmt, ...)
 	exit(1);
 }
 
+void	debug(char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+
+#ifdef DEBUG
+	fprintf(stdout, fmt, ap);
+#endif
+}
+
+
 static int	count_line(char *start, char *end)
 {
 	int	i;

@@ -6,9 +6,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-int	max(int a, int b);
-int	min(int a, int b);
-int	align_to(int n, int align);
+int			max(int a, int b);
+int			min(int a, int b);
+int			align_to(int n, int align);
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
@@ -16,8 +16,7 @@ static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
 static void	cmps(char *dst, char *from);
 static void	cmp(Type *dst, Type *from);
-char	*get_str_literal_name(int index);
-static void	comment(char *c);
+char		*get_str_literal_name(int index);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(Type *type);
@@ -31,7 +30,7 @@ static void	load_lval_addr(Node *node);
 static void	funcdef(Node *node);
 static void	print_global_constant(Node *node, Type *type);
 static void	globaldef(Node *node);
-void	gen(Node *node);
+void		gen(Node *node);
 
 extern t_str_elem	*str_literals;
 extern int			switchCaseCount;
@@ -67,19 +66,23 @@ int	align_to(int n, int align)
 static void	push()
 {
 	stack_count += 8;
-	printf("    %s %s # stack= %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	
+	debug("# stack= %d -> %d\n", stack_count - 8, stack_count);
+	printf("    %s %s\n", ASM_PUSH, RAX);
 }
 
-static void	pushi(int data)
+static void	pushi(int num)
 {
 	stack_count += 8;
-	printf("    %s %d # stack= %d -> %d\n", ASM_PUSH, data, stack_count - 8, stack_count);
+	debug("# stack= %d -> %d\n", stack_count - 8, stack_count);
+	printf("    %s %d\n", ASM_PUSH, num);
 }
 
 static void	pop(char *reg)
 {
 	stack_count -= 8;
-	printf("    pop %s # stack= %d -> %d\n", reg, stack_count + 8, stack_count);
+	debug("# stack= %d -> %d\n", stack_count + 8, stack_count);
+	printf("    pop %s\n", reg);
 }
 
 static void	mov(char *dst, char *from)
@@ -122,11 +125,6 @@ char	*get_str_literal_name(int index)
 	tmp = calloc(100, sizeof(char));
 	sprintf(tmp, "L_STR_%d", index);
 	return (tmp);
-}
-
-static void	comment(char *c)
-{
-	printf("# %s\n", c);
 }
 
 // RAXからR10(アドレス)に値をストアする
@@ -320,7 +318,7 @@ static void	call(Node *node)
 		{
 			min_offset = min(lvtmp->offset, min_offset);
 			max_argregindex = max(max_argregindex, lvtmp->arg_regindex);
-			printf(" # LOOP %d\n", lvtmp->arg_regindex);
+			debug(" # LOOP %d\n", lvtmp->arg_regindex);
 		}
 
 		// 一つめの引数を読み込み
@@ -339,9 +337,9 @@ static void	call(Node *node)
 
 		printf("    mov [rdi + 16], rsp\n\n"); // reg save area
 
-		printf("    # VA_START\n");
-		printf("    # gp_offset : %d\n", (1 + max_argregindex) * 8);
-		printf("    # fp_offset : %d\n", 0 * 8);
+		debug("    # VA_START\n");
+		debug("    # gp_offset : %d\n", (1 + max_argregindex) * 8);
+		debug("    # fp_offset : %d\n", 0 * 8);
 
 		return ;
 	}
@@ -352,9 +350,8 @@ static void	call(Node *node)
 
 		size = get_type_size(type_array_to_ptr(tmp->locals->type));
 
-		printf("# PUSH ARG %s (%d)\n",
-			strndup(tmp->locals->name, tmp->locals->len),
-			size);
+		debug("# PUSH ARG %s (%d)\n",
+			strndup(tmp->locals->name, tmp->locals->len),size);
 
 		gen(tmp);
 
@@ -405,7 +402,7 @@ static void	call(Node *node)
 	if (!is_aligned)
 		rbp_offset += 8;
 
-	printf("# RBP_OFFSET %d (is_aligned : %d)\n", rbp_offset, is_aligned);
+	debug("# RBP_OFFSET %d (is_aligned : %d)\n", rbp_offset, is_aligned);
 
 	pop_count = 0;
 	// 後ろから格納していく
@@ -416,7 +413,7 @@ static void	call(Node *node)
 		for (j = 1; j < i; j++)
 			tmp = tmp->next;
 
-		printf("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
+		debug("# POP %s\n", strndup(tmp->locals->name, tmp->locals->len));
 	
 		size = get_type_size(type_array_to_ptr(tmp->locals->type));
 
@@ -440,7 +437,7 @@ static void	call(Node *node)
 			continue ;
 		}
 
-		printf("# OFFSET %d\n", tmp->locals->offset);
+		debug("# OFFSET %d\n", tmp->locals->offset);
 
 		// スタックに積む
 		// 必ず8byteアラインなので楽々実装
@@ -464,8 +461,9 @@ static void	call(Node *node)
 	if (rbp_offset != 0)
 	{
 		if (!is_aligned)
-			comment("aligned + 8");
-		printf("    sub rsp, %d # rbp_offset\n", rbp_offset);
+			debug("# aligned + 8\n");
+		debug("#rbp_offset\n");
+		printf("    sub rsp, %d\n", rbp_offset);
 	}
 
 	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
@@ -475,7 +473,7 @@ static void	call(Node *node)
 	}
 
 	// call
-	printf("# CALL RBP_OFFSET: %d\n", rbp_offset);
+	debug("# CALL RBP_OFFSET: %d\n", rbp_offset);
 	if (node->is_variable_argument)
 		printf("    mov al, 0\n");
 	printf("    call _%s\n", strndup(node->fname, node->flen));
@@ -483,12 +481,14 @@ static void	call(Node *node)
 	// rspを元に戻す
 	if (rbp_offset != 0)
 	{
-		printf("    add rsp, %d # rbp_offset\n", rbp_offset);
+		debug("#rbp_offset\n");
+		printf("    add rsp, %d\n", rbp_offset);
 	}
 
 	// stack_countをあわせる
-	printf("    add rsp, %d # pop_count\n", pop_count * 8);
-	printf("# POP ALL %d -> %d\n", stack_count, stack_count - pop_count * 8);
+	debug("#pop_count\n");
+	printf("    add rsp, %d\n", pop_count * 8);
+	debug("# POP ALL %d -> %d\n", stack_count, stack_count - pop_count * 8);
 	stack_count -= pop_count * 8;
 
 	// 返り値がMEMORYなら、raxにアドレスを入れる
@@ -524,7 +524,7 @@ static void	cast(Type *from, Type *to)
 
 	name1 = get_type_name(from);
 	name2 = get_type_name(to);
-	printf("# cast %s -> %s\n", name1, name2);
+	debug("# cast %s -> %s\n", name1, name2);
 
 	// ポインタからポインタのキャストは何もしない
 	if (is_pointer_type(from)
@@ -565,14 +565,11 @@ static void	cast(Type *from, Type *to)
 		// 符号拡張する
 		if (size1 < size2)
 		{
+			debug("#cast %d -> %d\n", size1, size2);
 			if (size1 == 1)
-			{
-				printf("    movsx %s, %s # cast %d -> %d\n", RAX, AL, size1, size2);
-			}
+				printf("    movsx %s, %s\n", RAX, AL);
 			else if (size1 == 4)
-			{
-				printf("    movsx %s, %s # cast %d -> %d\n", RAX, EAX, size1, size2);
-			}
+				printf("    movsx %s, %s\n", RAX, EAX);
 			else
 				error("8byte -> 8byteのキャストは無い");
 		}
@@ -600,7 +597,8 @@ static void	arrow(Node *node, bool as_addr)
 
 	// offsetを足す
 	offset = node->elem->offset;
-	printf("    add rax, %d # offset\n", offset);
+	debug("# offset\n");
+	printf("    add rax, %d\n", offset);
 
 	// 値として欲しいなら値にする
 	if (!as_addr)
@@ -645,7 +643,7 @@ static void	create_add(bool is_add, Type *l, Type *r)
 {
 	int	size;
 
-	printf("    # add(%d) %s(%d) + %s(%d)\n", is_add,
+	debug("    # add(%d) %s(%d) + %s(%d)\n", is_add,
 			get_type_name(l), get_type_size(l),
 			get_type_name(r), get_type_size(r));
 
@@ -654,22 +652,40 @@ static void	create_add(bool is_add, Type *l, Type *r)
 	{
 		size = get_type_size(l);
 		if (size == 4)
-			printf("    movsxd rax, eax # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsxd rax, eax\n");
+		}
 		else if (size == 2)
-			printf("    movsx rax, ax # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsx rax, ax\n");
+		}
 		else if (size == 1)
-			printf("    movsx rax, al # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsx rax, al\n");
+		}
 	}
 
 	if (is_integer_type(r))
 	{
 		size = get_type_size(r);
 		if (size == 4)
-			printf("    movsxd rdi, edi # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsxd rdi, edi\n");
+		}
 		else if (size == 2)
-			printf("    movsx rdi, di # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsx rdi, di\n");
+		}
 		else if (size == 1)
-			printf("    movsx rdi, dil # sizeup\n");
+		{
+			debug("# sizeup\n");
+			printf("    movsx rdi, dil\n");
+		}
 	}
 
 	if (is_add)
@@ -712,7 +728,7 @@ static void	load_lval_addr(Node *node)
 
 static void	assign_prologue(Node *node)
 {
-	printf("#ASSIGN %d\n", node->lhs->kind);
+	debug("#ASSIGN %d\n", node->lhs->kind);
 	load_lval_addr(node->lhs);	
 	push();
 }
@@ -761,7 +777,7 @@ static void	funcdef(Node *node)
 		maxoff = 0;
 		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
-			printf("# VAR %s %d\n", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
+			debug("# VAR %s %d\n", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
 			maxoff = max(maxoff, lvtmp->offset);	
 		}
 		stack_size = align_to(maxoff, 8);
@@ -771,7 +787,7 @@ static void	funcdef(Node *node)
 
 	stack_count += stack_size; // stack_sizeを初期化
 
-	printf("# STACKSIZE : %d\n", stack_size);
+	debug("# STACKSIZE : %d\n", stack_size);
 
 	if (stack_size != 0)
 	{
@@ -781,7 +797,7 @@ static void	funcdef(Node *node)
 		{
 			if (!lvtmp->is_arg)
 				continue ;
-			printf("# ARG %s\n", strndup(lvtmp->name, lvtmp->len));
+			debug("# ARG %s\n", strndup(lvtmp->name, lvtmp->len));
 			if (lvtmp->arg_regindex != -1)
 			{
 				index = lvtmp->arg_regindex;
@@ -801,7 +817,7 @@ static void	funcdef(Node *node)
 				}
 			}
 		}
-		printf("# ARG_END\n");
+		debug("# ARG_END\n");
 	}
 
 	// 返り値がMEMORYなら、rdiからアドレスを取り出す
@@ -841,7 +857,7 @@ static void	funcdef(Node *node)
 	printf("    ret\n");
 
 	stack_count -= stack_size;
-	printf("#count %d\n", stack_count);
+	debug("#count %d\n", stack_count);
 	
 	if (stack_count != 0)
 		error("stack_countが0ではありません");
@@ -1073,7 +1089,7 @@ void	gen(Node *node)
 			printf("    mov [rsp - 8], rax\n"); //結果を格納
 
 			// if
-			printf("    # switch def:%d, end:%d\n", lbegin, lend);
+			debug("    # switch def:%d, end:%d\n", lbegin, lend);
 			SwitchCase	*sw_tmp;
 			for (sw_tmp = node->switch_cases; sw_tmp; sw_tmp = sw_tmp->next)
 			{
@@ -1088,7 +1104,7 @@ void	gen(Node *node)
 			else
 				printf("    jmp .Lend%d\n", lend);
 
-			printf("    # switch in\n");
+			debug("    # switch in\n");
 			// 文を出力
 			sb_switch_start(node->lhs->type, lend, lbegin);
 			gen(node->rhs);
@@ -1099,7 +1115,8 @@ void	gen(Node *node)
 		}
 		case ND_CASE:
 		{
-			printf(".Lswitch%d: # case %d\n", node->switch_label, node->val);
+			debug("# case %d\n", node->val);
+			printf(".Lswitch%d:\n", node->switch_label);
 			return ;
 		}
 		case ND_BREAK:
@@ -1108,7 +1125,8 @@ void	gen(Node *node)
 			// 一応チェック
 			if (sbdata == NULL)
 				error("breakに対応する文が見つかりません");
-			printf("jmp .Lend%d # break\n", sbdata->endlabel);
+			debug("# break\n");
+			printf("jmp .Lend%d\n", sbdata->endlabel);
 			return ;
 		}
 		case ND_CONTINUE:
@@ -1117,7 +1135,8 @@ void	gen(Node *node)
 			// 一応チェック
 			if (sbdata == NULL)
 				error("continueに対応する文が見つかりません");
-			printf("jmp .Lbegin%d # continue\n", sbdata->startlabel);
+			debug("# continue\n");
+			printf("jmp .Lbegin%d\n", sbdata->startlabel);
 			return ;
 		}
 		case ND_DEFAULT:
@@ -1126,7 +1145,8 @@ void	gen(Node *node)
 			// 一応チェック
 			if (sbdata == NULL)
 				error("defaultに対応する文が見つかりません");
-			printf(".Lswitch%d: # default\n", sbdata->defaultLabel);
+			debug("# default\n");
+			printf(".Lswitch%d:\n", sbdata->defaultLabel);
 			return ;
 		}
 		case ND_BLOCK:

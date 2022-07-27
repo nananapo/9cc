@@ -363,6 +363,9 @@ typedef struct s_typedefpair
 	Type	*type;
 }	TypedefPair;
 
+
+void	debug(char *fmt, ...);
+
 char	*read_file(char	*name);
 
 int	align_to(int a, int to);
