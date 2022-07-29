@@ -28,4 +28,12 @@ re:
 	cd prpr && make re
 	cd 9cc && make re
 
+clean:
+	cd prpr && make clean
+	cd 9cc && make clean
+
+fclean:
+	cd prpr && make fclean
+	cd 9cc && make fclean
+
 .PHONY: prpr 9cc prpr1 9cc1 re
