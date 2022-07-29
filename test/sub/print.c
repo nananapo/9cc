@@ -149,7 +149,7 @@ void put_intptrv(void *ptr)
 
 int *my_malloc_int(int size)
 {
-	write(2, "called malloc\n", 14);
+//	write(2, "called malloc\n", 14);
 	int* ptr = (int *)malloc(sizeof(int) * size);
 //	printf("ptr %p\n", ptr);
 	return ptr;

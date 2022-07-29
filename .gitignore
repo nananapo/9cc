@@ -11,3 +11,4 @@ a
 *.output
 9cc/test/gcc/*
 atcoder/*
+.DS_Store
