@@ -69,11 +69,10 @@ int	read_var_name(char *p)
 int	match_word(char *str, char *needle)
 {
 	int	len = strlen(needle);
+
 	if (strncmp(str, needle, len) != 0)
 		return 0;
-	if (isalnum(str[len]))
-		return 0;
-	if (!isspace(str[len]))
+	if (isalnum(str[len]) || issymbol(str[len]))
 		return 0;
 	return len;
 }
@@ -93,6 +92,7 @@ Token	*tokenize(char *p)
 			p++;
 			continue ;
 		}
+
 		res_result = match_reserved_word(p);
 		if (res_result != NULL)
 		{
@@ -101,6 +101,7 @@ Token	*tokenize(char *p)
 			p += cur->len;
 			continue ;
 		}
+
 		if (match_word(p, "return"))
 		{
 			cur = new_token(TK_RETURN, cur, p);

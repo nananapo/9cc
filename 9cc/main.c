@@ -24,10 +24,10 @@ int main(int argc, char **argv)
 	}
 
 	token = tokenize(user_input);
-	debug("# Tokenized\n");
+	debug("Tokenized");
 
 	parseresult = parse(token);
-	debug("# Node constructed\n");
+	debug("Node constructed");
 
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");

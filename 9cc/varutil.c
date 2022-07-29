@@ -187,6 +187,6 @@ LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 			}
 		}
 	}
-	debug("#CREATED LVAR %s\n", strndup(name, len));
+	debug("CREATED LVAR %s", strndup(name, len));
 	return lvar;
 }

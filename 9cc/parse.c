@@ -242,7 +242,7 @@ Node *call(Env *env, Token *tok)
 	Node	*ntmp;
 	Node	*refunc;
 
-	debug("# CALL %s START\n", strndup(tok->str, tok->len));
+	debug("CALL %s START", strndup(tok->str, tok->len));
 
 	node  = new_node(ND_CALL, NULL, NULL);
 	node->fname = tok->str;
@@ -326,11 +326,11 @@ Node *call(Env *env, Token *tok)
 
 	for (i = 0; i < node->argdef_count; i++)
 	{
-		debug("#  READ ARG(%d) START\n", i);
+		debug("  READ ARG(%d) START", i);
 
 		if (def != NULL && def->is_arg)
 		{
-			debug("#  is ARG\n");
+			debug("  is ARG");
 			// 型の確認
 			if (!type_equal(def->type, args->type))
 			{
@@ -349,7 +349,7 @@ Node *call(Env *env, Token *tok)
 		else
 		{
 			// defがNULL -> 可変長引数
-			debug("#  is VA\n");
+			debug("  is VA");
 
 			// create_local_varからのコピペ
 			def = calloc(1, sizeof(LVar));
@@ -363,7 +363,7 @@ Node *call(Env *env, Token *tok)
 
 			alloc_argument_simu(firstdef, def); 
 
-			debug("#ASSIGNED %d\n", def->arg_regindex);
+			debug("ASSIGNED %d", def->arg_regindex);
 
 			lastdef->next = def;
 		}
@@ -394,7 +394,7 @@ Node *call(Env *env, Token *tok)
 			def = NULL;
 		args = args->next;
 
-		debug("#  READ ARG(%d) END\n", i);
+		debug("  READ ARG(%d) END", i);
 	}
 
 	// 型を返り値の型に設定
@@ -408,7 +408,7 @@ Node *call(Env *env, Token *tok)
 		node->call_mem_stack->is_dummy = true;
 	}
 
-	debug("# CALL END\n");
+	debug(" CALL END");
 
 	return node;
 }
@@ -1084,7 +1084,7 @@ Node	*create_assign(Env *env, Node *lhs, Node *rhs, Token *tok)
 	{
 		if (type_can_cast(rhs->type, lhs->type, false))
 		{
-			debug("#assign (%s) <- (%s)\n",
+			debug("assign (%s) <- (%s)",
 					get_type_name(lhs->type),
 					get_type_name(rhs->type));
 			node->rhs = cast(env, rhs, lhs->type);
@@ -1224,19 +1224,19 @@ Node	*read_ifblock(Env *env)
 {
 	Node	*node;
 
-	debug("#  IF START\n");
+	debug("  IF START");
 
 	if (!consume(env, "("))
 		error_at(env->token->str, "(ではないトークンです");
 	node = new_node(ND_IF, expr(env), NULL);
 
-	debug("#   IF READed EXPR\n");
+	debug("   IF READed EXPR");
 
 	if (!consume(env, ")"))
 		error_at(env->token->str, ")ではないトークンです");
 	node->rhs = stmt(env);
 
-	debug("#   IF READ STMT\n");
+	debug("   IF READ STMT");
 
 	if (consume_with_type(env, TK_ELSE))
 	{
@@ -1245,7 +1245,7 @@ Node	*read_ifblock(Env *env)
 		else
 			node->els = stmt(env);
 	}
-	debug("#  IF END\n");
+	debug("  IF END");
 	return (node);
 }
 
@@ -1279,7 +1279,7 @@ Node	*stmt(Env *env)
 	}
 	else if (consume_with_type(env, TK_WHILE))
 	{
-		debug("#  WHILE START\n");
+		debug("  WHILE START");
 
 		if (!consume(env, "("))
 			error_at(env->token->str, "(ではないトークンです");
@@ -1292,7 +1292,7 @@ Node	*stmt(Env *env)
 			node->rhs = stmt(env);
 		sb_end();
 
-		debug("#  WHILE END\n");
+		debug("  WHILE END");
 		return node;
 	}
 	else if (consume_with_type(env, TK_DO))
@@ -1313,7 +1313,7 @@ Node	*stmt(Env *env)
 	}
 	else if (consume_with_type(env, TK_FOR))
 	{
-		debug("#  FOR START\n");
+		debug("  FOR START");
 
 		if (!consume(env, "("))
 			error_at(env->token->str, "(ではないトークンです");
@@ -1348,7 +1348,7 @@ Node	*stmt(Env *env)
 			node->lhs = stmt(env);
 		sb_end();
 
-		debug("#  FOR END\n");
+		debug("  FOR END");
 		return (node);
 	}
 	else if (consume_with_type(env, TK_SWITCH))
@@ -1430,11 +1430,11 @@ Node	*stmt(Env *env)
 
 		while (!consume(env, "}"))
 		{
-			debug("# START READ BLOCK LINE\n");
+			debug(" START READ BLOCK LINE");
 			node->lhs = stmt(env);
 			node->rhs = new_node(ND_BLOCK, NULL, NULL);
 			node = node->rhs;
-			debug("# END READ BLOCK LINE\n");
+			debug(" END READ BLOCK LINE");
 		}
 		return (start);
 	}
@@ -1646,7 +1646,7 @@ Node	*read_struct_block(Env *env, Token *ident)
 		continue ;
 	env->struct_defs[i] = def;
 
-	debug("# READ STRUCT %s\n", strndup(ident->str, ident->len));
+	debug(" READ STRUCT %s", strndup(ident->str, ident->len));
 
 	while (1)
 	{
@@ -1695,7 +1695,7 @@ Node	*read_struct_block(Env *env, Token *ident)
 				tmp->offset = ((i + 7) / 8) * 8 + typesize;
 		}
 
-		debug("#  OFFSET OF %s : %d\n", strndup(ident->str, ident->len), tmp->offset);
+		debug("  OFFSET OF %s : %d", strndup(ident->str, ident->len), tmp->offset);
 		def->members = tmp;
 	}
 
@@ -1705,10 +1705,10 @@ Node	*read_struct_block(Env *env, Token *ident)
 	else
 	{
 		maxsize = max_type_size(new_struct_type(env, def->name, def->name_len));
-		debug("#  MAX_SIZE = %d\n", maxsize);
+		debug("  MAX_SIZE = %d", maxsize);
 		def->mem_size = align_to(def->members->offset, maxsize);
 	}
-	debug("#  MEMSIZE = %d\n", def->mem_size);
+	debug("  MEMSIZE = %d", def->mem_size);
 
 	// offsetを修正
 	for (tmp = def->members; tmp != NULL; tmp = tmp->next)
@@ -1735,7 +1735,7 @@ Node	*read_enum_block(Env *env, Token *ident)
 		continue ;
 	env->enum_defs[i] = def;
 
-	debug("# READ ENUM %s\n", strndup(ident->str, ident->len));
+	debug(" READ ENUM %s", strndup(ident->str, ident->len));
 
 	while (1)
 	{
@@ -1751,7 +1751,7 @@ Node	*read_enum_block(Env *env, Token *ident)
 				error_at(env->token->str, "}が見つかりません");
 			break ;
 		}
-		debug("# ENUM %s\n", def->kinds[def->kind_len - 1]);
+		debug(" ENUM %s", def->kinds[def->kind_len - 1]);
 	}
 	return (new_node(ND_ENUM_DEF, NULL, NULL));
 }
@@ -1776,7 +1776,7 @@ Node	*read_union_block(Env *env, Token *ident)
 		continue ;
 	env->union_defs[i] = def;
 
-	debug("# READ UNION %s\n", strndup(ident->str, ident->len));
+	debug(" READ UNION %s", strndup(ident->str, ident->len));
 
 	// 要素を追加 & 最大のサイズを取得
 	while (1)
@@ -1810,7 +1810,7 @@ Node	*read_union_block(Env *env, Token *ident)
 		def->members = tmp;
 	}
 
-	debug("#  MEMSIZE = %d\n", def->mem_size);
+	debug("  MEMSIZE = %d", def->mem_size);
 	return (new_node(ND_UNION_DEF, NULL, NULL));
 }
 
@@ -1930,7 +1930,7 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 		node->argdef_count = -1;
 	}
 
-	debug("# END READ ARGS\n");
+	debug(" END READ ARGS");
 
 	// func_defsに代入
 	// TODO 関数名被り
@@ -1958,7 +1958,7 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 
 	env->func_now = NULL;
 	
-	debug("# CREATED FUNC %s\n", strndup(node->fname, node->flen));
+	debug(" CREATED FUNC %s", strndup(node->fname, node->flen));
 
 	return node;
 }

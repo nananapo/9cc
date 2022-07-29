@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+//#define DEBUG
+
 extern char	*user_input;
 
 void	error(char *fmt, ...)
@@ -21,7 +23,9 @@ void	debug(char *fmt, ...)
 	va_start(ap, fmt);
 
 #ifdef DEBUG
-	fprintf(stdout, fmt, ap);
+	fprintf(stdout, "#");
+	vfprintf(stdout, fmt, ap);
+	fprintf(stdout, "\n");
 #endif
 }
 
