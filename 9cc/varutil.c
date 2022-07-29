@@ -14,7 +14,7 @@ int	min(int a, int b);
 static void alloc_local_var(Env *env, LVar *lvar);
 Type	*type_cast_forarg(Type *type);
 
-FindEnumRes	*find_enum(Env *env, char *str, int len)
+bool	find_enum(Env *env, char *str, int len, EnumDef **res_def, int *res_value)
 {
 	int	i;
 	int	j;
@@ -28,15 +28,15 @@ FindEnumRes	*find_enum(Env *env, char *str, int len)
 			if ((int)strlen(var) == len
 			&& strncmp(str, var, strlen(var)) == 0)
 			{
-				FindEnumRes	*res;
-				res = malloc(sizeof(FindEnumRes));
-				res->type = new_enum_type(env, def->name, def->name_len);
-				res->value = j;
-				return (res);
+				if (res_def != NULL)
+					*res_def = def;
+				if (res_value != NULL)
+					*res_value = j;
+				return (true);
 			}
 		}
 	}
-	return (NULL);
+	return (false);
 }
 
 LVar	*find_lvar(Env *env, char *str, int len)

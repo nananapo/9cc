@@ -330,12 +330,6 @@ typedef struct s_str_literal_elem
 	int							index;
 }	t_str_elem;
 
-typedef struct	s_find_enum_res
-{
-	Type	*type;
-	int		value;
-}	FindEnumRes;
-
 #include "list.h"
 
 typedef struct s_parseresult

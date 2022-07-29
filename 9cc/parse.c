@@ -11,9 +11,9 @@
 
 #define Env ParseResult
 
-LVar		*find_lvar(Env *env, char *str, int len);
-FindEnumRes	*find_enum(Env *env, char *str, int len);
-LVar		*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg);
+LVar	*find_lvar(Env *env, char *str, int len);
+bool	*find_enum(Env *env, char *str, int len, EnumDef **res_def, int *res_value);
+LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg);
 Type	*type_cast_forarg(Type *type);
 LVar	*copy_lvar(LVar *f);
 void	alloc_argument_simu(LVar *first, LVar *lvar);
@@ -158,20 +158,17 @@ Node	*new_node_num(int val)
 
 bool	consume_enum_key(Env *env, Type **type, int *value)
 {
-	Token		*tok;
-	FindEnumRes	*fer;
+	Token	*tok;
+	EnumDef	*res_def;
 
 	if (env->token->kind != TK_IDENT)
 		return (false);
 	tok = env->token;
-	fer = find_enum(env, tok->str, tok->len);
-	if (fer != NULL)
+	if (find_enum(env, tok->str, tok->len, &res_def, value))
 	{
 		consume_ident(env);
 		if (type != NULL)
-			*type = fer->type;
-		if (value != NULL)
-			*value = fer->value;
+			*type = new_enum_type(env, res_def->name, res_def->name_len);
 		return (true);
 	}
 	return (false);
