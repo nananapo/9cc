@@ -17,6 +17,6 @@ void	expect(ParseResult *env, char *op);
 int		expect_number(ParseResult *env);
 bool	at_eof(ParseResult *env);
 
-Node	*find_global(ParseResult *env, char *str, int len);
+t_defvar	*find_global(ParseResult *env, char *str, int len);
 
 #endif

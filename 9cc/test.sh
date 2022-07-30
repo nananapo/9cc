@@ -20,16 +20,21 @@ rm -rf tmp
 mkdir tmp
 touch tmp/err
 
+COUNTER=0
+
 unique() {
-  echo $RANDOM | md5 | head -c 10
+  echo "`echo $RANDOM | md5 | head -c 10`"
 }
 
 assert_async(){
+
+	uni="$2"
+
 	input="$prefix`cat $testdir/$1`"
 	
-	asmname="./tmp/tmp$(unique).s"
-	cname="./tmp/tmp$(unique).c"
-	targetname="./tmp/$(unique)"
+	asmname="./tmp/asm_$uni.s"
+	cname="./tmp/c_$uni.c"
+	targetname="./tmp/exe_$uni"
 
     echo "$input" | $prpr - | $ncc > $asmname
 	if [ "$?" != "0" ]; then
@@ -70,7 +75,8 @@ assert_async(){
 }
 
 assert() {
-	assert_async "$1" &
+	COUNTER=$((++COUNTER))
+	assert_async "$1" "$1"_"$COUNTER"_"$(unique)" &
 }
 
 assert "expr1.c"

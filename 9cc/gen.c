@@ -27,9 +27,8 @@ static void	arrow(Node *node, bool as_addr);
 static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace);
 static void	create_add(bool is_add, Type *l, Type *r);
 static void	load_lval_addr(Node *node);
-static void	funcdef(Node *node);
+
 static void	print_global_constant(Node *node, Type *type);
-static void	globaldef(Node *node);
 void		gen(Node *node);
 
 extern t_str_elem	*str_literals;
@@ -40,7 +39,7 @@ int					jumpLabelCount = 0;
 char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 int					stack_count = 0;
 
-static Node	*g_func_now;
+static t_deffunc	*g_func_now;
 
 int	max(int a, int b)
 {
@@ -299,8 +298,8 @@ static void	call(Node *node)
 	int		max_argregindex;
 
 	// va_startマクロ
-	if (node->flen == 8
-	&& strncmp(node->fname, "va_start", 8) == 0)
+	if (node->funcdef->name_len == 8
+	&& strncmp(node->funcdef->name, "va_start", 8) == 0)
 	{
 		// register save
 		printf("    sub rsp, 48\n");
@@ -477,7 +476,7 @@ static void	call(Node *node)
 	if (node->is_variable_argument)
 		movi(AL, 0);
 		printf("    mov %s, 0\n", AL);
-	printf("    call _%s\n", strndup(node->fname, node->flen));
+	printf("    call _%s\n", strndup(node->funcdef->name, node->funcdef->name_len));
 
 	// rspを元に戻す
 	if (rbp_offset != 0)
@@ -750,7 +749,7 @@ static void	assign_epilogue(Type *type)
 		store_value(get_type_size(type));
 }
 
-static void	funcdef(Node *node)
+void	gen_deffunc(t_deffunc *node)
 {
 	char	*funcname;
 	LVar	*lvtmp;
@@ -759,7 +758,7 @@ static void	funcdef(Node *node)
 	int		index;
 	int		size;
 
-	funcname = strndup(node->fname, node->flen);
+	funcname = strndup(node->name, node->name_len);
 	stack_count = 0;
 	g_func_now = node;
 
@@ -822,12 +821,12 @@ static void	funcdef(Node *node)
 	}
 
 	// 返り値がMEMORYなら、rdiからアドレスを取り出す
-	if (is_memory_type(node->ret_type))
+	if (is_memory_type(node->type_return))
 	{
 		printf("    mov [rbp - %d], %s\n", node->locals->offset, RDI);
 	}
 
-	gen(node->lhs);
+	gen(node->stmt);
 
 	// TODO 返り値の型がMEMORYのとき、最後の式がreturnじゃないとセグフォします
 
@@ -835,18 +834,18 @@ static void	funcdef(Node *node)
 	printf(".Lepi_%s:\n", funcname);
 
 	// MEMORYなら、rdiのアドレスに格納
-	if (is_memory_type(node->ret_type))
+	if (is_memory_type(node->type_return))
 	{
 		printf("    mov %s, [rbp - %d]\n", R10, node->locals->offset);
-		store_ptr(get_type_size(node->ret_type), false);
+		store_ptr(get_type_size(node->type_return), false);
 
 		// RDIを復元する
 		printf("    mov %s, [rbp - %d]\n", RDI, node->locals->offset);
 	}
 	// STRUCTなら、rax, rdxに格納
-	else if (node->ret_type->ty == TY_STRUCT)
+	else if (node->type_return->ty == TY_STRUCT)
 	{
-		size = align_to(get_type_size(node->ret_type), 8);
+		size = align_to(get_type_size(node->type_return), 8);
 		if (size > 8)
 			printf("    mov %s, [%s  - 8]\n", RDX, RAX);
 		if (size > 0)
@@ -896,16 +895,16 @@ static void	print_global_constant(Node *node, Type *type)
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
 }
 
-static void globaldef(Node *node)
+void gen_defglobal(t_defvar *node)
 {
 	char	*name;
 
 	if (node->is_extern)
 		return ;
-	name = strndup(node->var_name, node->var_name_len);
+	name = strndup(node->name, node->name_len);
 	if (!node->is_static)
 		printf(".globl _%s\n", name);
-	if (node->global_assign == NULL)
+	if (node->assign == NULL)
 	{
 		printf("    .comm _%s,%d,2\n",
 				name, get_type_size(node->type));
@@ -914,7 +913,7 @@ static void globaldef(Node *node)
 	{
 		printf(".section	__DATA, __data\n");
 		printf("_%s:\n", name);
-		print_global_constant(node->global_assign, node->type);
+		print_global_constant(node->assign, node->type);
 	}
 }
 
@@ -926,32 +925,14 @@ void	gen(Node *node)
 	int		lelse;
 	SBData	*sbdata;
 
-	if (node->kind == ND_PROTOTYPE
-	|| node->kind == ND_DEFVAR
-	|| node->kind == ND_STRUCT_DEF
-	|| node->kind == ND_UNION_DEF
-	|| node->kind == ND_TYPEDEF
-	|| node->kind == ND_ENUM_DEF)
-		return;
-
 	switch(node->kind)
 	{
-		case ND_FUNCDEF:
-		{
-			funcdef(node);
-			return;
-		}
-		case ND_DEFVAR_GLOBAL:
-		{
-			globaldef(node);
-			return;
-		}
 		case ND_RETURN:
 		{
 			if (node->lhs != NULL)
 				gen(node->lhs);
 			// TODO 型チェックをしておく
-			printf("    jmp .Lepi_%s\n", strndup(g_func_now->fname, g_func_now->flen));
+			printf("    jmp .Lepi_%s\n", strndup(g_func_now->name, g_func_now->name_len));
 			return;
 		}
 		case ND_IF:
@@ -1511,6 +1492,10 @@ void	gen(Node *node)
 		{
 			gen(node->lhs);
 			return;
+		}
+		case ND_NONE:
+		{
+			return ;
 		}
 		default:
 		{

@@ -87,9 +87,8 @@ typedef struct Token
 
 typedef enum NodeKind
 {
-	ND_FUNCDEF,
-	ND_PROTOTYPE,
-	ND_TYPEDEF,
+	ND_NONE,
+
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
@@ -135,14 +134,8 @@ typedef enum NodeKind
 	ND_ADDR,
 	ND_DEREF,
 
-	ND_DEFVAR,
-	ND_DEFVAR_GLOBAL,
  	ND_LVAR_GLOBAL,
 	ND_STR_LITERAL,
-
-	ND_STRUCT_DEF,
-	ND_UNION_DEF,
-	ND_ENUM_DEF,
 
 	ND_MEMBER_VALUE, // .
 	ND_MEMBER_PTR_VALUE, // ->
@@ -293,9 +286,23 @@ typedef struct Node
 	struct Node	*for_if;
 	struct Node	*for_next;
 
-	// call & func
-	char		*fname;
-	int			flen;
+	// call
+struct s_deffunc
+{
+	char	*name;
+	int		name_len;
+	Type	*type_return;
+	Type	*type_arguments[100];
+
+	bool	is_static;
+	bool	is_prototype;
+	bool	is_zero_argument;		// func(void)
+	bool	is_variable_argument;	// func(, ...)
+
+	LVar	*locals;
+	struct Node	*stmt;
+}	*funcdef;
+
 	int			argdef_count;
 	
 	// call
@@ -322,6 +329,8 @@ typedef struct Node
 	bool		switch_has_default;
 }	Node;
 
+typedef struct s_deffunc t_deffunc;
+
 typedef struct s_str_literal_elem
 {
 	char						*str;
@@ -332,20 +341,31 @@ typedef struct s_str_literal_elem
 
 #include "list.h"
 
+typedef struct s_defvar
+{
+	char	*name;
+	int		name_len;
+	Type	*type;
+
+	// for global variable
+	bool	is_extern;
+	bool	is_static;
+	Node	*assign;
+}	t_defvar;
+
 typedef struct s_parseresult
 {
 	Token			*token;
-	Node			*code[1000];
-	Node			*func_defs[1000];
-	Node			*func_protos[1000];
-	Node			*global_vars[1000];
+	t_deffunc		*func_defs[1000];
+	t_deffunc		*func_protos[1000];
+	t_defvar		*global_vars[1000];
 	t_str_elem		*str_literals;
 	StructDef		*struct_defs[1000];
 	EnumDef			*enum_defs[1000];
 	UnionDef		*union_defs[1000];
 	LVar			*locals;
 
-	Node			*func_now;
+	t_deffunc		*func_now;
 
 	t_linked_list	*type_alias;
 }	ParseResult;
@@ -404,6 +424,8 @@ bool	is_memory_type(Type *type);
 char	*get_str_literal_name(int index);
 
 void	gen(Node *node);
+void gen_defglobal(t_defvar *node);
+void	gen_deffunc(t_deffunc *node);
 
 ParseResult	*parse(Token *tok);
 

@@ -49,15 +49,15 @@ LVar	*find_lvar(Env *env, char *str, int len)
 	return NULL;
 }
 
-Node	*find_global(Env *env, char *str, int len)
+t_defvar	*find_global(Env *env, char *str, int len)
 {
 	int	i;
 
 	for (i = 0; env->global_vars[i]; i++)
-		if (len == env->global_vars[i]->var_name_len
+		if (len == env->global_vars[i]->name_len
 			&& memcmp(str,
-					env->global_vars[i]->var_name,
-					env->global_vars[i]->var_name_len) == 0)
+					env->global_vars[i]->name,
+					env->global_vars[i]->name_len) == 0)
 			return env->global_vars[i];
 	return NULL;
 }

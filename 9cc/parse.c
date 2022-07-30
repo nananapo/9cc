@@ -18,7 +18,7 @@ Type	*type_cast_forarg(Type *type);
 LVar	*copy_lvar(LVar *f);
 void	alloc_argument_simu(LVar *first, LVar *lvar);
 
-Node	*get_function_by_name(Env *env, char *name, int len);
+t_deffunc	*get_function_by_name(Env *env, char *name, int len);
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node	*new_node_num(int val);
 bool	consume_enum_key(Env *env, Type **type, int *value);
@@ -58,13 +58,13 @@ int		add_switchcase(SBData *sbdata, int number);
 Node	*read_ifblock(Env *env);
 Node	*stmt(Env *env);
 Node	*expect_constant(Env *env, Type *type);
-Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static);
-Node	*read_struct_block(Env *env, Token *ident);
-Node	*read_enum_block(Env *env, Token *ident);
-Node	*read_union_block(Env *env, Token *ident);
-Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static);
-Node	*read_typedef(Env *env);
-Node	*filescope(Env *env);
+void	global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static);
+Type	*read_struct_block(Env *env, Token *ident);
+Type	*read_enum_block(Env *env, Token *ident);
+Type	*read_union_block(Env *env, Token *ident);
+void	funcdef(Env *env, Type *type, Token *ident, bool is_static);
+void	read_typedef(Env *env);
+void	filescope(Env *env);
 void	program(Env *env);
 Env		*parse(Token *tok);
 
@@ -78,16 +78,16 @@ static int max(int a, int b)
 	return (a);
 }
 
-Node	*get_function_by_name(Env *env, char *name, int len)
+t_deffunc	*get_function_by_name(Env *env, char *name, int len)
 {
 	int		i;
-	Node	*tmp;
+	t_deffunc	*tmp;
 
 	i = 0;
 	while (env->func_defs[i])
 	{
 		tmp = env->func_defs[i];
-		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
+		if (tmp->name_len == len && strncmp(tmp->name, name, len) == 0)
 			return tmp;
 		i++;
 	}
@@ -96,7 +96,7 @@ Node	*get_function_by_name(Env *env, char *name, int len)
 	while (env->func_protos[i])
 	{
 		tmp = env->func_protos[i];
-		if (tmp->flen == len && strncmp(tmp->fname, name, len) == 0)
+		if (tmp->name_len == len && strncmp(tmp->name, name, len) == 0)
 			return tmp;
 		i++;
 	}
@@ -112,23 +112,8 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->lhs = lhs;
 	node->rhs = rhs;
 
-	// for
-	node->for_init = NULL;
-	node->for_if = NULL;
-	node->for_next = NULL;
-
-	// else
-	node->els = NULL;
-	
-	// call & deffunc
-	node->fname = NULL;
-	node->args = NULL;
-
-	node->type = NULL;
-
 	// TODO とりあえずこれでprint_global_constantのchar*を区別
 	node->str_index = -1;
-
 	return node;
 }
 
@@ -187,6 +172,13 @@ bool consume_charlit(Env *env, int *number)
 	return (true);
 }
 
+void	expect_semicolon(Env *env)
+{
+	if (consume(env, ";"))
+		return ;
+	error_at(env->token->str, "; expected.");
+}
+
 
 
 
@@ -237,13 +229,11 @@ Node *call(Env *env, Token *tok)
 	Node	*args;
 	Node	*readarg;
 	Node	*ntmp;
-	Node	*refunc;
+	t_deffunc	*refunc;
 
 	debug("CALL %s START", strndup(tok->str, tok->len));
 
 	node  = new_node(ND_CALL, NULL, NULL);
-	node->fname = tok->str;
-	node->flen = tok->len;
 	node->args = NULL;
 	node->argdef_count = 0;
 
@@ -282,16 +272,22 @@ Node *call(Env *env, Token *tok)
 		}
 	}
 
-	refunc = get_function_by_name(env, node->fname, node->flen);
+	refunc = get_function_by_name(env, tok->str, tok->len);
 	// 関数定義が見つからない場合エラー
 	if (refunc == NULL)
-		error_at(env->token->str, "warning : 関数%sがみつかりません\n", strndup(node->fname, node->flen));
+		error_at(env->token->str, "warning : 関数%sがみつかりません\n", strndup(tok->str, tok->len));
+
+	node->funcdef = refunc;
+
+	int		def_argcount;
+
+	for (def_argcount = 0; refunc->type_arguments[def_argcount] != NULL; def_argcount++) ;
 
 	// 引数の数を確認
-	if (refunc->argdef_count != -1
-		&& ((!refunc->is_variable_argument && node->argdef_count != refunc->argdef_count)
-			|| (refunc->is_variable_argument && node->argdef_count < refunc->argdef_count)))
-		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(node->fname, node->flen), refunc->argdef_count, node->argdef_count);
+	if (!refunc->is_zero_argument
+		&& ((!refunc->is_variable_argument && node->argdef_count != def_argcount)
+			|| (refunc->is_variable_argument && node->argdef_count < def_argcount)))
+		error_at(env->token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(refunc->name, refunc->name_len), def_argcount, node->argdef_count);
 
 	// 関数の情報を保存しておく
 	node->is_variable_argument = refunc->is_variable_argument;
@@ -307,7 +303,7 @@ Node *call(Env *env, Token *tok)
 	if (refunc->locals != NULL)
 	{
 		// 返り値がMEMORYなら二個進める
-		if (is_memory_type(refunc->ret_type))
+		if (is_memory_type(refunc->type_return))
 		{
 			def = refunc->locals->next->next;
 			if (def != NULL)
@@ -334,7 +330,7 @@ Node *call(Env *env, Token *tok)
 				// 暗黙的なキャストの確認
 				if (!type_can_cast(args->type, def->type, false))
 					error_at(env->token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-							strndup(node->fname, node->flen),
+							strndup(refunc->name, refunc->name_len),
 							strndup(def->name, def->len),
 							get_type_name(def->type),
 							get_type_name(args->type));
@@ -395,13 +391,13 @@ Node *call(Env *env, Token *tok)
 	}
 
 	// 型を返り値の型に設定
-	node->type = refunc->ret_type;
+	node->type = refunc->type_return;
 
 	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
-	if (is_memory_type(refunc->ret_type)
-		|| refunc->ret_type->ty == TY_STRUCT)
+	if (is_memory_type(refunc->type_return)
+		|| refunc->type_return->ty == TY_STRUCT)
 	{
-		node->call_mem_stack = create_local_var(env, "", 0, refunc->ret_type, false);
+		node->call_mem_stack = create_local_var(env, "", 0, refunc->type_return, false);
 		node->call_mem_stack->is_dummy = true;
 	}
 
@@ -488,7 +484,7 @@ Node *primary(Env *env)
 
 	// identかcall
 	LVar	*lvar;
-	Node	*glovar;
+	t_defvar	*def_global;
 
 	tok = consume_ident(env);
 	if (tok)
@@ -511,13 +507,13 @@ Node *primary(Env *env)
 		}
 
 		// グローバル変数
-		glovar = find_global(env, tok->str, tok->len);
-		if (glovar != NULL)
+		def_global = find_global(env, tok->str, tok->len);
+		if (def_global != NULL)
 		{
 			node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
-			node->var_name = glovar->var_name;
-			node->var_name_len = glovar->var_name_len;
-			node->type = glovar->type;
+			node->var_name = def_global->name;
+			node->var_name_len = def_global->name_len;
+			node->type = def_global->type;
 			return read_deref_index(env, node);
 		}
 		error_at(tok->str,"%sが定義されていません", strndup(tok->str, tok->len));
@@ -1321,15 +1317,13 @@ Node	*stmt(Env *env)
 		if (!consume(env, ";"))
 		{
 			node->for_init = expr(env);
-			if (!consume(env, ";"))
-				error_at(env->token->str, ";が必要です");
+			expect_semicolon(env);
 		}
 		// for if
 		if (!consume(env, ";"))
 		{
 			node->for_if = expr(env);
-			if (!consume(env, ";"))
-				error_at(env->token->str, ";が必要です");
+			expect_semicolon(env);
 		}
 		// for next
 		if (!consume(env, ")"))
@@ -1447,13 +1441,13 @@ Node	*stmt(Env *env)
 
 			if (consume(env, "{"))
 			{
-				node = read_struct_block(env, ident);
+				type = read_struct_block(env, ident);
 				// ;なら構造体の宣言
-				// そうでないなら型宣言
 				if (consume(env, ";"))
-					return (node);
+					return new_node(ND_NONE, NULL, NULL);
 			}
-			type = new_struct_type(env, ident->str, ident->len);
+			else
+				type = new_struct_type(env, ident->str, ident->len);
 			consume_type_ptr(env, &type);
 		}
 		// enumの可能性
@@ -1465,13 +1459,13 @@ Node	*stmt(Env *env)
 
 			if (consume(env, "{"))
 			{
-				node = read_enum_block(env, ident);
+				type = read_enum_block(env, ident);
 				// ;ならenumの宣言
-				// そうでないなら型宣言
 				if (consume(env, ";"))
-					return (node);
+					return new_node(ND_NONE, NULL, NULL);
 			}
-			type = new_enum_type(env, ident->str, ident->len);
+			else
+				type = new_enum_type(env, ident->str, ident->len);
 			consume_type_ptr(env, &type);
 		}
 		// unionの可能性
@@ -1483,13 +1477,13 @@ Node	*stmt(Env *env)
 
 			if (consume(env, "{"))
 			{
-				node = read_union_block(env, ident);
+				type = read_union_block(env, ident);
 				// ;ならunionの宣言
-				// そうでないなら型宣言
 				if (consume(env, ";"))
-					return (node);
+					return (new_node(ND_NONE, NULL, NULL));
 			}
-			type = new_union_type(env, ident->str, ident->len);
+			else
+				type = new_union_type(env, ident->str, ident->len);
 			consume_type_ptr(env, &type);
 		}
 		else
@@ -1510,7 +1504,7 @@ Node	*stmt(Env *env)
 
 			created = create_local_var(env, ident->str, ident->len, type, false);
 
-			node = new_node(ND_DEFVAR, NULL, NULL);
+			node = new_node(ND_NONE, NULL, NULL);
 			node->type = type;
 			node->lvar = created;
 
@@ -1580,50 +1574,46 @@ Node	*expect_constant(Env *env, Type *type)
 	return (node);
 }
 
-Node	*global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static)
+void	global_var(Env *env, Type *type, Token *ident, bool is_extern, bool is_static)
 {
-	int		i;
-	Node	*node;
+	int			i;
+	t_defvar	*defvar;
 
 	// 後ろの型を読む
 	// TODO a[]とかでも許容したい
 	expect_type_after(env, &type);
 
-	node = new_node(ND_DEFVAR_GLOBAL, NULL, NULL);
-	node->type = type;
-	node->var_name = strndup(ident->str, ident->len);
-	node->var_name_len = ident->len;
-	node->is_extern = is_extern;
-	node->is_static = is_static;
+	defvar				= calloc(1, sizeof(t_defvar));
+	defvar->name		= ident->str;
+	defvar->name_len	= ident->len;
+	defvar->type		= type;
+	defvar->is_extern	= is_extern;
+	defvar->is_static	= is_static;
 
+	// TODO チェックは違うパスでやりたい....
 	if (is_static && is_extern)
 		error_at(env->token->str, "staticとexternは併用できません");
-
-	// TODO Voidチェックは違うパスでやりたい....
 	if (!is_declarable_type(type))
 		error_at(env->token->str, "宣言できない型の変数です");
 
 	// 保存
 	i = -1;
-	while (env->global_vars[++i])
-		continue;
-	env->global_vars[i] = node;
+	while (env->global_vars[++i]);
+	env->global_vars[i] = defvar;
 
-	// 代入を読む
-	node->global_assign = NULL;
-	if (!is_extern && consume(env, "="))
+	// 代入
+	if (consume(env, "="))
 	{
-		node->global_assign = expect_constant(env, node->type);
+		if (is_extern)
+			error_at(ident->str, "externしている変数に代入はできません");
+		defvar->assign = expect_constant(env, defvar->type);
 	}
 
-	if (!consume(env, ";"))
-		error_at(env->token->str, ";が必要です。");
-
-	return node;
+	expect_semicolon(env);
 }
 
 // {以降を読む
-Node	*read_struct_block(Env *env, Token *ident)
+Type	*read_struct_block(Env *env, Token *ident)
 {
 	Type		*type;
 	StructDef	*def;
@@ -1657,8 +1647,8 @@ Node	*read_struct_block(Env *env, Token *ident)
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です\n (read_struct_block)");
 		expect_type_after(env, &type);
-		if (!consume(env, ";"))
-			error_at(env->token->str, ";が必要です");
+
+		expect_semicolon(env);
 
 		tmp = calloc(1, sizeof(MemberElem));
 		tmp->name = ident->str;
@@ -1696,12 +1686,14 @@ Node	*read_struct_block(Env *env, Token *ident)
 		def->members = tmp;
 	}
 
+	type = new_struct_type(env, def->name, def->name_len);
+
 	// メモリサイズを決定
 	if (def->members == NULL)
 		def->mem_size = 0;
 	else
 	{
-		maxsize = max_type_size(new_struct_type(env, def->name, def->name_len));
+		maxsize = max_type_size(type);
 		debug("  MAX_SIZE = %d", maxsize);
 		def->mem_size = align_to(def->members->offset, maxsize);
 	}
@@ -1713,14 +1705,15 @@ Node	*read_struct_block(Env *env, Token *ident)
 		tmp->offset -= get_type_size(tmp->type);
 	}
 
-	return (new_node(ND_STRUCT_DEF, NULL, NULL));
+	return (type);
 }
 
 // {以降を読む
-Node	*read_enum_block(Env *env, Token *ident)
+Type	*read_enum_block(Env *env, Token *ident)
 {
 	int		i;
 	EnumDef	*def;
+	Type	*type;
 
 	def = calloc(1, sizeof(EnumDef));
 	def->name = ident->str;
@@ -1750,11 +1743,13 @@ Node	*read_enum_block(Env *env, Token *ident)
 		}
 		debug(" ENUM %s", def->kinds[def->kind_len - 1]);
 	}
-	return (new_node(ND_ENUM_DEF, NULL, NULL));
+
+	type = new_enum_type(env, def->name, def->name_len);
+	return (type);
 }
 
 // {以降を読む
-Node	*read_union_block(Env *env, Token *ident)
+Type	*read_union_block(Env *env, Token *ident)
 {
 	UnionDef	*def;
 	MemberElem	*tmp;
@@ -1788,8 +1783,8 @@ Node	*read_union_block(Env *env, Token *ident)
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です\n (read_union_block)");
 		expect_type_after(env, &type);
-		if (!consume(env, ";"))
-			error_at(env->token->str, ";が必要です");
+
+		expect_semicolon(env);
 
 		tmp = calloc(1, sizeof(MemberElem));
 		tmp->name = ident->str;
@@ -1808,35 +1803,34 @@ Node	*read_union_block(Env *env, Token *ident)
 	}
 
 	debug("  MEMSIZE = %d", def->mem_size);
-	return (new_node(ND_UNION_DEF, NULL, NULL));
+
+	type = new_union_type(env, def->name, def->name_len);
+	return (type);
 }
 
 
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
+void	funcdef(Env *env, Type *type, Token *ident, bool is_static)
 {
-	Node	*node;
-	Token	*arg;
-	int		i;
-	int		type_size;
-	LVar	*lvar;
+	t_deffunc	*def;
+	Token		*arg;
+	int			i;
+	int			type_size;
+	LVar		*lvar;
 
 	env->locals = NULL;
 
-	// create node
-	node = new_node(ND_FUNCDEF, NULL, NULL);
-	node->fname = strndup(ident->str, ident->len);
-	node->flen = ident->len;
-	node->ret_type = type;
-	node->argdef_count = 0;
-	node->is_variable_argument = false;
-	node->is_static = is_static;
-	env->func_now = node;
+	def							= calloc(1, sizeof(t_deffunc));
+	def->name					= ident->str;
+	def->name_len				= ident->len;
+	def->type_return			= type;
+	def->is_static				= is_static;
+	env->func_now = def;
 
 	// 返り値がMEMORYならダミーの変数を追加する
-	if (is_memory_type(node->ret_type))
+	if (is_memory_type(def->type_return))
 	{
 		// RDIを保存する用	
 		lvar = calloc(1, sizeof(LVar));
@@ -1852,12 +1846,12 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 
 		// とりあえずalign(typesize,16) * 2だけ隙間を用意しておく
 		// しかし使わない
-		type_size = align_to(get_type_size(node->ret_type), 16);
+		type_size = align_to(get_type_size(def->type_return), 16);
 
 		lvar = calloc(1, sizeof(LVar));
 		lvar->name = "";
 		lvar->len = 0;
-		lvar->type = node->ret_type;
+		lvar->type = def->type_return;
 		lvar->is_arg = false;
 		lvar->arg_regindex = -1;
 		lvar->is_dummy = true;
@@ -1872,32 +1866,38 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 		for (;;)
 		{
 			// variable argument
-			if (node->argdef_count != 0 && consume(env, "..."))
+			if (consume(env, "..."))
 			{
+				if (def->type_arguments[0] == NULL)
+					error_at(env->token->str, "可変長引数の宣言をするには、少なくとも一つの引数が必要です");
 				if (!consume(env, ")"))
 					error_at(env->token->str, ")が必要です");
-				node->is_variable_argument = true;
+				def->is_variable_argument = true;
 				break ;
 			}
 
 			// 型宣言の確認
 			type = consume_type_before(env, false);
 			if (type == NULL)
-				error_at(env->token->str,"型宣言が必要です\n (funcdef)");
+				error_at(env->token->str,"型が必要です\n (funcdef)");
 
 			// 仮引数名
 			arg = consume_ident(env);
 			if (arg == NULL)
 			{
 				// voidなら引数0個
-				if (type->ty == TY_VOID && node->argdef_count == 0)
+				if (type->ty == TY_VOID)
 				{
+					if (def->type_arguments[0] != NULL)
+						error_at(env->token->str, "既に引数が宣言されています");
 					if (!consume(env, ")"))
 						error_at(env->token->str, ")が見つかりませんでした。");
+					def->is_zero_argument = true;
 					break ;
 				}
 				error_at(env->token->str, "仮引数が必要です");
 			}
+
 			// LVarを作成
 			create_local_var(env, arg->str, arg->len, type, true);
 			// arrayを読む
@@ -1910,21 +1910,15 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 				error_at(env->token->str, "宣言できない型の変数です");
 
 			// 型情報を保存
-			type->next = node->arg_type;
-			node->arg_type = type;
-			node->argdef_count++;
-			
+			for (i = 0; def->type_arguments[i] != NULL; i++);
+			def->type_arguments[i] = type;
+
 			// )か,
 			if (consume(env, ")"))
 				break;
 			if (!consume(env, ","))
 				error_at(env->token->str, ",が必要です");
 		}
-	}
-	else
-	{
-		// ?
-		node->argdef_count = -1;
 	}
 
 	debug(" END READ ARGS");
@@ -1934,33 +1928,30 @@ Node	*funcdef(Env *env, Type *type, Token *ident, bool is_static)
 	// TODO プロトタイプ宣言後の関数定義
 	if (consume(env, ";"))
 	{
-		node->kind = ND_PROTOTYPE;
+		def->is_prototype = true;
+		for (i = 0; env->func_protos[i] != NULL; i++);
+		env->func_protos[i] = def;
 
-		i = 0;
-		while (env->func_protos[i])
-			i += 1;
-		env->func_protos[i] = node;
-		node->locals = env->locals;
+		def->locals = env->locals;
 	}
 	else
 	{
-		i = 0;
-		while (env->func_defs[i])
-			i += 1;
-		env->func_defs[i] = node;
-		node->locals = env->locals;
-		node->lhs = stmt(env);
-		node->locals = env->locals;
+		def->is_prototype = false;
+
+		for (i = 0; env->func_defs[i] != NULL; i++);
+		env->func_defs[i] = def;
+
+		def->locals = env->locals;
+		def->stmt = stmt(env);
+		def->locals = env->locals;
 	}
 
 	env->func_now = NULL;
 	
-	debug(" CREATED FUNC %s", strndup(node->fname, node->flen));
-
-	return node;
+	debug(" CREATED FUNC %s", strndup(def->name, def->name_len));
 }
 
-Node	*read_typedef(Env *env)
+void	read_typedef(Env *env)
 {
 	Type		*type;
 	Token		*token;
@@ -1984,24 +1975,21 @@ Node	*read_typedef(Env *env)
 	pair->type = type;
 	linked_list_insert(env->type_alias, pair);
 
-	if (!consume(env, ";"))
-		error_at(env->token->str, ";が必要です");
-
-	return (new_node(ND_TYPEDEF, NULL, NULL));
+	expect_semicolon(env);
 }
 
-Node	*filescope(Env *env)
+void	filescope(Env *env)
 {
 	Token	*ident;
 	Type	*type;
 	bool	is_static;
 	bool	is_inline;
-	Node	*node;
 
 	// typedef
 	if (consume_with_type(env, TK_TYPEDEF))
 	{
-		return (read_typedef(env));
+		read_typedef(env);
+		return ;
 	}
 
 	// extern
@@ -2013,7 +2001,8 @@ Node	*filescope(Env *env)
 		ident = consume_ident(env);
 		if (ident == NULL)
 			error_at(env->token->str, "識別子が必要です");
-		return (global_var(env, type, ident, true, false));
+		global_var(env, type, ident, true, false);
+		return ;
 	}
 
 	is_static = false;
@@ -2038,11 +2027,11 @@ Node	*filescope(Env *env)
 			
 		if (consume(env, "{"))
 		{
-			node = read_struct_block(env, ident);
+			read_struct_block(env, ident);
 			// ;なら構造体の宣言
 			// そうでないなら返り値かグローバル変数
 			if (consume(env, ";"))
-				return (node);
+				return ;
 		}
 		type = new_struct_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &type);
@@ -2056,11 +2045,11 @@ Node	*filescope(Env *env)
 			
 		if (consume(env, "{"))
 		{
-			node = read_enum_block(env, ident);
+			read_enum_block(env, ident);
 			// ;ならenumの宣言
 			// そうでないなら返り値かグローバル変数
 			if (consume(env, ";"))
-				return (node);
+				return ;
 		}
 		type = new_enum_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &type);
@@ -2074,11 +2063,11 @@ Node	*filescope(Env *env)
 			
 		if (consume(env, "{"))
 		{
-			node = read_union_block(env, ident);
+			read_union_block(env, ident);
 			// ;ならunionの宣言
 			// そうでないなら返り値かグローバル変数
 			if (consume(env, ";"))
-				return (node);
+				return ;
 		}
 		type = new_union_type(env, ident->str, ident->len);
 		consume_type_ptr(env, &type);
@@ -2097,23 +2086,19 @@ Node	*filescope(Env *env)
 
 		// function definition
 		if (consume(env, "("))
-			return funcdef(env, type, ident, is_static);
+			funcdef(env, type, ident, is_static);
 		else
-			return global_var(env, type, ident, false, is_static);
+			global_var(env, type, ident, false, is_static);
+		return ;
 	}
 
 	error_at(env->token->str, "構文解析に失敗しました[filescope kind:%d]", env->token->kind);
-	return (NULL);
 }
 
 void	program(Env *env)
 {
-	int	i;
-
-	i = 0;
 	while (!at_eof(env))
-		env->code[i++] = filescope(env);
-	env->code[i] = NULL;
+		filescope(env);
 }
 
 Env	*parse(Token *tok)
