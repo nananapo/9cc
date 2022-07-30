@@ -382,6 +382,8 @@ bool	can_use_arrow(Type *type);
 bool	can_use_dot(Type *type);
 bool	is_memory_type(Type *type);
 
+bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value);
+
 char	*get_str_literal_name(int index);
 
 void	gen(Node *node);

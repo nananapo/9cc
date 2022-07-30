@@ -193,6 +193,44 @@ void	expect_type_after(Type **type)// expect size
 	return;
 }
 
+bool	consume_enum_key(Type **type, int *value)
+{
+	Token	*tok;
+	EnumDef	*res_def;
+
+	if (g_token->kind != TK_IDENT)
+		return (false);
+	tok = g_token;
+	if (find_enum(tok->str, tok->len, &res_def, value))
+	{
+		consume_ident();
+		if (type != NULL)
+			*type = new_enum_type(res_def->name, res_def->name_len);
+		return (true);
+	}
+	return (false);
+}
+
+bool consume_charlit(int *number)
+{
+	if (g_token->kind != TK_CHAR_LITERAL)
+		return (false);
+
+	*number = get_char_to_int(g_token->str, g_token->strlen_actual);
+	if (*number == -1)
+		error_at(g_token->str, "不明なエスケープシーケンスです");
+
+	g_token = g_token->next; // 進める
+	return (true);
+}
+
+void	expect_semicolon(void)
+{
+	if (consume(";"))
+		return ;
+	error_at(g_token->str, "; expected.");
+}
+
 void	expect(char *op)
 {
 	if (g_token->kind != TK_RESERVED ||

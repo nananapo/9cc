@@ -10,7 +10,6 @@
 #include <stdbool.h>
 
 LVar	*find_lvar(char *str, int len);
-bool	*find_enum(char *str, int len, EnumDef **res_def, int *res_value);
 LVar	*create_local_var(char *name, int len, Type *type, bool is_arg);
 Type	*type_cast_forarg(Type *type);
 LVar	*copy_lvar(LVar *f);
@@ -22,30 +21,8 @@ Node	*new_node_num(int val);
 bool	consume_enum_key(Type **type, int *value);
 bool	consume_charlit(int *number);
 int		get_str_literal_index(char *str, int len);
-Node	 *cast(Node *node, Type *to);
-Node	*call(Token *tok);
-Node	*read_suffix_increment(Node *node);
-Node	*read_deref_index(Node *node);
-Node	*primary(void);
-Node	*arrow_loop(Node *node);
-Node	*arrow(void);
-Node	*unary(void);
-Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok);
-Node	*mul(void);
-Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
-Node	*add(void);
-Node	*shift(void);
-Node	*relational(void);
-Node	*equality(void);
-Node	*bitwise_and(void);
-Node	*bitwise_or(void);
-Node	*bitwise_xor(void);
-Node	*conditional_and(void);
-Node	*conditional_or(void);
-Node	*conditional_op(void);
-Node	*create_assign(Node *lhs, Node *rhs, Token *tok);
-Node	*assign(void);
-Node	*expr(void);
+
+
 SBData	*sbdata_new(bool isswitch, int start, int end);
 void	sb_forwhile_start(int startlabel, int endlabel);
 void	sb_switch_start(Type *type, int endlabel, int defaultLabel);
@@ -53,17 +30,41 @@ SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
 int		add_switchcase(SBData *sbdata, int number);
-Node	*read_ifblock(void);
-Node	*stmt(void);
-Node	*expect_constant(Type *type);
-void	global_var(Type *type, Token *ident, bool is_extern, bool is_static);
+
+static Node	 *cast(Node *node, Type *to);
+static Node	*call(Token *tok);
+static Node	*read_suffix_increment(Node *node);
+static Node	*read_deref_index(Node *node);
+static Node	*primary(void);
+static Node	*arrow_loop(Node *node);
+static Node	*arrow(void);
+static Node	*unary(void);
+static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok);
+static Node	*mul(void);
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
+static Node	*add(void);
+static Node	*shift(void);
+static Node	*relational(void);
+static Node	*equality(void);
+static Node	*bitwise_and(void);
+static Node	*bitwise_or(void);
+static Node	*bitwise_xor(void);
+static Node	*conditional_and(void);
+static Node	*conditional_or(void);
+static Node	*conditional_op(void);
+static Node	*create_assign(Node *lhs, Node *rhs, Token *tok);
+static Node	*assign(void);
+static Node	*expr(void);
+static Node	*read_ifblock(void);
+static Node	*stmt(void);
+static Node	*expect_constant(Type *type);
+static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static);
 Type	*read_struct_block(Token *ident);
 Type	*read_enum_block(Token *ident);
 Type	*read_union_block(Token *ident);
-void	funcdef(Type *type, Token *ident, bool is_static);
-void	read_typedef(void);
-void	filescope(void);
-void	program(void);
+static void	funcdef(Type *type, Token *ident, bool is_static);
+static void	read_typedef(void);
+static void	filescope(void);
 void	parse(Token *tok);
 
 int		switchCaseCount = 0;
@@ -88,6 +89,85 @@ static int max(int a, int b)
 		return (b);
 	return (a);
 }
+
+SBData	*sbdata_new(bool isswitch, int start, int end)
+{
+	SBData	*tmp;
+
+	tmp = (SBData *)calloc(1, sizeof(SBData));
+	tmp->isswitch = isswitch;
+	tmp->startlabel = start;
+	tmp->endlabel = end;
+
+	tmp->type = NULL;
+	tmp->cases = NULL;
+	tmp->defaultLabel = -1;
+	return (tmp);
+}
+
+void	sb_forwhile_start(int startlabel, int endlabel)
+{
+	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
+}
+
+void	sb_switch_start(Type *type, int endlabel, int defaultLabel)
+{
+	SBData	*tmp;
+
+	tmp = sbdata_new(true, -1, endlabel);
+	tmp->type = type;
+	tmp->defaultLabel = defaultLabel;
+	stack_push(&sbstack, tmp);
+}
+
+
+SBData	*sb_end(void)
+{
+	SBData	*result;
+
+	result = stack_pop(&sbstack);
+	return (result);
+}
+
+SBData	*sb_peek(void)
+{
+	return (SBData *)stack_peek(sbstack);
+}
+
+SBData	*sb_search(bool	isswitch)
+{
+	Stack	*tmp;
+	SBData	*data;
+
+	tmp = sbstack;
+	while (tmp != NULL)
+	{
+		data = (SBData *)tmp->data;
+		if (data->isswitch == isswitch)
+			return (data);
+		tmp = tmp->prev;
+	}
+	return (NULL);
+}
+
+int	add_switchcase(SBData *sbdata, int number)
+{
+	int			count;
+	SwitchCase	*tmp;
+
+	count = switchCaseCount++;
+
+	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
+	tmp->value = number;
+	tmp->label = count;
+	tmp->next = sbdata->cases;
+	sbdata->cases = tmp;
+
+	//TODO 被りチェック
+
+	return (count);
+}
+
 
 t_deffunc	*get_function_by_name(char *name, int len)
 {
@@ -142,61 +222,6 @@ Node	*new_node_num(int val)
 	return node;
 }
 
-
-
-
-
-
-
-
-
-
-
-bool	consume_enum_key(Type **type, int *value)
-{
-	Token	*tok;
-	EnumDef	*res_def;
-
-	if (g_token->kind != TK_IDENT)
-		return (false);
-	tok = g_token;
-	if (find_enum(tok->str, tok->len, &res_def, value))
-	{
-		consume_ident();
-		if (type != NULL)
-			*type = new_enum_type(res_def->name, res_def->name_len);
-		return (true);
-	}
-	return (false);
-}
-
-bool consume_charlit(int *number)
-{
-	if (g_token->kind != TK_CHAR_LITERAL)
-		return (false);
-
-	*number = get_char_to_int(g_token->str, g_token->strlen_actual);
-	if (*number == -1)
-		error_at(g_token->str, "不明なエスケープシーケンスです");
-
-	g_token = g_token->next; // 進める
-	return (true);
-}
-
-void	expect_semicolon(void)
-{
-	if (consume(";"))
-		return ;
-	error_at(g_token->str, "; expected.");
-}
-
-
-
-
-
-
-
-
 // リテラルを探す
 int	get_str_literal_index(char *str, int len)
 {
@@ -224,7 +249,7 @@ int	get_str_literal_index(char *str, int len)
 	return (tmp->index);
 }
 
-Node *cast(Node *node, Type *to)
+static Node *cast(Node *node, Type *to)
 {
 	node = new_node(ND_CAST, node, NULL);
 	if (!type_can_cast(node->lhs->type, to, true))
@@ -234,7 +259,7 @@ Node *cast(Node *node, Type *to)
 	return (node);
 }
 
-Node *call(Token *tok)
+static Node *call(Token *tok)
 {
 	Node		*node;
 
@@ -385,8 +410,138 @@ Node *call(Token *tok)
 	return node;
 }
 
+/*
+ * type:
+ * 0 : *
+ * 1 : /
+ * 2 : %
+ */
+static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
+{
+	Node	*node;
+
+	if (type == 0)
+		node = new_node(ND_MUL, lhs, rhs);
+	else if (type == 1)
+		node = new_node(ND_DIV, lhs, rhs);
+	else
+		node = new_node(ND_MOD, lhs, rhs);
+
+	if (!is_integer_type(node->lhs->type)
+	|| !is_integer_type(node->rhs->type))
+		error_at(tok->str, "ポインタ型に* か / を適用できません");
+
+	node->type = new_primitive_type(TY_INT);
+	return (node);
+}
+
+static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
+{
+	Node	*node;
+	Type	*l;
+	Type	*r;
+	int		size;
+
+	if (isadd)
+		node = new_node(ND_ADD, lhs, rhs);
+	else
+		node = new_node(ND_SUB, lhs, rhs);
+
+	l = node->lhs->type;
+	r = node->rhs->type;
+
+	// 左辺をポインタにする
+	if (is_pointer_type(r))
+	{
+		Type	*tmp;
+		tmp = l;
+		l = r;
+		r = tmp;
+	}
+
+	// 両方ともポインタ
+	if (is_pointer_type(l)
+	&& is_pointer_type(r))
+	{
+		if (!type_equal(l, r))
+			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
+		node->type = new_primitive_type(TY_INT);// TODO size_tにする
+
+		size = get_type_size(l->ptr_to);
+		if (size == 0 || size > 1)
+		{
+			if (size == 0)
+				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
+			node = new_node(ND_DIV, node, new_node_num(size));
+			node->type = new_primitive_type(TY_INT);
+		}
+		return (node);
+	}
+
+	// ポインタと整数の演算
+	if (is_pointer_type(l)
+	&& is_integer_type(r))
+	{
+		node->type = l;
+		return (node);
+	}
+
+	// 両方整数なら型の優先順位を考慮
+	if (is_integer_type(l)
+	|| is_integer_type(r))
+	{
+		// Intを左に寄せる
+		if (r->ty == TY_INT)
+		{
+			Type	*tmp;
+			tmp = l;
+			l = r;
+			r = tmp;
+		}
+		// 左辺の型にする
+		node->type = l;
+		return (node);
+	}
+
+	error_at(tok->str, "演算子 +, - が%dと%dの間に定義されていません",
+			node->lhs->type->ty, node->rhs->type->ty);
+	return (NULL);
+}
+
+static Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
+{
+	Node	*node;
+
+	node = new_node(ND_ASSIGN, lhs, rhs);
+
+	// 代入可能な型かどうか確かめる。
+	if (lhs->type->ty == TY_VOID
+	|| rhs->type->ty == TY_VOID)
+		error_at(tok->str, "voidを宣言、代入できません");
+
+	if (!type_equal(rhs->type, lhs->type))
+	{
+		if (type_can_cast(rhs->type, lhs->type, false))
+		{
+			debug("assign (%s) <- (%s)",
+					get_type_name(lhs->type),
+					get_type_name(rhs->type));
+			node->rhs = cast(rhs, lhs->type);
+			rhs = node->rhs;
+		}
+		else
+		{
+			error_at(tok->str, "左辺(%s)に右辺(%s)を代入できません",
+					get_type_name(lhs->type),
+					get_type_name(rhs->type));
+		}
+	}
+	node->type = lhs->type;
+	return (node);
+}
+
 // 後置インクリメント, デクリメント
-Node	*read_suffix_increment(Node *node)
+static Node	*read_suffix_increment(Node *node)
 {
 	if (consume("++"))
 	{
@@ -405,7 +560,7 @@ Node	*read_suffix_increment(Node *node)
 
 // 添字によるDEREF
 // TODO エラーメッセージが足し算用になってしまう
-Node	*read_deref_index(Node *node)
+static Node	*read_deref_index(Node *node)
 {
 	Node	*add;
 
@@ -421,7 +576,7 @@ Node	*read_deref_index(Node *node)
 	return read_suffix_increment(node);
 }
 
-Node *primary(void)
+static Node *primary(void)
 {
 	Token	*tok;
 	Node	*node;
@@ -528,7 +683,7 @@ Node *primary(void)
 }
 
 
-Node	*arrow_loop(Node *node)
+static Node	*arrow_loop(Node *node)
 {
 	Token		*ident;
 	MemberElem	*elem;
@@ -585,7 +740,7 @@ Node	*arrow_loop(Node *node)
 		return (node);
 }
 
-Node	*arrow(void)
+static Node	*arrow(void)
 {
 	Node	*node;
 
@@ -593,7 +748,7 @@ Node	*arrow(void)
 	return (arrow_loop(node));
 }
 
-Node *unary(void)
+static Node *unary(void)
 {
 	Node	*node;
 	Type	*type;
@@ -697,33 +852,7 @@ Node *unary(void)
 	return arrow();
 }
 
-
-/*
- * type:
- * 0 : *
- * 1 : /
- * 2 : %
- */
-Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-
-	if (type == 0)
-		node = new_node(ND_MUL, lhs, rhs);
-	else if (type == 1)
-		node = new_node(ND_DIV, lhs, rhs);
-	else
-		node = new_node(ND_MOD, lhs, rhs);
-
-	if (!is_integer_type(node->lhs->type)
-	|| !is_integer_type(node->rhs->type))
-		error_at(tok->str, "ポインタ型に* か / を適用できません");
-
-	node->type = new_primitive_type(TY_INT);
-	return (node);
-}
-
-Node *mul(void)
+static Node *mul(void)
 {
 	Node *node;
 
@@ -741,80 +870,7 @@ Node *mul(void)
 	}
 }
 
-Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-	Type	*l;
-	Type	*r;
-	int		size;
-
-	if (isadd)
-		node = new_node(ND_ADD, lhs, rhs);
-	else
-		node = new_node(ND_SUB, lhs, rhs);
-
-	l = node->lhs->type;
-	r = node->rhs->type;
-
-	// 左辺をポインタにする
-	if (is_pointer_type(r))
-	{
-		Type	*tmp;
-		tmp = l;
-		l = r;
-		r = tmp;
-	}
-
-	// 両方ともポインタ
-	if (is_pointer_type(l)
-	&& is_pointer_type(r))
-	{
-		if (!type_equal(l, r))
-			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
-		node->type = new_primitive_type(TY_INT);// TODO size_tにする
-
-		size = get_type_size(l->ptr_to);
-		if (size == 0 || size > 1)
-		{
-			if (size == 0)
-				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
-			node = new_node(ND_DIV, node, new_node_num(size));
-			node->type = new_primitive_type(TY_INT);
-		}
-		return (node);
-	}
-
-	// ポインタと整数の演算
-	if (is_pointer_type(l)
-	&& is_integer_type(r))
-	{
-		node->type = l;
-		return (node);
-	}
-
-	// 両方整数なら型の優先順位を考慮
-	if (is_integer_type(l)
-	|| is_integer_type(r))
-	{
-		// Intを左に寄せる
-		if (r->ty == TY_INT)
-		{
-			Type	*tmp;
-			tmp = l;
-			l = r;
-			r = tmp;
-		}
-		// 左辺の型にする
-		node->type = l;
-		return (node);
-	}
-
-	error_at(tok->str, "演算子 +, - が%dと%dの間に定義されていません",
-			node->lhs->type->ty, node->rhs->type->ty);
-	return (NULL);
-}
-
-Node	*add(void)
+static Node	*add(void)
 {
 	Node	*node;
 
@@ -831,7 +887,7 @@ Node	*add(void)
 }
 
 // TODO 型チェック
-Node	*shift(void)
+static Node	*shift(void)
 {
 	Node	*node;
 
@@ -861,7 +917,7 @@ Node	*shift(void)
 	return (node);
 }
 
-Node	*relational(void)
+static Node	*relational(void)
 {
 	Node	*node;
 	Type	*l_to;
@@ -895,7 +951,7 @@ Node	*relational(void)
 	}
 }
 
-Node *equality(void)
+static Node *equality(void)
 {
 	Node	*node;
 	Type	*l_to;
@@ -925,7 +981,7 @@ Node *equality(void)
 	}
 }
 
-Node	*bitwise_and(void)
+static Node	*bitwise_and(void)
 {
 	Node	*node;
 
@@ -948,7 +1004,7 @@ Node	*bitwise_and(void)
 }
 
 
-Node	*bitwise_xor(void)
+static Node	*bitwise_xor(void)
 {
 	Node	*node;
 
@@ -971,7 +1027,7 @@ Node	*bitwise_xor(void)
 }
 
 // TODO 型チェック
-Node	*bitwise_or(void)
+static Node	*bitwise_or(void)
 {
 	Node	*node;
 
@@ -994,7 +1050,7 @@ Node	*bitwise_or(void)
 }
 
 // TODO 型チェック
-Node	*conditional_and(void)
+static Node	*conditional_and(void)
 {
 	Node	*node;
 
@@ -1008,7 +1064,7 @@ Node	*conditional_and(void)
 }
 
 // TODO 型チェック
-Node	*conditional_or(void)
+static Node	*conditional_or(void)
 {
 	Node	*node;
 
@@ -1021,7 +1077,7 @@ Node	*conditional_or(void)
 	return (node);
 }
 
-Node	*conditional_op(void)
+static Node	*conditional_op(void)
 {
 	Node	*node;
 
@@ -1039,40 +1095,7 @@ Node	*conditional_op(void)
 	return (node);
 }
 
-
-Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-
-	node = new_node(ND_ASSIGN, lhs, rhs);
-
-	// 代入可能な型かどうか確かめる。
-	if (lhs->type->ty == TY_VOID
-	|| rhs->type->ty == TY_VOID)
-		error_at(tok->str, "voidを宣言、代入できません");
-
-	if (!type_equal(rhs->type, lhs->type))
-	{
-		if (type_can_cast(rhs->type, lhs->type, false))
-		{
-			debug("assign (%s) <- (%s)",
-					get_type_name(lhs->type),
-					get_type_name(rhs->type));
-			node->rhs = cast(rhs, lhs->type);
-			rhs = node->rhs;
-		}
-		else
-		{
-			error_at(tok->str, "左辺(%s)に右辺(%s)を代入できません",
-					get_type_name(lhs->type),
-					get_type_name(rhs->type));
-		}
-	}
-	node->type = lhs->type;
-	return (node);
-}
-
-Node	*assign(void)
+static Node	*assign(void)
 {
 	Node	*node;
 
@@ -1107,91 +1130,13 @@ Node	*assign(void)
 	return (node);
 }
 
-Node	*expr(void)
+static Node	*expr(void)
 {
 	return assign();
 }
 
-SBData	*sbdata_new(bool isswitch, int start, int end)
-{
-	SBData	*tmp;
-
-	tmp = (SBData *)calloc(1, sizeof(SBData));
-	tmp->isswitch = isswitch;
-	tmp->startlabel = start;
-	tmp->endlabel = end;
-
-	tmp->type = NULL;
-	tmp->cases = NULL;
-	tmp->defaultLabel = -1;
-	return (tmp);
-}
-
-void	sb_forwhile_start(int startlabel, int endlabel)
-{
-	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
-}
-
-void	sb_switch_start(Type *type, int endlabel, int defaultLabel)
-{
-	SBData	*tmp;
-
-	tmp = sbdata_new(true, -1, endlabel);
-	tmp->type = type;
-	tmp->defaultLabel = defaultLabel;
-	stack_push(&sbstack, tmp);
-}
-
-
-SBData	*sb_end(void)
-{
-	SBData	*result;
-
-	result = stack_pop(&sbstack);
-	return (result);
-}
-
-SBData	*sb_peek(void)
-{
-	return (SBData *)stack_peek(sbstack);
-}
-
-SBData	*sb_search(bool	isswitch)
-{
-	Stack	*tmp;
-	SBData	*data;
-
-	tmp = sbstack;
-	while (tmp != NULL)
-	{
-		data = (SBData *)tmp->data;
-		if (data->isswitch == isswitch)
-			return (data);
-		tmp = tmp->prev;
-	}
-	return (NULL);
-}
-
-int	add_switchcase(SBData *sbdata, int number)
-{
-	int			count;
-	SwitchCase	*tmp;
-
-	count = switchCaseCount++;
-
-	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
-	tmp->value = number;
-	tmp->label = count;
-	tmp->next = sbdata->cases;
-	sbdata->cases = tmp;
-
-	//TODO 被りチェック
-
-	return (count);
-}
-
 // ifの後ろの括弧から読む
-Node	*read_ifblock(void)
+static Node	*read_ifblock(void)
 {
 	Node	*node;
 
@@ -1221,7 +1166,7 @@ Node	*read_ifblock(void)
 }
 
 // TODO 条件の中身がintegerか確認する
-Node	*stmt(void)
+static Node	*stmt(void)
 {
 	Node	*node;
 	Type	*type;
@@ -1504,7 +1449,7 @@ Node	*stmt(void)
 	return node;
 }
 
-Node	*expect_constant(Type *type)
+static Node	*expect_constant(Type *type)
 {
 	Node	*node;
 	Node	**next;
@@ -1552,7 +1497,7 @@ Node	*expect_constant(Type *type)
 	return (node);
 }
 
-void	global_var(Type *type, Token *ident, bool is_extern, bool is_static)
+static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static)
 {
 	int			i;
 	t_defvar	*defvar;
@@ -1790,7 +1735,7 @@ Type	*read_union_block(Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-void	funcdef(Type *type, Token *ident, bool is_static)
+static void	funcdef(Type *type, Token *ident, bool is_static)
 {
 	t_deffunc	*def;
 	Token		*arg;
@@ -1929,7 +1874,7 @@ void	funcdef(Type *type, Token *ident, bool is_static)
 	debug(" CREATED FUNC %s", strndup(def->name, def->name_len));
 }
 
-void	read_typedef(void)
+static void	read_typedef(void)
 {
 	Type		*type;
 	Token		*token;
@@ -1956,7 +1901,7 @@ void	read_typedef(void)
 	expect_semicolon();
 }
 
-void	filescope(void)
+static void	filescope(void)
 {
 	Token	*ident;
 	Type	*type;
@@ -2073,15 +2018,10 @@ void	filescope(void)
 	error_at(g_token->str, "構文解析に失敗しました[filescope kind:%d]", g_token->kind);
 }
 
-void	program(void)
-{
-	while (!at_eof())
-		filescope();
-}
-
 void	parse(Token *tok)
 {
 	g_token = tok;
 	g_type_alias = linked_list_new();
-	program();
+	while (!at_eof())
+		filescope();
 }
