@@ -724,6 +724,8 @@ static void	load_lval_addr(Node *node)
 		arrow(node, true);
 	else if (node->kind == ND_MEMBER_PTR_VALUE)
 		arrow(node, true);
+	else if (node->kind == ND_PARENTHESES)
+		load_lval_addr(node->lhs);
 	else
 		error("左辺値が識別子かアドレスではありません");
 }

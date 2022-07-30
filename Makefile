@@ -5,7 +5,7 @@ prpr:
 	cd 9cc && make
 
 prpr1: 9cc prpr
-	./prtest.sh
+	./prtest1.sh
 
 prpr3: 9cc prpr
 	./prtest1.sh

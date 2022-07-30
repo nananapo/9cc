@@ -35,10 +35,52 @@ static Token *new_token(TokenKind kind, Token *last, char *str, int len)
 	return tok;
 }
 
+// read var name
+// return length
+static int	read_var_name(char *p)
+{
+	int	l = 0;
+
+	while (*p)
+	{
+		if (!isalnum(*p) && !issymbol(*p))
+			return l;
+		l++;
+		p++;
+	}
+	return l;
+}
+
+static bool	skipspace(char **str)
+{
+	if (isspace(**str))
+	{
+		*str += 1;
+		return (true);
+	}
+	return (false);
+}
+
+static int	match_operators(char **str, Token **last)
+{
+	int	i;
+	int	len;
+
+	for(i=0;(len = strlen(operators[i])) > 0;i++)
+		if (strncmp(operators[i], *str, len) == 0)
+		{
+			*last = new_token(TK_RESERVED, *last, *str, len);
+			*str += len;
+			return len;
+		}
+	return 0;
+}
+
+
 // check str is start with needle
 // if so, returns length of needle.
 // otherwise returns 0.
-int	match_word(char **str, Token **last, char *needle, TokenKind kind)
+static int	match_word(char **str, Token **last, char *needle, TokenKind kind)
 {
 	int		len;
 
@@ -54,51 +96,84 @@ int	match_word(char **str, Token **last, char *needle, TokenKind kind)
 	return len;
 }
 
-static int	match_operators(char *str)
+static bool	match_var_name(char **str, Token **last)
 {
-	int	i;
-
-	for(i=0;strlen(operators[i]) > 0;i++)
-		if (strncmp(operators[i], str, strlen(operators[i])) == 0)
-			return strlen(operators[i]);
-	return 0;
+	if (!can_use_beginning_of_var(**str))
+		return (false);
+	*last = new_token(TK_IDENT, *last, *str, read_var_name(*str));
+	*str += (*last)->len;
+	return (true);
 }
 
-// read var name
-// return length
-int	read_var_name(char *p)
+static bool	match_number(char **str, Token **last)
 {
-	int	l = 0;
+	if (!isdigit(**str))
+		return (false);
+	*last = new_token(TK_NUM, *last, *str, 1);
+	(*last)->val = strtol(*str, str, 10);
+	return (true);
+}
 
-	while (*p)
+static bool	match_strlit(char **str, Token **last)
+{
+	if (**str != '"')
+		return (false);
+	*last = new_token(TK_STR_LITERAL, *last, ++(*str), 0);
+	(*last)->len = 0;
+	(*last)->strlen_actual = 0;
+	while (*str)
 	{
-		if (!isalnum(*p) && !issymbol(*p))
-			return l;
-		l++;
-		p++;
+		if (**str == '\\')
+		{
+			(*str)++;
+			if (!is_escapedchar(**str))
+				error_at(*str, "不明なエスケープシーケンスです");
+			(*last)->len++;
+		}
+		else if (**str == '"')
+			break;
+		(*last)->len++;
+		(*last)->strlen_actual++;
+		(*str)++;
 	}
-	return l;
+	if (**str != '"')
+		error_at(*str, "文字列が終了しませんでした");
+	(*str)++;
+	return (true);
+}
+
+static bool	match_charlit(char **str, Token **last)
+{
+	if (**str != '\'')
+		return (false);
+	*last = new_token(TK_CHAR_LITERAL, *last, ++(*str), 1);
+	(*last)->len = 1;
+	(*last)->strlen_actual = 1;
+	if (**str == '\\')
+	{
+		(*str)++;
+		(*last)->strlen_actual++;
+		if (!is_escapedchar(**str))
+			error_at(*str, "不明なエスケープシーケンスです");
+	}
+	(*str)++;
+	if (**str != '\'')
+		error_at(*str, "文字が終了しませんでした : %c", **str);
+	(*str)++;
+	return (true);
 }
 
 Token	*tokenize(char *p)
 {
 	Token	head;
 	Token	*cur;
-	int		op_len;
 
 	head.next = NULL;
 	cur = &head;
 	while (*p)
 	{
-		if (isspace(*p)) { p++; continue ; }
-
-		op_len = match_operators(p);
-		if (op_len)
-		{
-			cur = new_token(TK_RESERVED, cur, p, op_len);
-			p += cur->len;
-			continue ;
-		}
+		if (skipspace(&p))									continue ;
+		if (match_operators(&p, &cur))						continue ;
 
 		if (match_word(&p, &cur, "return",	TK_RETURN))		continue ;
 		if (match_word(&p, &cur, "if",		TK_IF))			continue ;
@@ -120,61 +195,11 @@ Token	*tokenize(char *p)
 		if (match_word(&p, &cur, "extern",	TK_EXTERN))		continue ;
 		if (match_word(&p, &cur, "inline",	TK_INLINE))		continue ;
 
-		if (can_use_beginning_of_var(*p))
-		{
-			cur = new_token(TK_IDENT, cur, p, read_var_name(p));
-			p += cur->len;
-			continue ;
-		}
-		if (isdigit(*p))
-		{
-			cur = new_token(TK_NUM, cur, p, 1);
-			cur->val = strtol(p, &p, 10);
-			continue ;
-		}
-		if (*p == '"')
-		{
-			cur = new_token(TK_STR_LITERAL, cur, ++p, 0);
-			cur->len = 0;
-			cur->strlen_actual = 0;
-			while (*p)
-			{
-				if (*p == '\\')
-				{
-					p++;
-					if (!is_escapedchar(*p))
-						error_at(p, "不明なエスケープシーケンスです");
-					cur->len++;
-				}
-				else if (*p == '"')
-					break;
-				cur->len++;
-				cur->strlen_actual++;
-				p++;
-			}
-			if (*p != '"')
-				error_at(p, "文字列が終了しませんでした");
-			p++;
-			continue ;
-		}
-		if (*p == '\'')
-		{
-			cur = new_token(TK_CHAR_LITERAL, cur, ++p, 1);
-			cur->len = 1;
-			cur->strlen_actual = 1;
-			if (*p == '\\')
-			{
-				p++;
-				cur->strlen_actual++;
-				if (!is_escapedchar(*p))
-					error_at(p, "不明なエスケープシーケンスです");
-			}
-			p++;
-			if (*p != '\'')
-				error_at(p, "文字が終了しませんでした : %c", *p);
-			p++;
-			continue ;
-		}
+		if (match_var_name(&p, &cur))						continue ;
+		if (match_number(&p, &cur))							continue ;
+
+		if (match_strlit(&p, &cur))							continue ;
+		if (match_charlit(&p, &cur))						continue ;
 
 		error_at(p, "failed to Tokenize");
 	}
