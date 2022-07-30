@@ -2,6 +2,7 @@
 # define NINECC_H
 
 #include <stdbool.h>
+#include "list.h"
 
 # define ASM_MOV "mov"
 # define ASM_PUSH "push"
@@ -237,9 +238,9 @@ SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
 
-typedef struct	LVar
+typedef struct s_lvar
 {
-	struct LVar	*next;
+	struct s_lvar	*next;
 
 	char		*name;
 	int			len;
@@ -258,18 +259,23 @@ typedef struct Node
 	struct Node	*lhs;
 	struct Node	*rhs;
 
-	char		*var_name;
-	int			var_name_len;
 	Type		*type;
 
-	bool		is_static;
+	LVar		*lvar; // local var
 
-	// global var
+struct s_defvar
+{
+	char		*name;
+	int			name_len;
+	Type		*type;
+
+	// for global variable
 	bool		is_extern;
-	struct Node	*global_assign; // 初期化用
+	bool		is_static;
+	struct Node	*assign;
+}	*var_global;
 
-	// local var
-	LVar		*lvar;
+	struct Node	*global_assign_next;
 
 	// num
 	int			val;
@@ -292,7 +298,8 @@ struct s_deffunc
 	char	*name;
 	int		name_len;
 	Type	*type_return;
-	Type	*type_arguments[100];
+	int		argcount;
+	Type	*type_arguments[20]; // TODO t_linked_listにする
 
 	bool	is_static;
 	bool	is_prototype;
@@ -302,26 +309,16 @@ struct s_deffunc
 	LVar	*locals;
 	struct Node	*stmt;
 }	*funcdef;
-
-	int			argdef_count;
-	
-	// call
-	struct Node	*args;
-	
-	// func
-	Type		*arg_type;
-	Type		*ret_type;
-	LVar 		*locals;
-	bool		is_variable_argument;
+	int		funccall_argcount;
+	struct Node	*funccall_args[20]; // TODO t_linked_listにする
+	LVar	*locals;
 
 	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
 	LVar		*call_mem_stack;
 
-	// general
-	struct Node	*next;
+
 
 	MemberElem	*elem;
-	bool		is_struct_address;
 
 	// valとlabelでswicth-case
 	int			switch_label;
@@ -339,19 +336,7 @@ typedef struct s_str_literal_elem
 	int							index;
 }	t_str_elem;
 
-#include "list.h"
-
-typedef struct s_defvar
-{
-	char	*name;
-	int		name_len;
-	Type	*type;
-
-	// for global variable
-	bool	is_extern;
-	bool	is_static;
-	Node	*assign;
-}	t_defvar;
+typedef struct s_defvar	t_defvar;
 
 typedef struct s_typedefpair
 {

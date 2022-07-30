@@ -236,72 +236,46 @@ Node *cast(Node *node, Type *to)
 
 Node *call(Token *tok)
 {
-	Node	*node;
-	Node	*args;
-	Node	*readarg;
-	Node	*ntmp;
-	t_deffunc	*refunc;
+	Node		*node;
 
-	debug("CALL %s START", strndup(tok->str, tok->len));
+	debug("CALL %s", strndup(tok->str, tok->len));
 
-	node  = new_node(ND_CALL, NULL, NULL);
-	node->args = NULL;
-	node->argdef_count = 0;
+	node					= new_node(ND_CALL, NULL, NULL);
+	node->funccall_argcount	= 0;
+	node->funcdef			= get_function_by_name(tok->str, tok->len);
 
-	args = NULL;
+ 	// definition exist?
+	if (node->funcdef == NULL)
+		error_at(g_token->str, " 関数%sがみつかりません\n", strndup(tok->str, tok->len));
 
-	if (!consume(")"))
-	{
-		readarg = expr();
-		args = readarg;
-		node->argdef_count = 1;
+	// read arguments
+	for (;;)
+	{	
+		if (consume(")"))
+			break;
 
-		for (;;)
-		{	
-			if (consume(")"))
-				break;
-			if (!consume(","))
-				error_at(g_token->str, "トークンが,ではありません");
-			
-			readarg = expr();
-			readarg->type = readarg->type; // 配列からポインタにする
-			readarg->next = NULL;
-			if (args == NULL)
-				args = readarg;
-			else
-			{
-				for (ntmp = args; ntmp; ntmp = ntmp->next)
-				{
-					if (ntmp->next == NULL)
-					{
-						ntmp->next = readarg;
-						break ;
-					}
-				}
-			}
-			node->argdef_count += 1;
-		}
+		if (node->funccall_argcount != 0 && !consume(","))
+			error_at(g_token->str, "トークンが,ではありません");
+
+		node->funccall_args[node->funccall_argcount++] = expr();
 	}
 
-	refunc = get_function_by_name(tok->str, tok->len);
-	// 関数定義が見つからない場合エラー
-	if (refunc == NULL)
-		error_at(g_token->str, "warning : 関数%sがみつかりません\n", strndup(tok->str, tok->len));
-
-	node->funcdef = refunc;
-
-	int		def_argcount;
-
-	for (def_argcount = 0; refunc->type_arguments[def_argcount] != NULL; def_argcount++) ;
-
 	// 引数の数を確認
-	if (!refunc->is_zero_argument
-		&& ((!refunc->is_variable_argument && node->argdef_count != def_argcount)
-			|| (refunc->is_variable_argument && node->argdef_count < def_argcount)))
-		error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d", strndup(refunc->name, refunc->name_len), def_argcount, node->argdef_count);
-
-	// 関数の情報を保存しておく
-	node->is_variable_argument = refunc->is_variable_argument;
+	if (node->funcdef->is_zero_argument && node->funccall_argcount != 0)
+		error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
+					strndup(node->funcdef->name, node->funcdef->name_len),
+					node->funcdef->argcount, node->funccall_argcount);
+	else
+	{
+		if (!node->funcdef->is_variable_argument && node->funccall_argcount != node->funcdef->argcount)
+			error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
+						strndup(node->funcdef->name, node->funcdef->name_len),
+						node->funcdef->argcount, node->funccall_argcount);
+		if (node->funcdef->is_variable_argument && node->funccall_argcount < node->funcdef->argcount)
+			error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
+						strndup(node->funcdef->name, node->funcdef->name_len),
+						node->funcdef->argcount, node->funccall_argcount);
+	}
 
 	// 引数を定義と比較
 	LVar	*def;
@@ -309,28 +283,31 @@ Node *call(Token *tok)
 	LVar	*firstdef;
 	LVar	*lvtmp;
 	int		i;
-	int		j;
 
-	if (refunc->locals != NULL)
+	if (node->funcdef->locals != NULL)
 	{
 		// 返り値がMEMORYなら二個進める
-		if (is_memory_type(refunc->type_return))
+		if (is_memory_type(node->funcdef->type_return))
 		{
-			def = refunc->locals->next->next;
+			def = node->funcdef->locals->next->next;
 			if (def != NULL)
 				def = copy_lvar(def);
 		}
 		else
-			def = copy_lvar(refunc->locals);
+			def = copy_lvar(node->funcdef->locals);
 	}
 	else
 		def = NULL;
 	firstdef = def;
 	lastdef = NULL;
 
-	for (i = 0; i < node->argdef_count; i++)
+	Node	*args;
+
+	for (i = 0; i < node->funccall_argcount; i++)
 	{
 		debug("  READ ARG(%d) START", i);
+
+		args = node->funccall_args[i];
 
 		if (def != NULL && def->is_arg)
 		{
@@ -341,13 +318,13 @@ Node *call(Token *tok)
 				// 暗黙的なキャストの確認
 				if (!type_can_cast(args->type, def->type, false))
 					error_at(g_token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-							strndup(refunc->name, refunc->name_len),
+							strndup(node->funcdef->name, node->funcdef->name_len),
 							strndup(def->name, def->len),
 							get_type_name(def->type),
 							get_type_name(args->type));
 
 				args = cast(args, def->type);
-				args->next = args->lhs->next;
+				node->funccall_args[i] = args;
 			}
 		}
 		else
@@ -376,15 +353,7 @@ Node *call(Token *tok)
 		args->locals = def;
 
 		// 格納
-		if (node->args == NULL)
-			node->args = args;
-		else
-		{
-			ntmp = node->args;
-			for (j = 0; j < i - 1; j++)
-				ntmp = ntmp->next;
-			ntmp->next = args;
-		}
+		node->funccall_args[i] = args;
 
 		// 進める
 		lastdef = def;
@@ -396,19 +365,18 @@ Node *call(Token *tok)
 		}
 		else
 			def = NULL;
-		args = args->next;
 
 		debug("  READ ARG(%d) END", i);
 	}
 
 	// 型を返り値の型に設定
-	node->type = refunc->type_return;
+	node->type = node->funcdef->type_return;
 
 	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
-	if (is_memory_type(refunc->type_return)
-		|| refunc->type_return->ty == TY_STRUCT)
+	if (is_memory_type(node->funcdef->type_return)
+		|| node->funcdef->type_return->ty == TY_STRUCT)
 	{
-		node->call_mem_stack = create_local_var("", 0, refunc->type_return, false);
+		node->call_mem_stack = create_local_var("", 0, node->funcdef->type_return, false);
 		node->call_mem_stack->is_dummy = true;
 	}
 
@@ -522,8 +490,7 @@ Node *primary(void)
 		if (def_global != NULL)
 		{
 			node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
-			node->var_name = def_global->name;
-			node->var_name_len = def_global->name_len;
+			node->var_global = def_global;
 			node->type = def_global->type;
 			return read_deref_index(node);
 		}
@@ -1570,7 +1537,7 @@ Node	*expect_constant(Type *type)
 		for (;;)
 		{
 			*next = expect_constant(type->ptr_to);
-			next = &(*next)->next;
+			next = &(*next)->global_assign_next;
 			if (consume("}"))
 				break ;
 			if (!consume(","))
@@ -1827,9 +1794,9 @@ void	funcdef(Type *type, Token *ident, bool is_static)
 {
 	t_deffunc	*def;
 	Token		*arg;
-	int			i;
 	int			type_size;
 	LVar		*lvar;
+	int			i;
 
 	g_locals = NULL;
 
@@ -1837,6 +1804,7 @@ void	funcdef(Type *type, Token *ident, bool is_static)
 	def->name					= ident->str;
 	def->name_len				= ident->len;
 	def->type_return			= type;
+	def->argcount				= 0;
 	def->is_static				= is_static;
 	g_func_now = def;
 
@@ -1921,8 +1889,7 @@ void	funcdef(Type *type, Token *ident, bool is_static)
 				error_at(g_token->str, "宣言できない型の変数です");
 
 			// 型情報を保存
-			for (i = 0; def->type_arguments[i] != NULL; i++);
-			def->type_arguments[i] = type;
+			def->type_arguments[def->argcount++] = type;
 
 			// )か,
 			if (consume(")"))

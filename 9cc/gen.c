@@ -277,7 +277,7 @@ static void	lval(Node *node)
 	}
 	else if (node->kind == ND_LVAR_GLOBAL)
 	{
-		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_name, node->var_name_len));
+		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_global->name, node->var_global->name_len));
 	}
 }
 
@@ -285,12 +285,12 @@ static void	call(Node *node)
 {
 	int		size;
 	int 	rbp_offset;
-	int		arg_count = 0;
 	int		push_count = 0;
 	bool	is_aligned;
 	Node	*tmp;
 	int		i;
 	int		j;
+	int		count;
 	int		pop_count;
 
 	LVar	*lvtmp;
@@ -321,10 +321,10 @@ static void	call(Node *node)
 		}
 
 		// 一つめの引数を読み込み
-		if (node->args == NULL)
+		if (node->funccall_argcount == 0)
 			error("va_startに引数がありません");
 
-		lval(node->args);
+		lval(node->funccall_args[0]);
 		mov(RDI, RAX);
 
 		printf("    mov dword ptr [rdi], %d\n", (1 + max_argregindex) * 8); // gp offset
@@ -343,10 +343,9 @@ static void	call(Node *node)
 		return ;
 	}
 
-	for (tmp = node->args; tmp; tmp = tmp->next)
+	for (count = 0; count < node->funccall_argcount; count++)
 	{
-		arg_count++;
-
+		tmp = node->funccall_args[count];
 		size = get_type_size(type_array_to_ptr(tmp->locals->type));
 
 		debug("PUSH ARG %s (%d)",
@@ -386,12 +385,12 @@ static void	call(Node *node)
 
 	// 16 byteアラインチェック
 	rbp_offset = 0;
-	for (tmp = node->args; tmp; tmp = tmp->next)
+	for (i = 0; i < node->funccall_argcount; i++)
 	{
+		tmp = node->funccall_args[i];
 		if (tmp->locals->arg_regindex != -1)
 			continue ;
-		rbp_offset = min(rbp_offset,
-						tmp->locals->offset - align_to(get_type_size(tmp->locals->type), 8) + 8);
+		rbp_offset = min(rbp_offset, tmp->locals->offset - align_to(get_type_size(tmp->locals->type), 8) + 8);
 	}
 
 	// マイナスなのでプラスにする
@@ -402,15 +401,12 @@ static void	call(Node *node)
 		rbp_offset += 8;
 
 	debug("RBP_OFFSET %d (is_aligned : %d)", rbp_offset, is_aligned);
-
+	
 	pop_count = 0;
 	// 後ろから格納していく
-	for (i = arg_count; i > 0; i--)
+	for (i = node->funccall_argcount - 1; i >= 0; i--)
 	{
-		// i番目のtmpを求める
-		tmp = node->args;
-		for (j = 1; j < i; j++)
-			tmp = tmp->next;
+		tmp = node->funccall_args[i];
 
 		debug("POP %s", strndup(tmp->locals->name, tmp->locals->len));
 	
@@ -473,7 +469,7 @@ static void	call(Node *node)
 
 	// call
 	debug("CALL RBP_OFFSET: %d", rbp_offset);
-	if (node->is_variable_argument)
+	if (node->funcdef->is_variable_argument)
 		movi(AL, 0);
 		printf("    mov %s, 0\n", AL);
 	printf("    call _%s\n", strndup(node->funcdef->name, node->funcdef->name_len));
@@ -887,7 +883,7 @@ static void	print_global_constant(Node *node, Type *type)
 	{
 		// TODO 数のチェックはしてない
 		// array array
-		for (notmp = node; notmp; notmp = notmp->next)
+		for (notmp = node; notmp; notmp = notmp->global_assign_next)
 			print_global_constant(notmp, type->ptr_to);
 	}
 	else
