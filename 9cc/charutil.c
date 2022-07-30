@@ -1,8 +1,14 @@
 #include <ctype.h>
+#include <stdbool.h>
+
+bool	issymbol(char c)
+{
+	return (c == '_');
+}
 
 int	can_use_beginning_of_var(char c)
 {
-	return isalpha(c) || (c == '_');
+	return (isalpha(c) || issymbol(c));
 }
 
 int	is_escapedchar(char c)

@@ -118,7 +118,6 @@ static void	cmp(Type *dst, Type *from)
 
 char	*get_str_literal_name(int index)
 {
-
 	char	*tmp;
 
 	tmp = calloc(100, sizeof(char));
@@ -706,6 +705,13 @@ static void	equality_prologue(Node *node)
 	pop("rdi");
 }
 
+static void	assign_prologue(Node *node)
+{
+	debug("ASSIGN %d", node->lhs->kind);
+	load_lval_addr(node->lhs);	
+	push();
+}
+
 static void	load_lval_addr(Node *node)
 {
 	if (node->kind == ND_LVAR)
@@ -720,13 +726,6 @@ static void	load_lval_addr(Node *node)
 		arrow(node, true);
 	else
 		error("左辺値が識別子かアドレスではありません");
-}
-
-static void	assign_prologue(Node *node)
-{
-	debug("ASSIGN %d", node->lhs->kind);
-	load_lval_addr(node->lhs);	
-	push();
 }
 
 static void	assign_epilogue(Type *type)

@@ -6,9 +6,12 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+
+bool	issymbol(char c);
+
 extern char		*user_input;
 
-static char *reserved_words[42] = {
+static char *operators[42] = {
 	"...","++", "--", "->", ".",
 	">=", "<=", "==", "!=","||",
 	"&&","+=", "-=", "*=", "/=",
@@ -22,29 +25,43 @@ static char *reserved_words[42] = {
 	""
 };
 
-static Token *new_token(TokenKind kind, Token *cur, char *str)
+static Token *new_token(TokenKind kind, Token *last, char *str, int len)
 {
 	Token *tok = calloc(1, sizeof(Token));
 	tok->kind = kind;
 	tok->str = str;
-	cur->next = tok;
-	tok->len = 1;
+	tok->len = len;
+	last->next = tok;
 	return tok;
 }
 
-static char	*match_reserved_word(char *str)
+// check str is start with needle
+// if so, returns length of needle.
+// otherwise returns 0.
+int	match_word(char **str, Token **last, char *needle, TokenKind kind)
+{
+	int		len;
+
+	len = strlen(needle);
+	if (strncmp(*str, needle, len) != 0)
+		return 0;
+	if (isalnum((*str)[len]) || issymbol((*str)[len]))
+		return 0;
+
+	*last = new_token(kind, *last, *str, len);
+	*str += len;
+
+	return len;
+}
+
+static int	match_operators(char *str)
 {
 	int	i;
 
-	for(i=0;strlen(reserved_words[i]) > 0;i++)
-		if (strncmp(reserved_words[i], str, strlen(reserved_words[i])) == 0)
-			return reserved_words[i];
-	return NULL;
-}
-
-static bool	issymbol(char c)
-{
-	return (c == '_');
+	for(i=0;strlen(operators[i]) > 0;i++)
+		if (strncmp(operators[i], str, strlen(operators[i])) == 0)
+			return strlen(operators[i]);
+	return 0;
 }
 
 // read var name
@@ -63,194 +80,61 @@ int	read_var_name(char *p)
 	return l;
 }
 
-// check str is start with needle
-// if so, returns length of needle.
-// otherwise returns 0.
-int	match_word(char *str, char *needle)
-{
-	int	len = strlen(needle);
-
-	if (strncmp(str, needle, len) != 0)
-		return 0;
-	if (isalnum(str[len]) || issymbol(str[len]))
-		return 0;
-	return len;
-}
-
 Token	*tokenize(char *p)
 {
 	Token	head;
 	Token	*cur;
-	char	*res_result;
+	int		op_len;
 
 	head.next = NULL;
 	cur = &head;
 	while (*p)
 	{
-		if (isspace(*p))
-		{
-			p++;
-			continue ;
-		}
+		if (isspace(*p)) { p++; continue ; }
 
-		res_result = match_reserved_word(p);
-		if (res_result != NULL)
+		op_len = match_operators(p);
+		if (op_len)
 		{
-			cur = new_token(TK_RESERVED, cur, p);
-			cur->len = strlen(res_result);
+			cur = new_token(TK_RESERVED, cur, p, op_len);
 			p += cur->len;
 			continue ;
 		}
 
-		if (match_word(p, "return"))
-		{
-			cur = new_token(TK_RETURN, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "if"))
-		{
-			cur = new_token(TK_IF, cur, p);
-			cur->len = 2;
-			p += 2;
-			continue ;
-		}
-		if (match_word(p, "else"))
-		{
-			cur = new_token(TK_ELSE, cur, p);
-			cur->len = 4;
-			p += 4;
-			continue ;
-		}
-		if (match_word(p, "while"))
-		{
-			cur = new_token(TK_WHILE, cur, p);
-			cur->len = 5;
-			p += 5;
-			continue ;
-		}
-		if (match_word(p, "for"))
-		{
-			cur = new_token(TK_FOR, cur, p);
-			cur->len = 3;
-			p += 3;
-			continue ;
-		}
-		if (match_word(p, "do"))
-		{
-			cur = new_token(TK_DO, cur, p);
-			cur->len = 2;
-			p += 2;
-			continue ;
-		}
-		if (match_word(p, "sizeof"))
-		{
-			cur = new_token(TK_SIZEOF, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "struct"))
-		{
-			cur = new_token(TK_STRUCT, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "union"))
-		{
-			cur = new_token(TK_UNION, cur, p);
-			cur->len = 5;
-			p += 5;
-			continue ;
-		}
-		if (match_word(p, "break"))
-		{
-			cur = new_token(TK_BREAK, cur, p);
-			cur->len = 5;
-			p += 5;
-			continue ;
-		}
-		if (match_word(p, "continue"))
-		{
-			cur = new_token(TK_CONTINUE, cur, p);
-			cur->len = 8;
-			p += 8;
-			continue ;
-		}
-		if (match_word(p, "switch"))
-		{
-			cur = new_token(TK_SWITCH, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "case"))
-		{
-			cur = new_token(TK_CASE, cur, p);
-			cur->len = 4;
-			p += 4;
-			continue ;
-		}
-		if (match_word(p, "default"))
-		{
-			cur = new_token(TK_DEFAULT, cur, p);
-			cur->len = 7;
-			p += 7;
-			continue ;
-		}
-		if (match_word(p, "static"))
-		{
-			cur = new_token(TK_STATIC, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "typedef"))
-		{
-			cur = new_token(TK_TYPEDEF, cur, p);
-			cur->len = 7;
-			p += 7;
-			continue ;
-		}
-		if (match_word(p, "enum"))
-		{
-			cur = new_token(TK_ENUM, cur, p);
-			cur->len = 4;
-			p += 4;
-			continue ;
-		}
-		if (match_word(p, "extern"))
-		{
-			cur = new_token(TK_EXTERN, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
-		if (match_word(p, "inline"))
-		{
-			cur = new_token(TK_INLINE, cur, p);
-			cur->len = 6;
-			p += 6;
-			continue ;
-		}
+		if (match_word(&p, &cur, "return",	TK_RETURN))		continue ;
+		if (match_word(&p, &cur, "if",		TK_IF))			continue ;
+		if (match_word(&p, &cur, "else",	TK_ELSE))		continue ;
+		if (match_word(&p, &cur, "while",	TK_WHILE))		continue ;
+		if (match_word(&p, &cur, "for",		TK_FOR))		continue ;
+		if (match_word(&p, &cur, "do",		TK_DO))			continue ;
+		if (match_word(&p, &cur, "switch",	TK_SWITCH))		continue ;
+		if (match_word(&p, &cur, "sizeof",	TK_SIZEOF))		continue ;
+		if (match_word(&p, &cur, "struct",	TK_STRUCT))		continue ;
+		if (match_word(&p, &cur, "union",	TK_UNION))		continue ;
+		if (match_word(&p, &cur, "enum",	TK_ENUM))		continue ;
+		if (match_word(&p, &cur, "case",	TK_CASE))		continue ;
+		if (match_word(&p, &cur, "break",	TK_BREAK))		continue ;
+		if (match_word(&p, &cur, "continue",TK_CONTINUE))	continue ;
+		if (match_word(&p, &cur, "default",	TK_DEFAULT))	continue ;
+		if (match_word(&p, &cur, "static",	TK_STATIC))		continue ;
+		if (match_word(&p, &cur, "typedef",	TK_TYPEDEF))	continue ;
+		if (match_word(&p, &cur, "extern",	TK_EXTERN))		continue ;
+		if (match_word(&p, &cur, "inline",	TK_INLINE))		continue ;
+
 		if (can_use_beginning_of_var(*p))
 		{
-			cur = new_token(TK_IDENT, cur, p);
-			cur->len = read_var_name(p);
+			cur = new_token(TK_IDENT, cur, p, read_var_name(p));
 			p += cur->len;
 			continue ;
 		}
 		if (isdigit(*p))
 		{
-			cur = new_token(TK_NUM, cur, p);
+			cur = new_token(TK_NUM, cur, p, 1);
 			cur->val = strtol(p, &p, 10);
 			continue ;
 		}
 		if (*p == '"')
 		{
-			cur = new_token(TK_STR_LITERAL, cur, ++p);
+			cur = new_token(TK_STR_LITERAL, cur, ++p, 0);
 			cur->len = 0;
 			cur->strlen_actual = 0;
 			while (*p)
@@ -275,7 +159,7 @@ Token	*tokenize(char *p)
 		}
 		if (*p == '\'')
 		{
-			cur = new_token(TK_CHAR_LITERAL, cur, ++p);
+			cur = new_token(TK_CHAR_LITERAL, cur, ++p, 1);
 			cur->len = 1;
 			cur->strlen_actual = 1;
 			if (*p == '\\')
@@ -295,6 +179,6 @@ Token	*tokenize(char *p)
 		error_at(p, "failed to Tokenize");
 	}
 	
-	new_token(TK_EOF, cur, p);
+	new_token(TK_EOF, cur, p, 0);
 	return head.next;
 }

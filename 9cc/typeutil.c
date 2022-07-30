@@ -29,7 +29,6 @@ Type	*new_primitive_type(PrimitiveType pri)
 	Type	*type = calloc(1, sizeof(Type));
 	type->ty = pri;
 	type->ptr_to = NULL;
-	type->next = NULL;
 	return type;
 }
 
@@ -47,7 +46,7 @@ Type	*new_type_array(Type *ptr_to)
 	return type;
 }
 
-Type	*new_enum_type( char *name, int len)
+Type	*new_enum_type(char *name, int len)
 {
 	Type	*type;
 	int		i;
@@ -67,7 +66,7 @@ Type	*new_enum_type( char *name, int len)
 	return (type);
 }
 
-Type	*new_struct_type( char *name, int len)
+Type	*new_struct_type(char *name, int len)
 {
 	Type	*type;
 	int		i;
@@ -87,7 +86,7 @@ Type	*new_struct_type( char *name, int len)
 	return (type);
 }
 
-Type	*new_union_type( char *name, int len)
+Type	*new_union_type(char *name, int len)
 {
 	Type	*type;
 	int		i;

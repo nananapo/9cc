@@ -177,9 +177,6 @@ typedef struct Type
 
 	int 			array_size;
 
-	// arg用
-	struct Type		*next;
-
 	struct s_struct_definition
 	{
 		char				*name;
@@ -208,7 +205,6 @@ typedef struct Type
 
 typedef struct s_struct_definition	StructDef;
 typedef struct s_members			MemberElem;
-
 typedef struct s_union_definition	UnionDef;
 
 typedef struct	s_switchcase
@@ -327,6 +323,7 @@ struct s_deffunc
 }	Node;
 
 typedef struct s_deffunc t_deffunc;
+typedef struct s_defvar	t_defvar;
 
 typedef struct s_str_literal_elem
 {
@@ -335,8 +332,6 @@ typedef struct s_str_literal_elem
 	struct s_str_literal_elem	*next;
 	int							index;
 }	t_str_elem;
-
-typedef struct s_defvar	t_defvar;
 
 typedef struct s_typedefpair
 {
@@ -368,7 +363,6 @@ Node	*new_node_num(int val);
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
 int		get_type_size(Type *type);
-Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
 Type	*new_struct_type(char *name, int len);
@@ -379,7 +373,6 @@ bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
 bool	can_compared(Type *l, Type *r, Type **lt, Type **rt);
 bool	type_equal(Type *t1, Type *t2);
-char	*type_regname(Type *type);
 MemberElem	*get_member_by_name(Type *type, char *name, int len);
 int		max_type_size(Type *type);
 char	*get_type_name(Type *type);
