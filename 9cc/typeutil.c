@@ -3,6 +3,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+// main
+extern Token			*g_token;
+extern t_deffunc		*g_func_defs[1000];
+extern t_deffunc		*g_func_protos[1000];
+extern t_defvar			*g_global_vars[1000];
+extern t_str_elem		*g_str_literals;
+extern StructDef		*g_struct_defs[1000];
+extern EnumDef			*g_enum_defs[1000];
+extern UnionDef			*g_union_defs[1000];
+extern LVar				*g_locals;
+extern t_deffunc		*g_func_now;
+extern t_linked_list	*g_type_alias;
+
 static int max(int a, int b)
 {
 	if (a > b)
@@ -33,18 +47,18 @@ Type	*new_type_array(Type *ptr_to)
 	return type;
 }
 
-Type	*new_enum_type(ParseResult *env, char *name, int len)
+Type	*new_enum_type( char *name, int len)
 {
 	Type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_ENUM);
-	for (i = 0; env->enum_defs[i]; i++)
+	for (i = 0; g_enum_defs[i]; i++)
 	{
-		if (env->enum_defs[i]->name_len == len
-		&& strncmp(env->enum_defs[i]->name, name, len) == 0)
+		if (g_enum_defs[i]->name_len == len
+		&& strncmp(g_enum_defs[i]->name, name, len) == 0)
 		{
-			type->enm = env->enum_defs[i];
+			type->enm = g_enum_defs[i];
 			break ;
 		}
 	}
@@ -53,18 +67,18 @@ Type	*new_enum_type(ParseResult *env, char *name, int len)
 	return (type);
 }
 
-Type	*new_struct_type(ParseResult *env, char *name, int len)
+Type	*new_struct_type( char *name, int len)
 {
 	Type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_STRUCT);
-	for (i = 0; env->struct_defs[i]; i++)
+	for (i = 0; g_struct_defs[i]; i++)
 	{
-		if (env->struct_defs[i]->name_len == len
-		&& strncmp(env->struct_defs[i]->name, name, len) == 0)
+		if (g_struct_defs[i]->name_len == len
+		&& strncmp(g_struct_defs[i]->name, name, len) == 0)
 		{
-			type->strct = env->struct_defs[i];
+			type->strct = g_struct_defs[i];
 			break ;
 		}
 	}
@@ -73,18 +87,18 @@ Type	*new_struct_type(ParseResult *env, char *name, int len)
 	return (type);
 }
 
-Type	*new_union_type(ParseResult *env, char *name, int len)
+Type	*new_union_type( char *name, int len)
 {
 	Type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_UNION);
-	for (i = 0; env->union_defs[i]; i++)
+	for (i = 0; g_union_defs[i]; i++)
 	{
-		if (env->union_defs[i]->name_len == len
-		&& strncmp(env->union_defs[i]->name, name, len) == 0)
+		if (g_union_defs[i]->name_len == len
+		&& strncmp(g_union_defs[i]->name, name, len) == 0)
 		{
-			type->unon = env->union_defs[i];
+			type->unon = g_union_defs[i];
 			break ;
 		}
 	}

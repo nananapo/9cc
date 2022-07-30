@@ -762,7 +762,6 @@ void	gen_deffunc(t_deffunc *node)
 	stack_count = 0;
 	g_func_now = node;
 
-	printf(".section	__TEXT,__text,regular,pure_instructions\n");
 	if (!node->is_static)
 		printf(".globl _%s\n", funcname);
 	printf("_%s:\n", funcname);	
@@ -911,7 +910,6 @@ void gen_defglobal(t_defvar *node)
 	}
 	else
 	{
-		printf(".section	__DATA, __data\n");
 		printf("_%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}

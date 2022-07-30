@@ -2,86 +2,97 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define Env ParseResult
+Node	*read_struct_block(Token *ident);
+Node	*read_enum_block(Token *ident);
+Node	*read_union_block(Token *ident);
 
-Node	*read_struct_block(Env *env, Token *ident);
-Node	*read_enum_block(Env *env, Token *ident);
-Node	*read_union_block(Env *env, Token *ident);
+// main
+extern Token			*g_token;
+extern t_deffunc		*g_func_defs[1000];
+extern t_deffunc		*g_func_protos[1000];
+extern t_defvar			*g_global_vars[1000];
+extern t_str_elem		*g_str_literals;
+extern StructDef		*g_struct_defs[1000];
+extern EnumDef			*g_enum_defs[1000];
+extern UnionDef			*g_union_defs[1000];
+extern LVar				*g_locals;
+extern t_deffunc		*g_func_now;
+extern t_linked_list	*g_type_alias;
 
-bool	consume(Env *env, char *op)
+bool	consume(char *op)
 {
-	if (env->token->kind != TK_RESERVED ||
-		(int)strlen(op) != env->token->len ||
-		memcmp(env->token->str, op, env->token->len) != 0)
+	if (g_token->kind != TK_RESERVED ||
+		(int)strlen(op) != g_token->len ||
+		memcmp(g_token->str, op, g_token->len) != 0)
 		return false;
-	env->token = env->token->next;
+	g_token = g_token->next;
 	return true;
 }
 
-bool consume_number(Env *env, int *result)
+bool consume_number(int *result)
 {
-	if (env->token->kind != TK_NUM)
+	if (g_token->kind != TK_NUM)
 		return false;
-	*result = env->token->val;
-	env->token = env->token->next;
+	*result = g_token->val;
+	g_token = g_token->next;
 	return true;	
 }
 
-bool	consume_with_type(Env *env, TokenKind kind)
+bool	consume_with_type(TokenKind kind)
 {
-	if (env->token->kind != kind)
+	if (g_token->kind != kind)
 		return false;
-	env->token = env->token->next;
+	g_token = g_token->next;
 	return true;
 }
 
-Token	*consume_ident(Env *env)
+Token	*consume_ident(void)
 {
 	Token	*ret;
-	if (env->token->kind != TK_IDENT)
+	if (g_token->kind != TK_IDENT)
 		return NULL;
-	ret = env->token;
-	env->token = env->token->next;
+	ret = g_token;
+	g_token = g_token->next;
 	return ret;
 }
 
-Token	*consume_ident_str(Env *env, char *p)
+Token	*consume_ident_str(char *p)
 {
 	Token	*ret;
-	if (env->token->kind != TK_IDENT)
+	if (g_token->kind != TK_IDENT)
 		return NULL;
-	if (strncmp(p, env->token->str, strlen(p)) != 0)
+	if (strncmp(p, g_token->str, strlen(p)) != 0)
 		return NULL;
-	ret = env->token;
-	env->token = env->token->next;
+	ret = g_token;
+	g_token = g_token->next;
 	return ret;
 }
 
-Token	*consume_str_literal(Env *env)
+Token	*consume_str_literal(void)
 {
 	Token	*ret;
-	if (env->token->kind != TK_STR_LITERAL)
+	if (g_token->kind != TK_STR_LITERAL)
 		return NULL;
-	ret = env->token;
-	env->token = env->token->next;
+	ret = g_token;
+	g_token = g_token->next;
 	return ret;
 }
 
-Token	*consume_char_literal(Env *env)
+Token	*consume_char_literal(void)
 {
 	Token	*ret;
-	if (env->token->kind != TK_CHAR_LITERAL)
+	if (g_token->kind != TK_CHAR_LITERAL)
 		return NULL;
-	ret = env->token;
-	env->token = env->token->next;
+	ret = g_token;
+	g_token = g_token->next;
 	return ret;
 }
 
-void	consume_type_ptr(Env *env, Type **type)
+void	consume_type_ptr(Type **type)
 {
 	Type	*tmp;
 
-	while (consume(env, "*"))
+	while (consume("*"))
 	{
 		tmp = new_primitive_type(TY_PTR);
 		tmp->ptr_to = *type;
@@ -89,120 +100,120 @@ void	consume_type_ptr(Env *env, Type **type)
 	}
 }
 
-static bool	consume_type_alias(Env *env, Type **type)
+static bool	consume_type_alias(Type **type)
 {
 	TypedefPair	*pair;
 
-	if (env->token->kind != TK_IDENT)
+	if (g_token->kind != TK_IDENT)
 		return (false);
-	pair = linked_list_search(env->type_alias, strndup(env->token->str, env->token->len));
+	pair = linked_list_search(g_type_alias, strndup(g_token->str, g_token->len));
 	if (pair == NULL)
 		return (false);
-	consume_ident(env);
+	consume_ident();
 	*type = pair->type;
 	return (true);
 }
 
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
 // read_def	: structの宣言を読むかどうか
-Type	*consume_type_before(Env *env, bool read_def)
+Type	*consume_type_before(bool read_def)
 {
 	Type	*type;
 	Token	*ident;
 
 	// type name
-	if (consume_ident_str(env, "int"))
+	if (consume_ident_str("int"))
 		type = new_primitive_type(TY_INT);
-	else if (consume_ident_str(env, "char"))
+	else if (consume_ident_str("char"))
 		type = new_primitive_type(TY_CHAR);
-	else if (consume_ident_str(env, "_Bool"))
+	else if (consume_ident_str("_Bool"))
 		type = new_primitive_type(TY_BOOL);
-	else if (consume_ident_str(env, "void"))
+	else if (consume_ident_str("void"))
 		type = new_primitive_type(TY_VOID);
-	else if (consume_with_type(env, TK_STRUCT))
+	else if (consume_with_type(TK_STRUCT))
 	{
-		ident = consume_ident(env);
+		ident = consume_ident();
 		if (ident == NULL)
 			return (NULL);
-		if (read_def && consume(env, "{"))
-			read_struct_block(env, ident);
+		if (read_def && consume("{"))
+			read_struct_block(ident);
 
-		type = new_struct_type(env, ident->str, ident->len);
+		type = new_struct_type(ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
 	}
-	else if (consume_with_type(env, TK_ENUM))
+	else if (consume_with_type(TK_ENUM))
 	{
-		ident = consume_ident(env);
+		ident = consume_ident();
 		if (ident == NULL)
 			return (NULL);
-		if (read_def && consume(env, "{"))
-			read_enum_block(env, ident);
+		if (read_def && consume("{"))
+			read_enum_block(ident);
 
-		type = new_enum_type(env, ident->str, ident->len);
+		type = new_enum_type(ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
 	}
-	else if (consume_with_type(env, TK_UNION))
+	else if (consume_with_type(TK_UNION))
 	{
-		ident = consume_ident(env);
+		ident = consume_ident();
 		if (ident == NULL)
 			return (NULL);
-		if (read_def && consume(env, "{"))
-			read_union_block(env, ident);
+		if (read_def && consume("{"))
+			read_union_block(ident);
 
-		type = new_union_type(env, ident->str, ident->len);
+		type = new_union_type(ident->str, ident->len);
 		if (type == NULL)
 			return (NULL);
 	}
-	else if (consume_type_alias(env, &type))
+	else if (consume_type_alias(&type))
 	{
 	}
 	else
 		return (NULL);
 
-	consume_type_ptr(env, &type);
+	consume_type_ptr(&type);
 	return type;
 }
 
 // 型宣言のarray部分を読む
-void	expect_type_after(Env *env, Type **type)// expect size
+void	expect_type_after(Type **type)// expect size
 {
 	int		size;
 
-	while (consume(env, "["))
+	while (consume("["))
 	{
 		*type = new_type_array(*type);
-		if (!consume_number(env, &size))
-			error_at(env->token->str, "配列のサイズが定義されていません");
+		if (!consume_number(&size))
+			error_at(g_token->str, "配列のサイズが定義されていません");
 		(*type)->array_size = size;
-		if (!consume(env, "]"))
-			error_at(env->token->str, "]がありません");
+		if (!consume("]"))
+			error_at(g_token->str, "]がありません");
 	}
 	return;
 }
 
-void	expect(Env *env, char *op)
+void	expect(char *op)
 {
-	if (env->token->kind != TK_RESERVED ||
-		(int)strlen(op) != env->token->len ||
-		memcmp(env->token->str, op, env->token->len) != 0)
-		error_at(env->token->str, "'%s'ではありません", op);
-	env->token = env->token->next;
+	if (g_token->kind != TK_RESERVED ||
+		(int)strlen(op) != g_token->len ||
+		memcmp(g_token->str, op, g_token->len) != 0)
+		error_at(g_token->str, "'%s'ではありません", op);
+	g_token = g_token->next;
 }
 
-int expect_number(Env *env)
+int expect_number(void)
 {
 	int val;
 
-	if (env->token->kind != TK_NUM)
-		error_at(env->token->str, "数ではありません");
-	val = env->token->val;
-	env->token = env->token->next;
+	if (g_token->kind != TK_NUM)
+		error_at(g_token->str, "数ではありません");
+	val = g_token->val;
+	g_token = g_token->next;
 	return val;	
 }
 
-bool	at_eof(Env *env)
+bool	at_eof(void)
 {
-	return env->token->kind == TK_EOF;
+	return g_token->kind == TK_EOF;
 }

@@ -5,7 +5,7 @@
 
 //#define DEBUG
 
-extern char	*user_input;
+extern char	*g_user_input;
 
 void	error(char *fmt, ...)
 {
@@ -53,12 +53,12 @@ void	error_at(char *loc, char *fmt, ...)
 	va_start(ap, fmt);
 
 	mystart = loc;
-	while (mystart != user_input && *(mystart - 1) != '\n')
+	while (mystart != g_user_input && *(mystart - 1) != '\n')
 		mystart--;
 
 	int pos = loc - mystart;
 
-	fprintf(stderr, "%d:%d:\n", count_line(user_input, loc), pos);
+	fprintf(stderr, "%d:%d:\n", count_line(g_user_input, loc), pos);
 
 	ret = strchr(mystart, '\n');
 	if (ret == NULL)

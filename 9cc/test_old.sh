@@ -16,6 +16,8 @@ ncc="./9cc"
 prpr="../prpr/prpr --stddir ../std/"
 module="$testdir/sub/print.c"
 
+rm -rf tmp
+
 assert() {
   expected="$1"
   input="$2"

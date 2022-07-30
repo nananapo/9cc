@@ -5,23 +5,35 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define Env ParseResult
-
 int	align_to(int n, int align);
 int	max(int a, int b);
 int	min(int a, int b);
 
-static void alloc_local_var(Env *env, LVar *lvar);
+static void alloc_local_var(LVar *lvar);
 Type	*type_cast_forarg(Type *type);
 
-bool	find_enum(Env *env, char *str, int len, EnumDef **res_def, int *res_value)
+// main
+extern Token			*g_token;
+extern t_deffunc		*g_func_defs[1000];
+extern t_deffunc		*g_func_protos[1000];
+extern t_defvar			*g_global_vars[1000];
+extern t_str_elem		*g_str_literals;
+extern StructDef		*g_struct_defs[1000];
+extern EnumDef			*g_enum_defs[1000];
+extern UnionDef			*g_union_defs[1000];
+extern LVar				*g_locals;
+extern t_deffunc		*g_func_now;
+extern t_linked_list	*g_type_alias;
+
+
+bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value)
 {
 	int	i;
 	int	j;
 
-	for (i = 0; env->enum_defs[i]; i++)
+	for (i = 0; g_enum_defs[i]; i++)
 	{
-		EnumDef	*def = env->enum_defs[i];
+		EnumDef	*def = g_enum_defs[i];
 		for (j = 0; j < def->kind_len; j++)
 		{
 			char *var = def->kinds[j];
@@ -39,26 +51,26 @@ bool	find_enum(Env *env, char *str, int len, EnumDef **res_def, int *res_value)
 	return (false);
 }
 
-LVar	*find_lvar(Env *env, char *str, int len)
+LVar	*find_lvar(char *str, int len)
 {
 	LVar	*var;
 
-	for (var = env->locals; var; var = var->next)
+	for (var = g_locals; var; var = var->next)
 		if (!var->is_dummy && var->len == len && memcmp(str, var->name, var->len) == 0)
 			return var;
 	return NULL;
 }
 
-t_defvar	*find_global(Env *env, char *str, int len)
+t_defvar	*find_global(char *str, int len)
 {
 	int	i;
 
-	for (i = 0; env->global_vars[i]; i++)
-		if (len == env->global_vars[i]->name_len
+	for (i = 0; g_global_vars[i]; i++)
+		if (len == g_global_vars[i]->name_len
 			&& memcmp(str,
-					env->global_vars[i]->name,
-					env->global_vars[i]->name_len) == 0)
-			return env->global_vars[i];
+					g_global_vars[i]->name,
+					g_global_vars[i]->name_len) == 0)
+			return g_global_vars[i];
 	return NULL;
 }
 
@@ -116,12 +128,12 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 
 
 // TODO サイズ0はどうなるか確かめる
-static void	alloc_argument(Env *env, LVar *lvar)
+static void	alloc_argument(LVar *lvar)
 {
-	alloc_argument_simu(env->locals, lvar);
+	alloc_argument_simu(g_locals, lvar);
 }
 
-static void alloc_local_var(Env *env, LVar *lvar)
+static void alloc_local_var(LVar *lvar)
 {
 	int		size;
 	int 	offset_max;
@@ -129,7 +141,7 @@ static void alloc_local_var(Env *env, LVar *lvar)
 
 	// 引数のオフセットの正の最大値を求める
 	offset_max = 0;
-	for (tmp = env->locals; tmp; tmp = tmp->next)
+	for (tmp = g_locals; tmp; tmp = tmp->next)
 	{
 		offset_max = max(offset_max, max(0, tmp->offset));
 	}
@@ -151,7 +163,7 @@ static void alloc_local_var(Env *env, LVar *lvar)
 
 // TODO 同じ名前の変数がないかチェックする
 // TODO struct
-LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
+LVar	*create_local_var(char *name, int len, Type *type, bool is_arg)
 {
 	LVar	*lvar;
 	LVar	*tmp;
@@ -168,17 +180,17 @@ LVar	*create_local_var(Env *env, char *name, int len, Type *type, bool is_arg)
 
 	// メモリを割り当て
 	if (is_arg)
-		alloc_argument(env, lvar);
+		alloc_argument(lvar);
 	else
-		alloc_local_var(env, lvar);
+		alloc_local_var(lvar);
 
 	// localsに保存
 	lvar->next = NULL;
-	if (env->locals == NULL)
-		env->locals = lvar;
+	if (g_locals == NULL)
+		g_locals = lvar;
 	else
 	{
-		for(tmp = env->locals; tmp; tmp = tmp->next)
+		for(tmp = g_locals; tmp; tmp = tmp->next)
 		{
 			if (tmp->next == NULL)
 			{

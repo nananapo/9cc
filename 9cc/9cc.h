@@ -353,23 +353,6 @@ typedef struct s_defvar
 	Node	*assign;
 }	t_defvar;
 
-typedef struct s_parseresult
-{
-	Token			*token;
-	t_deffunc		*func_defs[1000];
-	t_deffunc		*func_protos[1000];
-	t_defvar		*global_vars[1000];
-	t_str_elem		*str_literals;
-	StructDef		*struct_defs[1000];
-	EnumDef			*enum_defs[1000];
-	UnionDef		*union_defs[1000];
-	LVar			*locals;
-
-	t_deffunc		*func_now;
-
-	t_linked_list	*type_alias;
-}	ParseResult;
-
 typedef struct s_typedefpair
 {
 	char	*name;
@@ -403,9 +386,9 @@ int		get_type_size(Type *type);
 Type	*new_primitive_type(PrimitiveType pri);
 Type	*new_type_ptr_to(Type *ptr_to);
 Type	*new_type_array(Type *ptr_to);
-Type	*new_struct_type(ParseResult *env, char *name, int len);
-Type	*new_enum_type(ParseResult *env, char *name, int len);
-Type	*new_union_type(ParseResult *env, char *name, int len);
+Type	*new_struct_type(char *name, int len);
+Type	*new_enum_type(char *name, int len);
+Type	*new_union_type(char *name, int len);
 bool	is_integer_type(Type *type);
 bool	is_pointer_type(Type *type);
 bool	is_declarable_type(Type *type);
@@ -424,9 +407,9 @@ bool	is_memory_type(Type *type);
 char	*get_str_literal_name(int index);
 
 void	gen(Node *node);
-void gen_defglobal(t_defvar *node);
+void	gen_defglobal(t_defvar *node);
 void	gen_deffunc(t_deffunc *node);
 
-ParseResult	*parse(Token *tok);
+void	parse(Token *tok);
 
 #endif
