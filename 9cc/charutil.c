@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 bool	issymbol(char c)
 {
@@ -17,11 +18,13 @@ int	is_escapedchar(char c)
 		|| c == 'r' || c == 't' || c == 'v' || c == '0' || c == '\'' || c == '\\');
 }
 
-int get_char_to_int(char *p, int len)
+// lenはstrlen_actualを使う
+int char_to_int(char *p, int len)
 {
 	if (len == 1)
 		return (*p);
 	p++;
+
 	switch (*p)
 	{
 		case '"':
@@ -47,4 +50,21 @@ int get_char_to_int(char *p, int len)
 			return '\\';
 	}
 	return -1;
+}
+
+void	put_str_literal(char *str, int len)
+{
+	int	i;
+
+	i = -1;
+	while (++i < len)
+	{
+		if (str[i] == '\\')
+		{
+			i++;
+			if (str[i] != '\'')
+				printf("\\");
+		}
+		printf("%c", str[i]);
+	}
 }

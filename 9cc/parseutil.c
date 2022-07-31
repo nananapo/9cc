@@ -211,19 +211,6 @@ bool	consume_enum_key(Type **type, int *value)
 	return (false);
 }
 
-bool consume_charlit(int *number)
-{
-	if (g_token->kind != TK_CHAR_LITERAL)
-		return (false);
-
-	*number = get_char_to_int(g_token->str, g_token->strlen_actual);
-	if (*number == -1)
-		error_at(g_token->str, "不明なエスケープシーケンスです");
-
-	g_token = g_token->next; // 進める
-	return (true);
-}
-
 void	expect_semicolon(void)
 {
 	if (consume(";"))

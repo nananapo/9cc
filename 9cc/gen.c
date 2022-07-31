@@ -1,4 +1,5 @@
 #include "9cc.h"
+#include "gen.h"
 #include "stack.h"
 
 #include <stdio.h>
@@ -16,7 +17,7 @@ static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
 static void	cmps(char *dst, char *from);
 static void	cmp(Type *dst, Type *from);
-char		*get_str_literal_name(int index);
+char		*get_str_literal_name(t_str_elem *elem);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(Type *type);
@@ -116,12 +117,12 @@ static void	cmp(Type *dst, Type *from)
 	cmps(RAX, RDI);
 }
 
-char	*get_str_literal_name(int index)
+char	*get_str_literal_name(t_str_elem *elem)
 {
 	char	*tmp;
 
 	tmp = calloc(100, sizeof(char));
-	sprintf(tmp, "L_STR_%d", index);
+	sprintf(tmp, "L_STR_%d", elem->index);
 	return (tmp);
 }
 
@@ -342,17 +343,21 @@ static void	call(Node *node)
 		return ;
 	}
 
+	LVar	*lvar_defargs;
+
 	for (count = 0; count < node->funccall_argcount; count++)
 	{
 		tmp = node->funccall_args[count];
-		size = get_type_size(type_array_to_ptr(tmp->locals->type));
+		lvar_defargs = node->funccall_argdefs[count];
+
+		size = get_type_size(type_array_to_ptr(lvar_defargs->type));
 
 		debug("PUSH ARG %s (%d)",
-			strndup(tmp->locals->name, tmp->locals->len),size);
+			strndup(lvar_defargs->name, lvar_defargs->name_len),size);
 
 		gen(tmp);
 
-		if (tmp->locals->arg_regindex != -1)
+		if (lvar_defargs->arg_regindex != -1)
 		{
 			if (size <= 8)
 			{
@@ -360,8 +365,7 @@ static void	call(Node *node)
 				push_count++;
 				continue ;
 			}
-			// size > 8なものは必ずstructであると願います( ;∀;)
-			// RAXにアドレスが入っていると想定
+			// size > 8はstructなので、スタックに積む
 			mov(RDI, RAX);
 			for (i = 0; i < size; i += 8)
 			{
@@ -387,9 +391,11 @@ static void	call(Node *node)
 	for (i = 0; i < node->funccall_argcount; i++)
 	{
 		tmp = node->funccall_args[i];
-		if (tmp->locals->arg_regindex != -1)
+		lvar_defargs = node->funccall_argdefs[i];
+
+		if (lvar_defargs->arg_regindex != -1)
 			continue ;
-		rbp_offset = min(rbp_offset, tmp->locals->offset - align_to(get_type_size(tmp->locals->type), 8) + 8);
+		rbp_offset = min(rbp_offset, lvar_defargs->offset - align_to(get_type_size(lvar_defargs->type), 8) + 8);
 	}
 
 	// マイナスなのでプラスにする
@@ -406,18 +412,19 @@ static void	call(Node *node)
 	for (i = node->funccall_argcount - 1; i >= 0; i--)
 	{
 		tmp = node->funccall_args[i];
+		lvar_defargs = node->funccall_argdefs[i];
 
-		debug("POP %s", strndup(tmp->locals->name, tmp->locals->len));
+		debug("POP %s", strndup(lvar_defargs->name, lvar_defargs->name_len));
 	
-		size = get_type_size(type_array_to_ptr(tmp->locals->type));
+		size = get_type_size(type_array_to_ptr(lvar_defargs->type));
 
 		// レジスタに入れる
-		if (tmp->locals->arg_regindex != -1)
+		if (lvar_defargs->arg_regindex != -1)
 		{
 			if (size <= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
-				mov(arg_regs[tmp->locals->arg_regindex], RAX);
+				mov(arg_regs[lvar_defargs->arg_regindex], RAX);
 				continue ;
 			}
 			// size > 8なものは必ずstructであると願います( ;∀;)
@@ -425,13 +432,13 @@ static void	call(Node *node)
 			for (j = size - 8; j >= 0; j -= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV,
-					arg_regs[tmp->locals->arg_regindex - j / 8],
+					arg_regs[lvar_defargs->arg_regindex - j / 8],
 					 RSP, pop_count++ * 8);
 			}
 			continue ;
 		}
 
-		debug("OFFSET %d", tmp->locals->offset);
+		debug("OFFSET %d", lvar_defargs->offset);
 
 		// スタックに積む
 		// 必ず8byteアラインなので楽々実装
@@ -441,7 +448,7 @@ static void	call(Node *node)
 		mov(R10, RSP);
 
 		printf("    sub %s, %d\n", R10,
-				(tmp->locals->offset + 16) + rbp_offset);
+				(lvar_defargs->offset + 16) + rbp_offset);
 
 		// ptr先を渡すのはSTRUCTだけ
 		if (tmp->type->ty == TY_STRUCT
@@ -773,7 +780,7 @@ void	gen_deffunc(t_deffunc *node)
 		maxoff = 0;
 		for (lvtmp = node->locals; lvtmp; lvtmp = lvtmp->next)
 		{
-			debug("VAR %s %d", strndup(lvtmp->name, lvtmp->len), lvtmp->offset);
+			debug("VAR %s %d", strndup(lvtmp->name, lvtmp->name_len), lvtmp->offset);
 			maxoff = max(maxoff, lvtmp->offset);	
 		}
 		stack_size = align_to(maxoff, 8);
@@ -793,7 +800,7 @@ void	gen_deffunc(t_deffunc *node)
 		{
 			if (!lvtmp->is_arg)
 				continue ;
-			debug("ARG %s", strndup(lvtmp->name, lvtmp->len));
+			debug("ARG %s", strndup(lvtmp->name, lvtmp->name_len));
 			if (lvtmp->arg_regindex != -1)
 			{
 				index = lvtmp->arg_regindex;
@@ -874,11 +881,11 @@ static void	print_global_constant(Node *node, Type *type)
 		printf("    .byte %d\n", node->val);
 	}
  	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
-			&& node->str_index >= 0)
+			&& node->def_str != NULL)
 	{
 		// TODO arrayのchar
 		printf("    .quad %s\n",
-				get_str_literal_name(node->str_index));
+				get_str_literal_name(node->def_str));
 	}
 	else if (is_pointer_type(type))
 	{
@@ -1025,17 +1032,17 @@ void	gen(Node *node)
 			lend = jumpLabelCount++;
 			
 			// init
-			if (node->for_init != NULL)
-				gen(node->for_init);
+			if (node->for_expr[0] != NULL)
+				gen(node->for_expr[0]);
 
 			printf(".Lbegin%d:\n", lbegin);
 			
 			// if
-			if(node->for_if != NULL)
+			if(node->for_expr[1] != NULL)
 			{
-				gen(node->for_if);
+				gen(node->for_expr[1]);
 				mov(RDI, "0");
-				cmp(node->for_if->type, new_primitive_type(TY_INT));
+				cmp(node->for_expr[1]->type, new_primitive_type(TY_INT));
 				printf("    je .Lend%d\n", lend);
 			}
 
@@ -1047,8 +1054,8 @@ void	gen(Node *node)
 
 			printf(".Lbegin%d:\n", lbegin2); // continue先
 			// next
-			if(node->for_next != NULL)
-				gen(node->for_next);
+			if(node->for_expr[2] != NULL)
+				gen(node->for_expr[2]);
 
 			printf("    jmp .Lbegin%d\n", lbegin);
 			
@@ -1470,7 +1477,7 @@ void	gen(Node *node)
 		case ND_STR_LITERAL:
 		{
 			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX,
-					get_str_literal_name(node->str_index));
+					get_str_literal_name(node->def_str));
 			return;
 		}
 		case ND_CALL:

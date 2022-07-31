@@ -1,5 +1,6 @@
 #include "9cc.h"
 #include "parse.h"
+#include "charutil.h"
 #include "stack.h"
 
 #include <stdio.h>
@@ -19,8 +20,7 @@ t_deffunc	*get_function_by_name(char *name, int len);
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node	*new_node_num(int val);
 bool	consume_enum_key(Type **type, int *value);
-bool	consume_charlit(int *number);
-int		get_str_literal_index(char *str, int len);
+t_str_elem	*get_str_literal(char *str, int len);
 
 
 SBData	*sbdata_new(bool isswitch, int start, int end);
@@ -75,7 +75,7 @@ extern Token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
-extern t_str_elem		*g_str_literals;
+extern t_str_elem		*g_str_literals[1000];
 extern StructDef		*g_struct_defs[1000];
 extern EnumDef			*g_enum_defs[1000];
 extern UnionDef			*g_union_defs[1000];
@@ -202,9 +202,6 @@ Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
 	node->kind = kind;
 	node->lhs = lhs;
 	node->rhs = rhs;
-
-	// TODO とりあえずこれでprint_global_constantのchar*を区別
-	node->str_index = -1;
 	return node;
 }
 
@@ -222,31 +219,29 @@ Node	*new_node_num(int val)
 	return node;
 }
 
-// リテラルを探す
-int	get_str_literal_index(char *str, int len)
+// 文字列リテラルを保存してオブジェクトを取得する
+// 既に同じ文字列があるならそのオブジェクトを取得する
+t_str_elem	*get_str_literal(char *str, int len)
 {
 	t_str_elem	*tmp;
+	t_str_elem	*elem;
+	int			i;
 
-	tmp = g_str_literals;
-	while (tmp != NULL)
+	// find same literal
+	for (i = 0; g_str_literals[i] != NULL; i++)
 	{
+		tmp = g_str_literals[i];
 		if (len == tmp->len && strncmp(tmp->str, str, len) == 0)
-			return (tmp->index);
-		tmp = tmp->next;
+			return (tmp);
 	}
 
-	tmp = calloc(1, sizeof(t_str_elem));
-	tmp->str = str;
-	tmp->len = len;
-	if (g_str_literals == NULL)
-		tmp->index = 0;
-	else
-		tmp->index = g_str_literals->index + 1;
-
-	tmp->next = g_str_literals;
-	g_str_literals = tmp;
-
-	return (tmp->index);
+	// save 
+	elem = calloc(1, sizeof(t_str_elem));
+	elem->str = str;
+	elem->len = len;
+	elem->index = i;
+	g_str_literals[i] = elem;
+	return (elem);
 }
 
 static Node *cast(Node *node, Type *to)
@@ -327,7 +322,6 @@ static Node *call(Token *tok)
 	lastdef = NULL;
 
 	Node	*args;
-
 	for (i = 0; i < node->funccall_argcount; i++)
 	{
 		debug("  READ ARG(%d) START", i);
@@ -344,7 +338,7 @@ static Node *call(Token *tok)
 				if (!type_can_cast(args->type, def->type, false))
 					error_at(g_token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
 							strndup(node->funcdef->name, node->funcdef->name_len),
-							strndup(def->name, def->len),
+							strndup(def->name, def->name_len),
 							get_type_name(def->type),
 							get_type_name(args->type));
 
@@ -360,7 +354,7 @@ static Node *call(Token *tok)
 			// create_local_varからのコピペ
 			def = calloc(1, sizeof(LVar));
 			def->name = "VA";
-			def->len = 2;
+			def->name_len = 2;
 			def->type = type_cast_forarg(args->type);
 			def->is_arg = true;
 			def->arg_regindex = -1;
@@ -374,11 +368,7 @@ static Node *call(Token *tok)
 			lastdef->next = def;
 		}
 
-		// use->localsにdefを入れる
-		args->locals = def;
-
-		// 格納
-		node->funccall_args[i] = args;
+		node->funccall_argdefs[i] = def;
 
 		// 進める
 		lastdef = def;
@@ -657,7 +647,7 @@ static Node *primary(void)
 	if (tok)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
-		node->str_index = get_str_literal_index(tok->str, tok->len);
+		node->def_str = get_str_literal(tok->str, tok->len);
 		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 		return read_deref_index(node);
 	}
@@ -666,9 +656,9 @@ static Node *primary(void)
 	tok = consume_char_literal();
 	if (tok)
 	{
-		number = get_char_to_int(tok->str, tok->strlen_actual);
+		number = char_to_int(tok->str, tok->strlen_actual);
 		if (number == -1)
-			error_at(tok->str, "不明なエスケープシーケンスです");
+			error_at(tok->str, "不明なエスケープシーケンスです (primary)");
 		node = new_node_num(number);
 		node->type = new_primitive_type(TY_CHAR);
 		return read_deref_index(node); // charの後ろに[]はおかしいけれど、とりあえず許容
@@ -1239,19 +1229,19 @@ static Node	*stmt(void)
 		// for init
 		if (!consume(";"))
 		{
-			node->for_init = expr();
+			node->for_expr[0] = expr();
 			expect_semicolon();
 		}
 		// for if
 		if (!consume(";"))
 		{
-			node->for_if = expr();
+			node->for_expr[1] = expr();
 			expect_semicolon();
 		}
 		// for next
 		if (!consume(")"))
 		{
-			node->for_next = expr();
+			node->for_expr[2] = expr();
 			if(!consume(")"))
 				error_at(g_token->str, ")ではないトークンです");
 		}
@@ -1291,8 +1281,10 @@ static Node	*stmt(void)
 		{
 			if (!consume_enum_key(NULL, &number))
 			{
-				if (!consume_charlit(&number))
+				ident = consume_char_literal();
+				if (ident == NULL)
 					error_at(g_token->str, "定数が必要です");
+				number = char_to_int(ident->str, ident->strlen_actual);
 			}
 		}
 		if (!consume(":"))
@@ -1464,15 +1456,15 @@ static Node	*expect_constant(Type *type)
 			&& (tok = consume_str_literal()) != NULL)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
-		node->str_index = get_str_literal_index(tok->str, tok->len);
+		node->def_str = get_str_literal(tok->str, tok->len);
 		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 	}
 	else if (type_equal(type, new_primitive_type(TY_CHAR)) 
 			&& (tok = consume_char_literal()) != NULL)
 	{
-		number = get_char_to_int(tok->str, tok->strlen_actual);
+		number = char_to_int(tok->str, tok->strlen_actual);
 		if (number == -1)
-			error_at(tok->str, "不明なエスケープシーケンスです");
+			error_at(tok->str, "不明なエスケープシーケンスです (expect_constant)");
 		node = new_node_num(number);
 	}
 	else if (is_pointer_type(type) && consume("{"))
@@ -1759,7 +1751,7 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 		// RDIを保存する用	
 		lvar = calloc(1, sizeof(LVar));
 		lvar->name = "";
-		lvar->len = 0;
+		lvar->name_len = 0;
 		lvar->type = new_type_ptr_to(new_primitive_type(TY_VOID));
 		lvar->is_arg = true;
 		lvar->arg_regindex = 0;
@@ -1774,7 +1766,7 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 
 		lvar = calloc(1, sizeof(LVar));
 		lvar->name = "";
-		lvar->len = 0;
+		lvar->name_len = 0;
 		lvar->type = def->type_return;
 		lvar->is_arg = false;
 		lvar->arg_regindex = -1;

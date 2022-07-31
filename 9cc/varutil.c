@@ -56,7 +56,8 @@ LVar	*find_lvar(char *str, int len)
 	LVar	*var;
 
 	for (var = g_locals; var; var = var->next)
-		if (!var->is_dummy && var->len == len && memcmp(str, var->name, var->len) == 0)
+		if (!var->is_dummy && var->name_len == len
+		&& memcmp(str, var->name, var->name_len) == 0)
 			return var;
 	return NULL;
 }
@@ -170,7 +171,7 @@ LVar	*create_local_var(char *name, int len, Type *type, bool is_arg)
 
 	lvar = calloc(1, sizeof(LVar));
 	lvar->name = name;
-	lvar->len = len;
+	lvar->name_len = len;
 	if (is_arg)
 		type = type_cast_forarg(type);
 	lvar->type = type;

@@ -1,23 +1,16 @@
 #include "9cc.h"
+#include "charutil.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include <stdbool.h>
-
-
-bool	issymbol(char c);
-
-extern char		*user_input;
 
 static char *operators[42] = {
 	"...","++", "--", "->", ".",
 	">=", "<=", "==", "!=","||",
 	"&&","+=", "-=", "*=", "/=",
-
 	">>", "<<", 
-
 	"%=",">", "<", "=","+", "^",
 	"-","*", "/", "%", "&", "?", "|", "~",
 	"!","(",")", "{", "}", 
@@ -31,6 +24,7 @@ static Token *new_token(TokenKind kind, Token *last, char *str, int len)
 	tok->kind = kind;
 	tok->str = str;
 	tok->len = len;
+	tok->strlen_actual = len;
 	last->next = tok;
 	return tok;
 }
@@ -76,10 +70,6 @@ static int	match_operators(char **str, Token **last)
 	return 0;
 }
 
-
-// check str is start with needle
-// if so, returns length of needle.
-// otherwise returns 0.
 static int	match_word(char **str, Token **last, char *needle, TokenKind kind)
 {
 	int		len;
@@ -92,7 +82,6 @@ static int	match_word(char **str, Token **last, char *needle, TokenKind kind)
 
 	*last = new_token(kind, *last, *str, len);
 	*str += len;
-
 	return len;
 }
 
@@ -146,16 +135,18 @@ static bool	match_charlit(char **str, Token **last)
 {
 	if (**str != '\'')
 		return (false);
-	*last = new_token(TK_CHAR_LITERAL, *last, ++(*str), 1);
-	(*last)->len = 1;
-	(*last)->strlen_actual = 1;
+
+	(*str)++;
+	*last = new_token(TK_CHAR_LITERAL, *last, *str, 1);
+
 	if (**str == '\\')
 	{
-		(*str)++;
+		*str += 1;
 		(*last)->strlen_actual++;
 		if (!is_escapedchar(**str))
-			error_at(*str, "不明なエスケープシーケンスです");
+			error_at(*str, "不明なエスケープシーケンスです (match_charlit)");
 	}
+
 	(*str)++;
 	if (**str != '\'')
 		error_at(*str, "文字が終了しませんでした : %c", **str);
@@ -166,44 +157,43 @@ static bool	match_charlit(char **str, Token **last)
 Token	*tokenize(char *p)
 {
 	Token	head;
-	Token	*cur;
+	Token	*last;
 
-	head.next = NULL;
-	cur = &head;
+	last = &head;
 	while (*p)
 	{
 		if (skipspace(&p))									continue ;
-		if (match_operators(&p, &cur))						continue ;
+		if (match_operators(&p, &last))						continue ;
 
-		if (match_word(&p, &cur, "return",	TK_RETURN))		continue ;
-		if (match_word(&p, &cur, "if",		TK_IF))			continue ;
-		if (match_word(&p, &cur, "else",	TK_ELSE))		continue ;
-		if (match_word(&p, &cur, "while",	TK_WHILE))		continue ;
-		if (match_word(&p, &cur, "for",		TK_FOR))		continue ;
-		if (match_word(&p, &cur, "do",		TK_DO))			continue ;
-		if (match_word(&p, &cur, "switch",	TK_SWITCH))		continue ;
-		if (match_word(&p, &cur, "sizeof",	TK_SIZEOF))		continue ;
-		if (match_word(&p, &cur, "struct",	TK_STRUCT))		continue ;
-		if (match_word(&p, &cur, "union",	TK_UNION))		continue ;
-		if (match_word(&p, &cur, "enum",	TK_ENUM))		continue ;
-		if (match_word(&p, &cur, "case",	TK_CASE))		continue ;
-		if (match_word(&p, &cur, "break",	TK_BREAK))		continue ;
-		if (match_word(&p, &cur, "continue",TK_CONTINUE))	continue ;
-		if (match_word(&p, &cur, "default",	TK_DEFAULT))	continue ;
-		if (match_word(&p, &cur, "static",	TK_STATIC))		continue ;
-		if (match_word(&p, &cur, "typedef",	TK_TYPEDEF))	continue ;
-		if (match_word(&p, &cur, "extern",	TK_EXTERN))		continue ;
-		if (match_word(&p, &cur, "inline",	TK_INLINE))		continue ;
+		if (match_word(&p, &last, "return",	TK_RETURN))		continue ;
+		if (match_word(&p, &last, "if",		TK_IF))			continue ;
+		if (match_word(&p, &last, "else",	TK_ELSE))		continue ;
+		if (match_word(&p, &last, "while",	TK_WHILE))		continue ;
+		if (match_word(&p, &last, "for",	TK_FOR))		continue ;
+		if (match_word(&p, &last, "do",		TK_DO))			continue ;
+		if (match_word(&p, &last, "switch",	TK_SWITCH))		continue ;
+		if (match_word(&p, &last, "sizeof",	TK_SIZEOF))		continue ;
+		if (match_word(&p, &last, "struct",	TK_STRUCT))		continue ;
+		if (match_word(&p, &last, "union",	TK_UNION))		continue ;
+		if (match_word(&p, &last, "enum",	TK_ENUM))		continue ;
+		if (match_word(&p, &last, "case",	TK_CASE))		continue ;
+		if (match_word(&p, &last, "break",	TK_BREAK))		continue ;
+		if (match_word(&p, &last, "continue",TK_CONTINUE))	continue ;
+		if (match_word(&p, &last, "default",TK_DEFAULT))	continue ;
+		if (match_word(&p, &last, "static",	TK_STATIC))		continue ;
+		if (match_word(&p, &last, "typedef",TK_TYPEDEF))	continue ;
+		if (match_word(&p, &last, "extern",	TK_EXTERN))		continue ;
+		if (match_word(&p, &last, "inline",	TK_INLINE))		continue ;
 
-		if (match_var_name(&p, &cur))						continue ;
-		if (match_number(&p, &cur))							continue ;
+		if (match_var_name(&p, &last))						continue ;
+		if (match_number(&p, &last))						continue ;
 
-		if (match_strlit(&p, &cur))							continue ;
-		if (match_charlit(&p, &cur))						continue ;
+		if (match_strlit(&p, &last))						continue ;
+		if (match_charlit(&p, &last))						continue ;
 
 		error_at(p, "failed to Tokenize");
 	}
 	
-	new_token(TK_EOF, cur, p, 0);
+	new_token(TK_EOF, last, p, 0);
 	return head.next;
 }

@@ -80,10 +80,11 @@ typedef struct Token
 {
 	TokenKind		kind;
 	struct Token	*next;
-	int				val;
-	char			*str;
-	int				len;
-	int				strlen_actual;
+
+	int				val;			// number
+	char			*str;			// token str
+	int				len;			// length
+	int				strlen_actual;	// charlit
 } Token;
 
 typedef enum NodeKind
@@ -239,7 +240,7 @@ typedef struct s_lvar
 	struct s_lvar	*next;
 
 	char		*name;
-	int			len;
+	int			name_len;
 	int			offset;
 
 	bool		is_arg;
@@ -248,6 +249,13 @@ typedef struct s_lvar
 
 	Type		*type;
 } LVar;
+
+typedef struct s_str_literal_elem
+{
+	char	*str;
+	int		len;
+	int		index;
+}	t_str_elem;
 
 typedef struct Node
 {
@@ -258,7 +266,7 @@ typedef struct Node
 	Type		*type;
 
 	LVar		*lvar; // local var
-
+	t_str_elem	*def_str;
 struct s_defvar
 {
 	char		*name;
@@ -276,17 +284,11 @@ struct s_defvar
 	// num
 	int			val;
 
-	// str
-	int			str_index;
-
 	// else of if
 	struct Node	*elsif;
 	struct Node	*els;
 
-	// for
-	struct Node	*for_init;
-	struct Node	*for_if;
-	struct Node	*for_next;
+	struct Node	*for_expr[3]; // for (0; 1; 2)
 
 	// call
 struct s_deffunc
@@ -307,12 +309,10 @@ struct s_deffunc
 }	*funcdef;
 	int		funccall_argcount;
 	struct Node	*funccall_args[20]; // TODO t_linked_listにする
-	LVar	*locals;
+	LVar	*funccall_argdefs[20];	// argsに対応するLVar
 
 	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
 	LVar		*call_mem_stack;
-
-
 
 	MemberElem	*elem;
 
@@ -324,14 +324,6 @@ struct s_deffunc
 
 typedef struct s_deffunc t_deffunc;
 typedef struct s_defvar	t_defvar;
-
-typedef struct s_str_literal_elem
-{
-	char						*str;
-	int							len;
-	struct s_str_literal_elem	*next;
-	int							index;
-}	t_str_elem;
 
 typedef struct s_typedefpair
 {
@@ -347,10 +339,6 @@ char	*read_file(char	*name);
 
 int	align_to(int a, int to);
 
-int	can_use_beginning_of_var(char c);
-int	is_escapedchar(char c);
-int get_char_to_int(char *p, int len);
-
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
 
@@ -358,7 +346,6 @@ Token	*tokenize(char *p);
 
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node	*new_node_num(int val);
-
 
 // Type
 Type	*new_primitive_type(PrimitiveType pri);
@@ -383,12 +370,6 @@ bool	can_use_dot(Type *type);
 bool	is_memory_type(Type *type);
 
 bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value);
-
-char	*get_str_literal_name(int index);
-
-void	gen(Node *node);
-void	gen_defglobal(t_defvar *node);
-void	gen_deffunc(t_deffunc *node);
 
 void	parse(Token *tok);
 
