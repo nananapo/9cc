@@ -65,7 +65,7 @@ Type	*read_union_block(Token *ident);
 static void	funcdef(Type *type, Token *ident, bool is_static);
 static void	read_typedef(void);
 static void	filescope(void);
-void	parse(Token *tok);
+void	parse(void);
 
 int		switchCaseCount = 0;
 Stack	*sbstack;
@@ -2010,10 +2010,8 @@ static void	filescope(void)
 	error_at(g_token->str, "構文解析に失敗しました[filescope kind:%d]", g_token->kind);
 }
 
-void	parse(Token *tok)
+void	parse(void)
 {
-	g_token = tok;
-	g_type_alias = linked_list_new();
 	while (!at_eof())
 		filescope();
 }

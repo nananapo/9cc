@@ -1,6 +1,5 @@
 #include "9cc.h"
-#include "gen.h"
-#include "charutil.h"
+#include "list.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -22,9 +21,6 @@ t_linked_list	*g_type_alias;
 
 int main(int argc, char **argv)
 {
-	int		i;
-	Token	*token;
-
 	if (argc == 1)
 		g_user_input = read_file("-");
 	else if (argc == 2)
@@ -35,33 +31,21 @@ int main(int argc, char **argv)
 		return (1);
 	}
 
-	token = tokenize(g_user_input);
-	debug("Tokenized");
+	g_type_alias = linked_list_new();
 
-	parse(token);
-	debug("Node constructed");
+	// tokenize
+	g_token = tokenize(g_user_input);
+	debug("tokenize end");
 
-	printf(".intel_syntax noprefix\n");
-	printf(".p2align	4, 0x90\n");
+	// parse
+	parse();
+	debug("parse end");
 
-	// 文字列リテラル生成
-	for (i = 0; g_str_literals[i] != NULL; i++)
-	{
-		printf("%s:\n", get_str_literal_name(g_str_literals[i]));
-		printf("    .string \"");
-		put_str_literal(g_str_literals[i]->str, g_str_literals[i]->len);
-		printf("\"\n");
-	}
+	// analyze
+//	analyze();
 
-	// グローバル変数を生成
-	printf(".section	__DATA, __data\n");
-	for (i = 0; g_global_vars[i] != NULL; i++)
-		gen_defglobal(g_global_vars[i]);
-
-	// 関数を生成
-	printf(".section	__TEXT,__text,regular,pure_instructions\n");
-	for (i = 0; g_func_defs[i] != NULL; i++)
-		gen_deffunc(g_func_defs[i]);
+	// codegen
+	codegen();
 
 	return (0);
 }

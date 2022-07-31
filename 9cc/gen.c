@@ -1,7 +1,6 @@
 #include "9cc.h"
-#include "gen.h"
 #include "stack.h"
-
+#include "charutil.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -30,9 +29,8 @@ static void	create_add(bool is_add, Type *l, Type *r);
 static void	load_lval_addr(Node *node);
 
 static void	print_global_constant(Node *node, Type *type);
-void		gen(Node *node);
+static void	gen(Node *node);
 
-extern t_str_elem	*str_literals;
 extern int			switchCaseCount;
 extern Stack		*sbstack;
 
@@ -41,6 +39,20 @@ char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 int					stack_count = 0;
 
 static t_deffunc	*g_func_now;
+
+
+// main
+extern Token			*g_token;
+extern t_deffunc		*g_func_defs[1000];
+extern t_deffunc		*g_func_protos[1000];
+extern t_defvar			*g_global_vars[1000];
+extern t_str_elem		*g_str_literals[1000];
+extern StructDef		*g_struct_defs[1000];
+extern EnumDef			*g_enum_defs[1000];
+extern UnionDef			*g_union_defs[1000];
+extern LVar				*g_locals;
+extern t_deffunc		*g_func_now;
+extern t_linked_list	*g_type_alias;
 
 int	max(int a, int b)
 {
@@ -753,7 +765,7 @@ static void	assign_epilogue(Type *type)
 		store_value(get_type_size(type));
 }
 
-void	gen_deffunc(t_deffunc *node)
+static void	gen_deffunc(t_deffunc *node)
 {
 	char	*funcname;
 	LVar	*lvtmp;
@@ -898,7 +910,7 @@ static void	print_global_constant(Node *node, Type *type)
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
 }
 
-void gen_defglobal(t_defvar *node)
+static void gen_defglobal(t_defvar *node)
 {
 	char	*name;
 
@@ -919,7 +931,7 @@ void gen_defglobal(t_defvar *node)
 	}
 }
 
-void	gen(Node *node)
+static void	gen(Node *node)
 {
 	int		lend;
 	int		lbegin;
@@ -1505,4 +1517,31 @@ void	gen(Node *node)
 			return;
 		}
 	}
+}
+
+void	codegen(void)
+{
+	int	i;
+
+	printf(".intel_syntax noprefix\n");
+	printf(".p2align	4, 0x90\n");
+
+	// 文字列リテラル生成
+	for (i = 0; g_str_literals[i] != NULL; i++)
+	{
+		printf("%s:\n", get_str_literal_name(g_str_literals[i]));
+		printf("    .string \"");
+		put_str_literal(g_str_literals[i]->str, g_str_literals[i]->len);
+		printf("\"\n");
+	}
+
+	// グローバル変数を生成
+	printf(".section	__DATA, __data\n");
+	for (i = 0; g_global_vars[i] != NULL; i++)
+		gen_defglobal(g_global_vars[i]);
+
+	// 関数を生成
+	printf(".section	__TEXT,__text,regular,pure_instructions\n");
+	for (i = 0; g_func_defs[i] != NULL; i++)
+		gen_deffunc(g_func_defs[i]);
 }

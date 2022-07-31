@@ -371,6 +371,8 @@ bool	is_memory_type(Type *type);
 
 bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value);
 
-void	parse(Token *tok);
+void	parse(void);
+
+void	codegen(void);
 
 #endif
