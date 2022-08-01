@@ -11,20 +11,12 @@
 #include <stdbool.h>
 
 t_deffunc	*get_function_by_name(char *name, int len);
-Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
-Node	*new_node_num(int val);
-bool	consume_enum_key(Type **type, int *value);
+Node		*new_node(NodeKind kind, Node *lhs, Node *rhs);
+Node		*new_node_num(int val);
+bool		consume_enum_key(Type **type, int *value);
 t_str_elem	*get_str_literal(char *str, int len);
 
-
-SBData	*sbdata_new(bool isswitch, int start, int end);
-void	sb_forwhile_start(int startlabel, int endlabel);
-void	sb_switch_start(Type *type, int endlabel, int defaultLabel);
-SBData	*sb_end(void);
-SBData	*sb_peek(void);
-SBData	*sb_search(bool	isswitch);
-
-Node	 *cast(Node *node, Type *to);
+Node	 	*cast(Node *node, Type *to);
 static Node	*call(Token *tok);
 static Node	*read_suffix_increment(Node *node);
 static Node	*read_deref_index(Node *node);
@@ -32,7 +24,6 @@ static Node	*primary(void);
 static Node	*arrow_loop(Node *node);
 static Node	*arrow(void);
 static Node	*unary(void);
-static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok);
 static Node	*mul(void);
 static Node	*add(void);
 static Node	*shift(void);
@@ -50,16 +41,13 @@ static Node	*read_ifblock(void);
 static Node	*stmt(void);
 static Node	*expect_constant(Type *type);
 static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static);
-Type	*read_struct_block(Token *ident);
-Type	*read_enum_block(Token *ident);
-Type	*read_union_block(Token *ident);
+Type		*read_struct_block(Token *ident);
+Type		*read_enum_block(Token *ident);
+Type		*read_union_block(Token *ident);
 static void	funcdef(Type *type, Token *ident, bool is_static);
 static void	read_typedef(void);
 static void	filescope(void);
-void	parse(void);
-
-int		switchCaseCount = 0;
-Stack	*sbstack;
+void		parse(void);
 
 // main
 extern Token			*g_token;
@@ -79,85 +67,6 @@ static int max(int a, int b)
 		return (b);
 	return (a);
 }
-
-SBData	*sbdata_new(bool isswitch, int start, int end)
-{
-	SBData	*tmp;
-
-	tmp = (SBData *)calloc(1, sizeof(SBData));
-	tmp->isswitch = isswitch;
-	tmp->startlabel = start;
-	tmp->endlabel = end;
-
-	tmp->type = NULL;
-	tmp->cases = NULL;
-	tmp->defaultLabel = -1;
-	return (tmp);
-}
-
-void	sb_forwhile_start(int startlabel, int endlabel)
-{
-	stack_push(&sbstack, sbdata_new(false, startlabel, endlabel));
-}
-
-void	sb_switch_start(Type *type, int endlabel, int defaultLabel)
-{
-	SBData	*tmp;
-
-	tmp = sbdata_new(true, -1, endlabel);
-	tmp->type = type;
-	tmp->defaultLabel = defaultLabel;
-	stack_push(&sbstack, tmp);
-}
-
-
-SBData	*sb_end(void)
-{
-	SBData	*result;
-
-	result = stack_pop(&sbstack);
-	return (result);
-}
-
-SBData	*sb_peek(void)
-{
-	return (SBData *)stack_peek(sbstack);
-}
-
-SBData	*sb_search(bool	isswitch)
-{
-	Stack	*tmp;
-	SBData	*data;
-
-	tmp = sbstack;
-	while (tmp != NULL)
-	{
-		data = (SBData *)tmp->data;
-		if (data->isswitch == isswitch)
-			return (data);
-		tmp = tmp->prev;
-	}
-	return (NULL);
-}
-
-int	add_switchcase(SBData *sbdata, int number)
-{
-	int			count;
-	SwitchCase	*tmp;
-
-	count = switchCaseCount++;
-
-	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
-	tmp->value = number;
-	tmp->label = count;
-	tmp->next = sbdata->cases;
-	sbdata->cases = tmp;
-
-	//TODO 被りチェック
-
-	return (count);
-}
-
 
 t_deffunc	*get_function_by_name(char *name, int len)
 {
@@ -266,26 +175,6 @@ static Node *call(Token *tok)
 
 	debug(" CALL END");
 	return node;
-}
-
-/*
- * type:
- * 0 : *
- * 1 : /
- * 2 : %
- */
-static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-
-	if (type == 0)
-		node = new_node(ND_MUL, lhs, rhs);
-	else if (type == 1)
-		node = new_node(ND_DIV, lhs, rhs);
-	else
-		node = new_node(ND_MOD, lhs, rhs);
-	node->analyze_source = tok->str;
-	return (node);
 }
 
 // 後置インクリメント, デクリメント
@@ -548,20 +437,23 @@ static Node *unary(void)
 
 static Node *mul(void)
 {
-	Node *node;
+	Node	*node;
+	char	*source;
 
 	node = unary();
+	source = g_token->str;
 	for (;;)
 	{
-		// TODO sourceが一こ先にずれてる
 		if (consume("*"))
-			node = create_mul(0, node, unary(), g_token);
+			node = new_node(ND_MUL, node, unary());
 		else if (consume("/"))
-			node = create_mul(1, node, unary(), g_token);
+			node = new_node(ND_DIV, node, unary());
 		else if (consume("%"))
-			node = create_mul(2, node, unary(), g_token);
+			node = new_node(ND_MOD, node, unary());
 		else
 			return (node);
+
+		node->analyze_source = source;
 	}
 }
 
@@ -763,18 +655,18 @@ static Node	*assign(void)
 	}
 	else if (consume("*="))
 	{
-		node = create_mul(0, node, assign(), g_token);
-		node->kind = ND_COMP_MUL;
+		node = new_node(ND_COMP_MUL, node, assign());
+		node->analyze_source = source;
 	}
 	else if (consume("/="))
 	{
-		node = create_mul(1, node, assign(), g_token);
-		node->kind = ND_COMP_DIV;
+		node = new_node(ND_COMP_DIV, node, assign());
+		node->analyze_source = source;
 	}
 	else if (consume("%="))
 	{
-		node = create_mul(2, node, assign(), g_token);
-		node->kind = ND_COMP_MOD;
+		node = new_node(ND_COMP_MOD, node, assign());
+		node->analyze_source = source;
 	}
 	return (node);
 }

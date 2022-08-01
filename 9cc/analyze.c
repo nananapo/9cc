@@ -1,17 +1,17 @@
 #include "9cc.h"
+#include "stack.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
+Node		*new_node(NodeKind kind, Node *lhs, Node *rhs);
 
-LVar	*create_lvar(t_deffunc *func, char *name, int name_len, Type *type, bool is_arg);
-LVar	*copy_lvar(LVar *f);
-Type	*type_cast_forarg(Type *type);
-void	alloc_argument_simu(LVar *first, LVar *lvar);
-int		add_switchcase(SBData *sbdata, int number);
+LVar		*create_lvar(t_deffunc *func, char *name, int name_len, Type *type, bool is_arg);
+LVar		*copy_lvar(LVar *f);
+Type		*type_cast_forarg(Type *type);
+void		alloc_argument_simu(LVar *first, LVar *lvar);
 
-Node	 *cast(Node *node, Type *to);
+Node		 *cast(Node *node, Type *to);
 
 static Node *analyze_var_def(Node *node);
 static Node *analyze_var(Node *node);
@@ -54,6 +54,99 @@ extern EnumDef			*g_enum_defs[1000];
 extern UnionDef			*g_union_defs[1000];
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
+
+Stack	*sbstack;
+
+static SBData		*sbdata_new(bool isswitch, int start, int end);
+static SBData		*sb_forwhile_start(int startlabel, int endlabel);
+static SBData		*sb_switch_start(Type *type, int endlabel, int defaultLabel);
+static SBData		*sb_end(void);
+static SBData		*sb_peek(void);
+static SBData		*sb_search(bool	isswitch);
+static SwitchCase	*add_switchcase(SBData *sbdata, int number);
+
+static SBData	*sbdata_new(bool isswitch, int start, int end)
+{
+	SBData	*tmp;
+
+	tmp = (SBData *)calloc(1, sizeof(SBData));
+	tmp->isswitch = isswitch;
+	tmp->startlabel = start;
+	tmp->endlabel = end;
+
+	tmp->type = NULL;
+	tmp->cases = NULL;
+	tmp->defaultLabel = -1;
+	return (tmp);
+}
+
+static SBData	*sb_forwhile_start(int startlabel, int endlabel)
+{
+	SBData	*tmp;
+
+	tmp = sbdata_new(false, startlabel, endlabel);
+	stack_push(&sbstack, tmp);
+	return (tmp);
+}
+
+static SBData	*sb_switch_start(Type *type, int endlabel, int defaultLabel)
+{
+	SBData	*tmp;
+
+	tmp = sbdata_new(true, -1, endlabel);
+	tmp->type = type;
+	tmp->defaultLabel = defaultLabel;
+	stack_push(&sbstack, tmp);
+	return (tmp);
+}
+
+
+static SBData	*sb_end(void)
+{
+	SBData	*result;
+
+	result = stack_pop(&sbstack);
+	return (result);
+}
+
+static SBData	*sb_peek(void)
+{
+	return (SBData *)stack_peek(sbstack);
+}
+
+static SBData	*sb_search(bool	isswitch)
+{
+	Stack	*tmp;
+	SBData	*data;
+
+	tmp = sbstack;
+	while (tmp != NULL)
+	{
+		data = (SBData *)tmp->data;
+		if (data->isswitch == isswitch)
+			return (data);
+		tmp = tmp->prev;
+	}
+	return (NULL);
+}
+
+static SwitchCase	*add_switchcase(SBData *sbdata, int number)
+{
+	SwitchCase	*tmp;
+
+	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
+	tmp->value = number;
+	tmp->label = 0;
+	tmp->next = sbdata->cases;
+	sbdata->cases = tmp;
+
+	//TODO 被りチェック
+	return (tmp);
+}
+
+
+
+
 
 static Node *analyze_var_def(Node *node)
 {
@@ -627,23 +720,29 @@ static Node	*analyze_if(Node *node)
 // while (lhs) rhs
 static Node	*analyze_while(Node *node)
 {
+	SBData	*data;
+
 	node->lhs = analyze_node(node->lhs);
 
-	sb_forwhile_start(-1, -1);
+	data = sb_forwhile_start(-1, -1);
 	if (node->rhs != NULL)
 		node->rhs = analyze_node(node->rhs);
 	sb_end();
 
+	node->block_sbdata = data;
 	return (node);
 }
 
 // do lhs while (rhs)
 static Node	*analyze_dowhile(Node *node)
 {
-	sb_forwhile_start(-1, -1);
+	SBData	*data;
+
+	data = sb_forwhile_start(-1, -1);
 	node->lhs = analyze_node(node->lhs);
 	sb_end();
 
+	node->block_sbdata = data;
 	node->rhs = analyze_node(node->rhs);
 	return (node);
 }
@@ -651,16 +750,19 @@ static Node	*analyze_dowhile(Node *node)
 // for (0; 1; 2) lhs
 static Node	*analyze_for(Node *node)
 {
-	int	i;
+	SBData	*data;
+	int		i;
 
 	for (i = 0; i < 3; i++)
 		if (node->for_expr[i] != NULL)
 			node->for_expr[i] = analyze_node(node->for_expr[i]);
 	
-	sb_forwhile_start(-1, -1);
+	data = sb_forwhile_start(-1, -1);
 	if (node->lhs != NULL)
 		node->lhs = analyze_node(node->lhs);
 	sb_end();
+
+	node->block_sbdata = data;
 	return (node);
 }
 
@@ -679,6 +781,7 @@ static Node	*analyze_switch(Node *node)
 	node->rhs = analyze_node(node->rhs);
 	data = sb_end();
 
+	node->block_sbdata = data;
 	node->switch_cases = data->cases;
 	node->switch_has_default = data->defaultLabel != -1;
 
@@ -694,7 +797,8 @@ static Node	*analyze_case(Node *node)
 		error_at(node->analyze_source, "caseに対応するswitchがありません");
 
 	// TODO 被りチェック
-	node->switch_label = add_switchcase(data, node->val);
+	node->case_label = add_switchcase(data, node->val);
+	node->block_sbdata = data;
 	return (node);
 }
 
@@ -705,13 +809,18 @@ static Node	*analyze_break(Node *node)
 	data = sb_peek();
 	if (data == NULL)
 		error_at(node->analyze_source, "breakに対応するstatementがありません");
+	node->block_sbdata = data;
 	return (node);
 }
 
 static Node	*analyze_continue(Node *node)
 {
-	if (sb_search(false) == NULL)
+	SBData	*data;
+
+	data = sb_search(false);
+	if (data == NULL)
 		error_at(node->analyze_source, "continueに対応するstatementがありません");
+	node->block_sbdata = data;
 	return (node);
 }
 
@@ -725,7 +834,7 @@ static Node	*analyze_default(Node *node)
 	if (data->defaultLabel != -1)
 		error_at(node->analyze_source, "defaultが2個以上あります");
 	data->defaultLabel = 1; // TODO これはgenで決まる(後でここに持ってくる)
-
+	node->block_sbdata = data;
 	return (node);
 }
 

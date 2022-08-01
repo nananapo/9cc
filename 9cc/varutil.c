@@ -1,13 +1,10 @@
 #include "9cc.h"
 #include "parse.h"
-#include <stdlib.h>
+#include "mymath.h"
+#include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdio.h>
-
-int	align_to(int n, int align);
-int	max(int a, int b);
-int	min(int a, int b);
+#include <stdlib.h>
 
 // main
 extern Token			*g_token;

@@ -1,14 +1,11 @@
 #include "9cc.h"
-#include "stack.h"
 #include "charutil.h"
+#include "mymath.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
-int			max(int a, int b);
-int			min(int a, int b);
-int			align_to(int n, int align);
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
@@ -16,7 +13,6 @@ static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
 static void	cmps(char *dst, char *from);
 static void	cmp(Type *dst, Type *from);
-char		*get_str_literal_name(t_str_elem *elem);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(Type *type);
@@ -26,19 +22,12 @@ static void	cast(Type *from, Type *to);
 static void	arrow(Node *node, bool as_addr);
 static void	create_add(bool is_add, Type *l, Type *r);
 static void	load_lval_addr(Node *node);
-
 static void	print_global_constant(Node *node, Type *type);
 static void	gen(Node *node);
 
-extern int			switchCaseCount;
-extern Stack		*sbstack;
-
-int					jumpLabelCount = 0;
-char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-int					stack_count = 0;
-
-static t_deffunc	*g_func_now;
-
+static int				jumpLabelCount = 0;
+static char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static int				stack_count = 0;
 
 // main
 extern Token			*g_token;
@@ -52,27 +41,6 @@ extern UnionDef			*g_union_defs[1000];
 extern LVar				*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
-
-int	max(int a, int b)
-{
-	if (a > b)
-		return (a);
-	return (b);
-}
-
-int	min(int a, int b)
-{
-	if (a < b)
-		return (a);
-	return (b);
-}
-
-int	align_to(int n, int align)
-{
-	if (align == 0)
-		return (n);
-	return ((n + align - 1) / align * align);
-}
 
 static void	push()
 {
@@ -126,15 +94,6 @@ static void	cmp(Type *dst, Type *from)
 		return ;
 	}
 	cmps(RAX, RDI);
-}
-
-char	*get_str_literal_name(t_str_elem *elem)
-{
-	char	*tmp;
-
-	tmp = calloc(100, sizeof(char));
-	sprintf(tmp, "L_STR_%d", elem->index);
-	return (tmp);
 }
 
 // RAXからR10(アドレス)に値をストアする
@@ -869,8 +828,7 @@ static void	print_global_constant(Node *node, Type *type)
 			&& node->def_str != NULL)
 	{
 		// TODO arrayのchar
-		printf("    .quad %s\n",
-				get_str_literal_name(node->def_str));
+		printf("    .quad L_STR_%d\n", node->def_str->index);
 	}
 	else if (is_pointer_type(type))
 	{
@@ -906,11 +864,11 @@ static void gen_defglobal(t_defvar *node)
 
 static void	gen(Node *node)
 {
-	int		lend;
-	int		lbegin;
-	int		lbegin2;
-	int		lelse;
-	SBData	*sbdata;
+	int			lend;
+	int			lbegin;
+	int			lbegin2;
+	int			lelse;
+	SwitchCase	*cases;
 
 	//fprintf(stderr, "# kind: %d\n", node->kind);
 
@@ -972,7 +930,10 @@ static void	gen(Node *node)
 		{
 			lbegin = jumpLabelCount++;
 			lend = jumpLabelCount++;
-			
+
+			node->block_sbdata->startlabel = lbegin;
+			node->block_sbdata->endlabel = lend;
+
 			printf(".Lbegin%d:\n", lbegin); // continue先
 			
 			// if
@@ -982,10 +943,8 @@ static void	gen(Node *node)
 			printf("    je .Lend%d\n", lend);
 			
 			// while block
-			sb_forwhile_start(lbegin, lend);
 			if (node->rhs != NULL)
 				gen(node->rhs);
-			sb_end();
 			
 			// next
 			printf("    jmp .Lbegin%d\n", lbegin);
@@ -999,14 +958,15 @@ static void	gen(Node *node)
 			lbegin = jumpLabelCount++;
 			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
+
+			node->block_sbdata->startlabel = lbegin2;
+			node->block_sbdata->endlabel = lend;
 			
 			printf(".Lbegin%d:\n", lbegin);
 
 			// while block
-			sb_forwhile_start(lbegin2, lend);
 			if (node->lhs != NULL)
 				gen(node->lhs);
-			sb_end();
 
 			// if
 			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
@@ -1023,6 +983,9 @@ static void	gen(Node *node)
 			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
 			
+			node->block_sbdata->startlabel = lbegin2;
+			node->block_sbdata->endlabel = lend;
+
 			// init
 			if (node->for_expr[0] != NULL)
 				gen(node->for_expr[0]);
@@ -1039,10 +1002,8 @@ static void	gen(Node *node)
 			}
 
 			// for-block
-			sb_forwhile_start(lbegin2, lend);
 			if (node->lhs != NULL)
 				gen(node->lhs);
-			sb_end();
 
 			printf(".Lbegin%d:\n", lbegin2); // continue先
 			// next
@@ -1057,9 +1018,13 @@ static void	gen(Node *node)
 		}
 		case ND_SWITCH:
 		{
-			lbegin = switchCaseCount++;
+			lbegin = jumpLabelCount++;
 			lend = jumpLabelCount++;
 
+			// ケースのラベルに数字を振る
+			for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
+				cases->	label = jumpLabelCount++;
+	
 			// 評価
 			gen(node->lhs);
 			printf("    mov [rsp - 8], rax\n"); //結果を格納
@@ -1081,10 +1046,13 @@ static void	gen(Node *node)
 				printf("    jmp .Lend%d\n", lend);
 
 			debug("    switch in");
+
 			// 文を出力
-			sb_switch_start(node->lhs->type, lend, lbegin);
+			node->block_sbdata->startlabel = -1;
+			node->block_sbdata->endlabel = lend;
+			node->block_sbdata->defaultLabel = lbegin;
+			
 			gen(node->rhs);
-			sb_end();
 
 			printf(".Lend%d:\n", lend);
 			return ;
@@ -1092,37 +1060,25 @@ static void	gen(Node *node)
 		case ND_CASE:
 		{
 			debug("case %d", node->val);
-			printf(".Lswitch%d:\n", node->switch_label);
+			printf(".Lswitch%d:\n", node->case_label->label);
 			return ;
 		}
 		case ND_BREAK:
 		{
-			sbdata = sb_peek();
-			// 一応チェック
-			if (sbdata == NULL)
-				error("breakに対応する文が見つかりません");
 			debug("break");
-			printf("jmp .Lend%d\n", sbdata->endlabel);
+			printf("jmp .Lend%d\n", node->block_sbdata->endlabel);
 			return ;
 		}
 		case ND_CONTINUE:
 		{
-			sbdata = sb_search(false);
-			// 一応チェック
-			if (sbdata == NULL)
-				error("continueに対応する文が見つかりません");
 			debug("continue");
-			printf("jmp .Lbegin%d\n", sbdata->startlabel);
+			printf("jmp .Lbegin%d\n", node->block_sbdata->startlabel);
 			return ;
 		}
 		case ND_DEFAULT:
 		{
-			sbdata = sb_search(true);
-			// 一応チェック
-			if (sbdata == NULL)
-				error("defaultに対応する文が見つかりません");
 			debug("default");
-			printf(".Lswitch%d:\n", sbdata->defaultLabel);
+			printf(".Lswitch%d:\n", node->block_sbdata->defaultLabel);
 			return ;
 		}
 		case ND_BLOCK:
@@ -1463,8 +1419,7 @@ static void	gen(Node *node)
 		}
 		case ND_STR_LITERAL:
 		{
-			printf("    %s %s, [rip + %s]\n", ASM_LEA, RAX,
-					get_str_literal_name(node->def_str));
+			printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, RAX, node->def_str->index);
 			return;
 		}
 		case ND_CALL:
@@ -1509,7 +1464,7 @@ void	codegen(void)
 	// 文字列リテラル生成
 	for (i = 0; g_str_literals[i] != NULL; i++)
 	{
-		printf("%s:\n", get_str_literal_name(g_str_literals[i]));
+		printf("L_STR_%d:\n", g_str_literals[i]->index);
 		printf("    .string \"");
 		put_str_literal(g_str_literals[i]->str, g_str_literals[i]->len);
 		printf("\"\n");

@@ -240,13 +240,6 @@ typedef struct s_sbdata
 	int			defaultLabel;
 }	SBData;
 
-SBData	*sbdata_new(bool isswitch, int start, int end);
-void	sb_forwhile_start(int startlabel, int endlabel);
-void	sb_switch_start(Type *type, int endlabel, int defaultLabel);
-SBData	*sb_end(void);
-SBData	*sb_peek(void);
-SBData	*sb_search(bool	isswitch);
-
 typedef struct s_lvar
 {
 	struct s_lvar	*next;
@@ -337,12 +330,11 @@ struct s_deffunc
 	MemberElem	*elem;
 
 	// valとlabelでswicth-case
-	int			switch_label;
 	SwitchCase	*switch_cases;
+	SwitchCase	*case_label;
 	bool		switch_has_default;
 
-
-
+	SBData		*block_sbdata;
 
 
 
