@@ -18,7 +18,4 @@ int		expect_number(void);
 
 void	expect_semicolon(void);
 bool	at_eof(void);
-
-t_defvar	*find_global(char *str, int len);
-
 #endif

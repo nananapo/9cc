@@ -24,7 +24,6 @@ static void	lval(Node *node);
 static void	call(Node *node);
 static void	cast(Type *from, Type *to);
 static void	arrow(Node *node, bool as_addr);
-static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace);
 static void	create_add(bool is_add, Type *l, Type *r);
 static void	load_lval_addr(Node *node);
 
@@ -240,7 +239,6 @@ static void store_ptr(int size, bool minus_step)
 // raxをraxに読み込む
 static void	load(Type *type)
 {
-	
 	if (type->ty == TY_PTR)
 	{
 		mov(RAX, "[rax]");
@@ -275,10 +273,10 @@ static void	lval(Node *node)
 {
 	int	offset;
 
-	if (node->kind != ND_LVAR && node->kind != ND_LVAR_GLOBAL)
+	if (node->kind != ND_VAR_LOCAL && node->kind != ND_VAR_GLOBAL)
 		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
 
-	if (node->kind == ND_LVAR)
+	if (node->kind == ND_VAR_LOCAL)
 	{
 		offset = node->lvar->offset;
 		mov(RAX, RBP);
@@ -287,7 +285,7 @@ static void	lval(Node *node)
 		else if (offset < 0)
 			printf("    add %s, %d\n", RAX, - offset);
 	}
-	else if (node->kind == ND_LVAR_GLOBAL)
+	else if (node->kind == ND_VAR_GLOBAL)
 	{
 		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_global->name, node->var_global->name_len));
 	}
@@ -627,31 +625,6 @@ static void	mul_prologue(Node *node)
 	pop("rdi");
 }
 
-static void	add_check_pointer(Type *restype, Node **lhs, Node **rhs, bool can_replace)
-{
-	// 結果がポインタ型なら
-	if (restype->ty != TY_PTR && restype->ty != TY_ARRAY)
-		return ;
-
-	// 左辺をポインタ型にする
-	if (can_replace &&
-		((*rhs)->type->ty == TY_PTR || (*rhs)->type->ty == TY_ARRAY))
-	{
-		Node *tmp = *lhs;
-		*lhs = *rhs;
-		*rhs = tmp;
-	}
-
-	// 右辺が整数型なら掛け算に置き換える
-	if (is_integer_type((*rhs)->type))
-	{
-		// ポインタの先のサイズを掛ける
-		*rhs = new_node(ND_MUL, *rhs,
-						new_node_num(get_type_size((*lhs)->type->ptr_to)));
-		(*rhs)->type = new_primitive_type(TY_INT);
-	}
-}
-
 // rax, rdi
 static void	create_add(bool is_add, Type *l, Type *r)
 {
@@ -733,9 +706,9 @@ static void	assign_prologue(Node *node)
 
 static void	load_lval_addr(Node *node)
 {
-	if (node->kind == ND_LVAR)
+	if (node->kind == ND_VAR_LOCAL)
 		lval(node);
-	else if (node->kind == ND_LVAR_GLOBAL)
+	else if (node->kind == ND_VAR_GLOBAL)
 		lval(node);
 	else if (node->kind == ND_DEREF)
 		gen(node->lhs);// ここもDEREFと同じようにやってる！！！！！
@@ -939,13 +912,20 @@ static void	gen(Node *node)
 	int		lelse;
 	SBData	*sbdata;
 
+	//fprintf(stderr, "# kind: %d\n", node->kind);
+
+	if (!node->is_analyzed)
+	{
+		error("Node is not analyzed");
+	}
+
+
 	switch(node->kind)
 	{
 		case ND_RETURN:
 		{
 			if (node->lhs != NULL)
 				gen(node->lhs);
-			// TODO 型チェックをしておく
 			printf("    jmp .Lepi_%s\n", strndup(g_func_now->name, g_func_now->name_len));
 			return;
 		}
@@ -1169,8 +1149,6 @@ static void	gen(Node *node)
 
 			push();
 
-			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
-
 			gen(node->rhs);
 			pop(RDI);
 
@@ -1187,7 +1165,6 @@ static void	gen(Node *node)
 			assign_prologue(node);
 
 			push();
-			add_check_pointer(node->type, &node->lhs, &node->rhs, false);
 
 			gen(node->rhs);
 			mov(RDI, RAX);
@@ -1392,8 +1369,6 @@ static void	gen(Node *node)
 		case ND_ADD:
 		case ND_SUB:
 		{
-			add_check_pointer(node->type, &node->lhs, &node->rhs, true);
-
 			gen(node->rhs);
 			push();
 			gen(node->lhs);
@@ -1407,8 +1382,8 @@ static void	gen(Node *node)
 			switch(node->lhs->kind)
 			{
 				// 変数ならアドレスを取り出す
-				case ND_LVAR:
-				case ND_LVAR_GLOBAL:
+				case ND_VAR_LOCAL:
+				case ND_VAR_GLOBAL:
 					lval(node->lhs);
 					break ;
 				// 構造体, unionからのアクセスなら、アドレスなのでそのまま返す
@@ -1474,13 +1449,13 @@ static void	gen(Node *node)
 			cast(node->lhs->type, node->type);
 			return;
 		}
-		case ND_LVAR:
+		case ND_VAR_LOCAL:
 		{
 			lval(node);
 			load(node->type);
 			return ;
 		}
-		case ND_LVAR_GLOBAL:
+		case ND_VAR_GLOBAL:
 		{
 			lval(node);
 			load(node->type);
@@ -1509,6 +1484,11 @@ static void	gen(Node *node)
 		}
 		case ND_NONE:
 		{
+			return ;
+		}
+		case ND_SIZEOF:
+		{
+			error("ND_SIZEOFの変換漏れ");
 			return ;
 		}
 		default:

@@ -9,9 +9,6 @@ int	align_to(int n, int align);
 int	max(int a, int b);
 int	min(int a, int b);
 
-static void alloc_local_var(LVar *lvar);
-Type	*type_cast_forarg(Type *type);
-
 // main
 extern Token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
@@ -21,41 +18,14 @@ extern t_str_elem		*g_str_literals;
 extern StructDef		*g_struct_defs[1000];
 extern EnumDef			*g_enum_defs[1000];
 extern UnionDef			*g_union_defs[1000];
-extern LVar				*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
-
-bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value)
-{
-	int	i;
-	int	j;
-
-	for (i = 0; g_enum_defs[i]; i++)
-	{
-		EnumDef	*def = g_enum_defs[i];
-		for (j = 0; j < def->kind_len; j++)
-		{
-			char *var = def->kinds[j];
-			if ((int)strlen(var) == len
-			&& strncmp(str, var, strlen(var)) == 0)
-			{
-				if (res_def != NULL)
-					*res_def = def;
-				if (res_value != NULL)
-					*res_value = j;
-				return (true);
-			}
-		}
-	}
-	return (false);
-}
-
-LVar	*find_lvar(char *str, int len)
+LVar	*find_lvar(t_deffunc *func, char *str, int len)
 {
 	LVar	*var;
 
-	for (var = g_locals; var; var = var->next)
+	for (var = func->locals; var; var = var->next)
 		if (!var->is_dummy && var->name_len == len
 		&& memcmp(str, var->name, var->name_len) == 0)
 			return var;
@@ -118,7 +88,6 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 		// とりあえず必ず8byteにする
 		lvar->arg_regindex = regindex_max + align_to(size, 8) / 8;
 		lvar->offset = (offset_max + size + 7) / 8 * 8;
-		// alloc_local_var(lvar);
 		return ;
 	}
 
@@ -129,12 +98,12 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 
 
 // TODO サイズ0はどうなるか確かめる
-static void	alloc_argument(LVar *lvar)
+static void	alloc_argument(t_deffunc *func, LVar *lvar)
 {
-	alloc_argument_simu(g_locals, lvar);
+	alloc_argument_simu(func->locals, lvar);
 }
 
-static void alloc_local_var(LVar *lvar)
+static void alloc_local_var(t_deffunc *func, LVar *lvar)
 {
 	int		size;
 	int 	offset_max;
@@ -142,7 +111,7 @@ static void alloc_local_var(LVar *lvar)
 
 	// 引数のオフセットの正の最大値を求める
 	offset_max = 0;
-	for (tmp = g_locals; tmp; tmp = tmp->next)
+	for (tmp = func->locals; tmp != NULL; tmp = tmp->next)
 	{
 		offset_max = max(offset_max, max(0, tmp->offset));
 	}
@@ -163,43 +132,34 @@ static void alloc_local_var(LVar *lvar)
 }
 
 // TODO 同じ名前の変数がないかチェックする
-// TODO struct
-LVar	*create_local_var(char *name, int len, Type *type, bool is_arg)
+LVar	*create_lvar(t_deffunc *func, char *name, int name_len, Type *type, bool is_arg)
 {
 	LVar	*lvar;
 	LVar	*tmp;
 
-	lvar = calloc(1, sizeof(LVar));
-	lvar->name = name;
-	lvar->name_len = len;
-	if (is_arg)
-		type = type_cast_forarg(type);
-	lvar->type = type;
-	lvar->is_arg = is_arg;
-	lvar->arg_regindex = -1;
-	lvar->is_dummy = false;
+	lvar				= calloc(1, sizeof(LVar));
+	lvar->name			= name;
+	lvar->name_len		= name_len;
+	lvar->type			= type;
+	lvar->is_arg		= is_arg;
+	lvar->arg_regindex	= -1;
+	lvar->is_dummy		= false;
+	lvar->next			= NULL;
 
-	// メモリを割り当て
+	// スタックを割り当て
 	if (is_arg)
-		alloc_argument(lvar);
+		alloc_argument(func, lvar);
 	else
-		alloc_local_var(lvar);
+		alloc_local_var(func, lvar);
 
-	// localsに保存
-	lvar->next = NULL;
-	if (g_locals == NULL)
-		g_locals = lvar;
+	// append
+	if (func->locals == NULL)
+		func->locals = lvar;
 	else
 	{
-		for(tmp = g_locals; tmp; tmp = tmp->next)
-		{
-			if (tmp->next == NULL)
-			{
-				tmp->next = lvar;
-				break ;
-			}
-		}
+		for(tmp = func->locals; tmp->next != NULL; tmp = tmp->next);
+		tmp->next = lvar;
 	}
-	debug("CREATED LVAR %s", strndup(name, len));
+	debug("lvar: %s created", strndup(name, name_len));
 	return lvar;
 }

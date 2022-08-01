@@ -90,7 +90,7 @@ typedef struct Token
 typedef enum NodeKind
 {
 	ND_NONE,
-
+	ND_ANALYZE_VAR,
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
@@ -100,6 +100,8 @@ typedef enum NodeKind
 	ND_MUL,
 	ND_DIV,
 	ND_MOD,
+
+
 
 	ND_COMP_ADD,
 	ND_COMP_SUB,
@@ -113,8 +115,11 @@ typedef enum NodeKind
 	ND_LESSEQ,
 	ND_ASSIGN,
 
-	ND_LVAR,
 
+
+	ND_VAR_DEF,
+	ND_VAR_LOCAL,
+ 	ND_VAR_GLOBAL,
 	ND_SHIFT_LEFT,
 	ND_SHIFT_RIGHT,
 
@@ -122,31 +127,38 @@ typedef enum NodeKind
 	ND_BITWISE_OR,
 	ND_BITWISE_NOT,
 	ND_BITWISE_XOR,
+	ND_COND_OP,
+
+
+
 	ND_COND_AND,
 	ND_COND_OR,
 	ND_RETURN,
-
 	ND_IF,
 	ND_WHILE,
+
 	ND_DOWHILE,
 	ND_FOR,
 	ND_SWITCH,
 	ND_CASE,
-
 	ND_ADDR,
+
+
+
 	ND_DEREF,
-
- 	ND_LVAR_GLOBAL,
 	ND_STR_LITERAL,
-
 	ND_MEMBER_VALUE, // .
 	ND_MEMBER_PTR_VALUE, // ->
-
 	ND_CAST,
+
 	ND_PARENTHESES,
 	ND_BREAK,
 	ND_CONTINUE,
 	ND_DEFAULT,
+	ND_SIZEOF,
+
+	ND_ADD_UNARY,
+	ND_SUB_UNARY
 } NodeKind;
 
 typedef enum PrimitiveType
@@ -266,11 +278,14 @@ typedef struct Node
 	Type		*type;
 
 	LVar		*lvar; // local var
+	struct Node	*lvar_assign; // type ident = expr;
+
 	t_str_elem	*def_str;
 struct s_defvar
 {
 	char		*name;
 	int			name_len;
+
 	Type		*type;
 
 	// for global variable
@@ -295,9 +310,14 @@ struct s_deffunc
 {
 	char	*name;
 	int		name_len;
+
 	Type	*type_return;
+
 	int		argcount;
-	Type	*type_arguments[20]; // TODO t_linked_listにする
+
+	char	*argument_names[20];
+	int		argument_name_lens[20];
+	Type	*type_arguments[20];
 
 	bool	is_static;
 	bool	is_prototype;
@@ -308,8 +328,8 @@ struct s_deffunc
 	struct Node	*stmt;
 }	*funcdef;
 	int		funccall_argcount;
-	struct Node	*funccall_args[20]; // TODO t_linked_listにする
-	LVar	*funccall_argdefs[20];	// argsに対応するLVar
+	struct Node	*funccall_args[20];
+	LVar	*funccall_argdefs[20];
 
 	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
 	LVar		*call_mem_stack;
@@ -320,6 +340,24 @@ struct s_deffunc
 	int			switch_label;
 	SwitchCase	*switch_cases;
 	bool		switch_has_default;
+
+
+
+
+
+
+	// analyze
+	bool		is_analyzed;
+	char		*analyze_source;
+
+	char		*analyze_var_name;
+	int			analyze_var_name_len;
+
+	char		*analyze_funccall_name;
+	int			analyze_funccall_name_len;
+
+	char		*analyze_member_name;
+	int			analyze_member_name_len;
 }	Node;
 
 typedef struct s_deffunc t_deffunc;
@@ -370,9 +408,11 @@ bool	can_use_dot(Type *type);
 bool	is_memory_type(Type *type);
 
 bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value);
+LVar	*find_lvar(t_deffunc *func, char *str, int len);
+t_defvar	*find_global(char *str, int len);
 
 void	parse(void);
-
+void	analyze();
 void	codegen(void);
 
 #endif

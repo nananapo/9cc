@@ -10,12 +10,6 @@
 #include <string.h>
 #include <stdbool.h>
 
-LVar	*find_lvar(char *str, int len);
-LVar	*create_local_var(char *name, int len, Type *type, bool is_arg);
-Type	*type_cast_forarg(Type *type);
-LVar	*copy_lvar(LVar *f);
-void	alloc_argument_simu(LVar *first, LVar *lvar);
-
 t_deffunc	*get_function_by_name(char *name, int len);
 Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
 Node	*new_node_num(int val);
@@ -29,9 +23,8 @@ void	sb_switch_start(Type *type, int endlabel, int defaultLabel);
 SBData	*sb_end(void);
 SBData	*sb_peek(void);
 SBData	*sb_search(bool	isswitch);
-int		add_switchcase(SBData *sbdata, int number);
 
-static Node	 *cast(Node *node, Type *to);
+Node	 *cast(Node *node, Type *to);
 static Node	*call(Token *tok);
 static Node	*read_suffix_increment(Node *node);
 static Node	*read_deref_index(Node *node);
@@ -41,7 +34,6 @@ static Node	*arrow(void);
 static Node	*unary(void);
 static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok);
 static Node	*mul(void);
-static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok);
 static Node	*add(void);
 static Node	*shift(void);
 static Node	*relational(void);
@@ -52,7 +44,6 @@ static Node	*bitwise_xor(void);
 static Node	*conditional_and(void);
 static Node	*conditional_or(void);
 static Node	*conditional_op(void);
-static Node	*create_assign(Node *lhs, Node *rhs, Token *tok);
 static Node	*assign(void);
 static Node	*expr(void);
 static Node	*read_ifblock(void);
@@ -79,7 +70,6 @@ extern t_str_elem		*g_str_literals[1000];
 extern StructDef		*g_struct_defs[1000];
 extern EnumDef			*g_enum_defs[1000];
 extern UnionDef			*g_union_defs[1000];
-extern LVar				*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
@@ -194,7 +184,7 @@ t_deffunc	*get_function_by_name(char *name, int len)
 	return NULL;
 }
 
-Node *new_node(NodeKind kind, Node *lhs, Node *rhs)
+Node	*new_node(NodeKind kind, Node *lhs, Node *rhs)
 {
 	Node *node;
 
@@ -211,11 +201,7 @@ Node	*new_node_num(int val)
 
 	node = new_node(ND_NUM, NULL, NULL);
 	node->val = val;
-
-	//if (val < 127 && val > -128)
-	//	node->type = new_primitive_type(TY_CHAR);
-	//else
-		node->type = new_primitive_type(TY_INT);
+	node->type = new_primitive_type(TY_INT);
 	return node;
 }
 
@@ -244,13 +230,12 @@ t_str_elem	*get_str_literal(char *str, int len)
 	return (elem);
 }
 
-static Node *cast(Node *node, Type *to)
+// TODO analyze用と分けて、analyze版はanalyze_nodeをしてしまう
+Node	*cast(Node *node, Type *to)
 {
 	node = new_node(ND_CAST, node, NULL);
-	if (!type_can_cast(node->lhs->type, to, true))
-		error_at(g_token->str, "%sを%sにキャストできません",
-					get_type_name(node->lhs->type), get_type_name(to));
 	node->type = to;
+	node->analyze_source = node->lhs->analyze_source;
 	return (node);
 }
 
@@ -260,13 +245,12 @@ static Node *call(Token *tok)
 
 	debug("CALL %s", strndup(tok->str, tok->len));
 
-	node					= new_node(ND_CALL, NULL, NULL);
-	node->funccall_argcount	= 0;
-	node->funcdef			= get_function_by_name(tok->str, tok->len);
-
- 	// definition exist?
-	if (node->funcdef == NULL)
-		error_at(g_token->str, " 関数%sがみつかりません\n", strndup(tok->str, tok->len));
+	node							= new_node(ND_CALL, NULL, NULL);
+	node->analyze_source			= tok->str;
+	node->analyze_funccall_name		= tok->str;
+	node->analyze_funccall_name_len	= tok->len;
+	node->funccall_argcount			= 0;
+	node->funcdef					= get_function_by_name(tok->str, tok->len);
 
 	// read arguments
 	for (;;)
@@ -280,123 +264,7 @@ static Node *call(Token *tok)
 		node->funccall_args[node->funccall_argcount++] = expr();
 	}
 
-	// 引数の数を確認
-	if (node->funcdef->is_zero_argument && node->funccall_argcount != 0)
-		error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-					strndup(node->funcdef->name, node->funcdef->name_len),
-					node->funcdef->argcount, node->funccall_argcount);
-	else
-	{
-		if (!node->funcdef->is_variable_argument && node->funccall_argcount != node->funcdef->argcount)
-			error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-						strndup(node->funcdef->name, node->funcdef->name_len),
-						node->funcdef->argcount, node->funccall_argcount);
-		if (node->funcdef->is_variable_argument && node->funccall_argcount < node->funcdef->argcount)
-			error_at(g_token->str, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-						strndup(node->funcdef->name, node->funcdef->name_len),
-						node->funcdef->argcount, node->funccall_argcount);
-	}
-
-	// 引数を定義と比較
-	LVar	*def;
-	LVar	*lastdef;
-	LVar	*firstdef;
-	LVar	*lvtmp;
-	int		i;
-
-	if (node->funcdef->locals != NULL)
-	{
-		// 返り値がMEMORYなら二個進める
-		if (is_memory_type(node->funcdef->type_return))
-		{
-			def = node->funcdef->locals->next->next;
-			if (def != NULL)
-				def = copy_lvar(def);
-		}
-		else
-			def = copy_lvar(node->funcdef->locals);
-	}
-	else
-		def = NULL;
-	firstdef = def;
-	lastdef = NULL;
-
-	Node	*args;
-	for (i = 0; i < node->funccall_argcount; i++)
-	{
-		debug("  READ ARG(%d) START", i);
-
-		args = node->funccall_args[i];
-
-		if (def != NULL && def->is_arg)
-		{
-			debug("  is ARG");
-			// 型の確認
-			if (!type_equal(def->type, args->type))
-			{
-				// 暗黙的なキャストの確認
-				if (!type_can_cast(args->type, def->type, false))
-					error_at(g_token->str, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-							strndup(node->funcdef->name, node->funcdef->name_len),
-							strndup(def->name, def->name_len),
-							get_type_name(def->type),
-							get_type_name(args->type));
-
-				args = cast(args, def->type);
-				node->funccall_args[i] = args;
-			}
-		}
-		else
-		{
-			// defがNULL -> 可変長引数
-			debug("  is VA");
-
-			// create_local_varからのコピペ
-			def = calloc(1, sizeof(LVar));
-			def->name = "VA";
-			def->name_len = 2;
-			def->type = type_cast_forarg(args->type);
-			def->is_arg = true;
-			def->arg_regindex = -1;
-			def->next = NULL;
-			def->is_dummy = false;
-
-			alloc_argument_simu(firstdef, def); 
-
-			debug("ASSIGNED %d", def->arg_regindex);
-
-			lastdef->next = def;
-		}
-
-		node->funccall_argdefs[i] = def;
-
-		// 進める
-		lastdef = def;
-		if (def->next != NULL)
-		{
-			lvtmp = copy_lvar(def->next);
-			def->next = lvtmp;
-			def = lvtmp;
-		}
-		else
-			def = NULL;
-
-		debug("  READ ARG(%d) END", i);
-	}
-
-	// 型を返り値の型に設定
-	node->type = node->funcdef->type_return;
-
-	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
-	if (is_memory_type(node->funcdef->type_return)
-		|| node->funcdef->type_return->ty == TY_STRUCT)
-	{
-		node->call_mem_stack = create_local_var("", 0, node->funcdef->type_return, false);
-		node->call_mem_stack->is_dummy = true;
-	}
-
 	debug(" CALL END");
-
 	return node;
 }
 
@@ -416,134 +284,31 @@ static Node	*create_mul(int type, Node *lhs, Node *rhs, Token *tok)
 		node = new_node(ND_DIV, lhs, rhs);
 	else
 		node = new_node(ND_MOD, lhs, rhs);
-
-	if (!is_integer_type(node->lhs->type)
-	|| !is_integer_type(node->rhs->type))
-		error_at(tok->str, "ポインタ型に* か / を適用できません");
-
-	node->type = new_primitive_type(TY_INT);
-	return (node);
-}
-
-static Node	*create_add(bool isadd, Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-	Type	*l;
-	Type	*r;
-	int		size;
-
-	if (isadd)
-		node = new_node(ND_ADD, lhs, rhs);
-	else
-		node = new_node(ND_SUB, lhs, rhs);
-
-	l = node->lhs->type;
-	r = node->rhs->type;
-
-	// 左辺をポインタにする
-	if (is_pointer_type(r))
-	{
-		Type	*tmp;
-		tmp = l;
-		l = r;
-		r = tmp;
-	}
-
-	// 両方ともポインタ
-	if (is_pointer_type(l)
-	&& is_pointer_type(r))
-	{
-		if (!type_equal(l, r))
-			error_at(tok->str, "型が一致しないポインタ型どうしの加減算はできません");
-		node->type = new_primitive_type(TY_INT);// TODO size_tにする
-
-		size = get_type_size(l->ptr_to);
-		if (size == 0 || size > 1)
-		{
-			if (size == 0)
-				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
-			node = new_node(ND_DIV, node, new_node_num(size));
-			node->type = new_primitive_type(TY_INT);
-		}
-		return (node);
-	}
-
-	// ポインタと整数の演算
-	if (is_pointer_type(l)
-	&& is_integer_type(r))
-	{
-		node->type = l;
-		return (node);
-	}
-
-	// 両方整数なら型の優先順位を考慮
-	if (is_integer_type(l)
-	|| is_integer_type(r))
-	{
-		// Intを左に寄せる
-		if (r->ty == TY_INT)
-		{
-			Type	*tmp;
-			tmp = l;
-			l = r;
-			r = tmp;
-		}
-		// 左辺の型にする
-		node->type = l;
-		return (node);
-	}
-
-	error_at(tok->str, "演算子 +, - が%dと%dの間に定義されていません",
-			node->lhs->type->ty, node->rhs->type->ty);
-	return (NULL);
-}
-
-static Node	*create_assign(Node *lhs, Node *rhs, Token *tok)
-{
-	Node	*node;
-
-	node = new_node(ND_ASSIGN, lhs, rhs);
-
-	// 代入可能な型かどうか確かめる。
-	if (lhs->type->ty == TY_VOID
-	|| rhs->type->ty == TY_VOID)
-		error_at(tok->str, "voidを宣言、代入できません");
-
-	if (!type_equal(rhs->type, lhs->type))
-	{
-		if (type_can_cast(rhs->type, lhs->type, false))
-		{
-			debug("assign (%s) <- (%s)",
-					get_type_name(lhs->type),
-					get_type_name(rhs->type));
-			node->rhs = cast(rhs, lhs->type);
-			rhs = node->rhs;
-		}
-		else
-		{
-			error_at(tok->str, "左辺(%s)に右辺(%s)を代入できません",
-					get_type_name(lhs->type),
-					get_type_name(rhs->type));
-		}
-	}
-	node->type = lhs->type;
+	node->analyze_source = tok->str;
 	return (node);
 }
 
 // 後置インクリメント, デクリメント
 static Node	*read_suffix_increment(Node *node)
 {
+	char	*source;
+
+	source = g_token->str;
 	if (consume("++"))
 	{
-		node = create_add(true, node, new_node_num(1), g_token);
-		node->kind = ND_COMP_ADD;
-		node = create_add(false, node, new_node_num(1), g_token); // 1を引く
+		node = new_node(ND_COMP_ADD, node, new_node_num(1));
+		node->analyze_source = source;
+
+		node = new_node(ND_SUB, node, new_node_num(1));
+		node->analyze_source = source;
 	}
 	else if (consume("--"))
 	{
-		node = create_add(false, node, new_node_num(1), g_token);
-		node->kind = ND_COMP_SUB;
-		node = create_add(true, node, new_node_num(1), g_token); // 1を足す
+		node = new_node(ND_COMP_SUB, node, new_node_num(1));
+		node->analyze_source = source;
+
+		node = new_node(ND_ADD, node, new_node_num(1));
+		node->analyze_source = source;
 	}
 	return (node);
 }
@@ -552,18 +317,23 @@ static Node	*read_suffix_increment(Node *node)
 // TODO エラーメッセージが足し算用になってしまう
 static Node	*read_deref_index(Node *node)
 {
-	Node	*add;
+	char	*source;
 
+	source = g_token->str;
 	while (consume("["))
 	{
-		add = create_add(true, node, expr(), g_token);
-		node = new_node(ND_DEREF, add, NULL);
-		node->type = node->lhs->type->ptr_to;
+		node = new_node(ND_ADD, node, expr());
+		node->analyze_source = source;
+
+		node = new_node(ND_DEREF, node, NULL);
+		node->analyze_source = source;
 
 		if (!consume("]"))
 			error_at(g_token->str, "%s");
+
+		source = g_token->str;
 	}
-	return read_suffix_increment(node);
+	return (read_suffix_increment(node));
 }
 
 static Node *primary(void)
@@ -583,7 +353,6 @@ static Node *primary(void)
 		if (type_cast == NULL)
 		{
 			node = new_node(ND_PARENTHESES, expr(), NULL);
-			node->type = node->lhs->type;
 			expect(")");
 			return read_deref_index(node);
 		}
@@ -606,10 +375,8 @@ static Node *primary(void)
 		return read_deref_index(node);
 	}
 
-	// identかcall
-	LVar	*lvar;
-	t_defvar	*def_global;
-
+	// 変数かcall
+	// TODO 関数を変数として、関数呼び出しをパースする
 	tok = consume_ident();
 	if (tok)
 	{
@@ -620,26 +387,12 @@ static Node *primary(void)
 			return read_deref_index(node);
 		}
 
-		// ローカル変数
-		lvar = find_lvar(tok->str, tok->len);
-		if (lvar != NULL)
-		{
-			node = new_node(ND_LVAR, NULL, NULL);
-			node->lvar = lvar;
-			node->type = lvar->type;
-			return read_deref_index(node);
-		}
-
-		// グローバル変数
-		def_global = find_global(tok->str, tok->len);
-		if (def_global != NULL)
-		{
-			node = new_node(ND_LVAR_GLOBAL, NULL, NULL);
-			node->var_global = def_global;
-			node->type = def_global->type;
-			return read_deref_index(node);
-		}
-		error_at(tok->str,"%sが定義されていません", strndup(tok->str, tok->len));
+		// 変数
+		node						= new_node(ND_ANALYZE_VAR, NULL, NULL);
+		node->analyze_source		= tok->str;
+		node->analyze_var_name		= tok->str;
+		node->analyze_var_name_len	= tok->len;
+		return read_deref_index(node);
 	}
 
 	// string
@@ -648,7 +401,6 @@ static Node *primary(void)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
 		node->def_str = get_str_literal(tok->str, tok->len);
-		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 		return read_deref_index(node);
 	}
 
@@ -676,54 +428,34 @@ static Node *primary(void)
 static Node	*arrow_loop(Node *node)
 {
 	Token		*ident;
-	MemberElem	*elem;
-	Type		*type;
+	char		*source;
 
+	source = g_token->str;
 	if (consume("->"))
 	{
-		type = node->type;
-
-		if (!can_use_arrow(type))
-			error_at(g_token->str, "%sに->を適用できません", get_type_name(type));
-		
 		ident = consume_ident();
 
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が必要です\n (arrow_loop)");
-
-		elem = get_member_by_name(type->ptr_to, ident->str, ident->len);
-		if (elem == NULL)
-			error_at(g_token->str, "識別子が存在しません", strndup(ident->str, ident->len));
-		
-		node = new_node(ND_MEMBER_PTR_VALUE, node, NULL);
-		node->elem = elem;
-		node->type = elem->type;
-
-		node = read_deref_index(node);
-
+	
+		node							= new_node(ND_MEMBER_PTR_VALUE, node, NULL);
+		node->analyze_source			= source;
+		node->analyze_member_name		= ident->str;
+		node->analyze_member_name_len	= ident->len;
+		node							= read_deref_index(node);
 		return arrow_loop(node);
 	}
 	else if (consume("."))
 	{
-		type = node->type;
-
-		if (!can_use_dot(type))
-			error_at(g_token->str, "%sに.を適用できません", get_type_name(type));
-
 		ident = consume_ident();
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が必要です\n (arrow_loop)");
 
-		elem = get_member_by_name(type, ident->str, ident->len);
-		if (elem == NULL)
-			error_at(g_token->str, "識別子が存在しません", strndup(ident->str, ident->len));
-
-		node = new_node(ND_MEMBER_VALUE, node, NULL);
-		node->elem = elem;
-		node->type = elem->type;
-
-		node = read_deref_index(node);
-
+		node							= new_node(ND_MEMBER_VALUE, node, NULL);
+		node->analyze_source			= source;
+		node->analyze_member_name		= ident->str;
+		node->analyze_member_name_len	= ident->len;
+		node							= read_deref_index(node);
 		return arrow_loop(node);
 	}
 	else
@@ -742,101 +474,73 @@ static Node *unary(void)
 {
 	Node	*node;
 	Type	*type;
+	char	*source;
 
+	source = g_token->str;
 	if (consume("+"))
 	{
-		node = unary();
-		if (is_pointer_type(node->type))
-			error_at(g_token->str, "ポインタ型に対してunary -を適用できません");
-		return node;
+		node = new_node(ND_ADD_UNARY, unary(), NULL);
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume("-"))
 	{
-		node = new_node(ND_SUB, new_node_num(0), unary());
-		if (is_pointer_type(node->rhs->type))
-			error_at(g_token->str, "ポインタ型に対してunary -を適用できません");
-		node->type = node->rhs->type;
-		return node;
+		node = new_node(ND_SUB_UNARY, unary(), NULL);
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume("*"))
 	{
 		node = new_node(ND_DEREF, unary(), NULL);
-		if (!is_pointer_type(node->lhs->type))
-			error_at(g_token->str,
-					"ポインタではない型(%d)に対してunary *を適用できません",
-					node->lhs->type->ty);
-		node->type = node->lhs->type->ptr_to;	
-		return node;
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume("&"))
 	{
 		node = new_node(ND_ADDR, unary(), NULL);
-
-		// 変数と構造体、ND_DEREFに対する&
-		if (node->lhs->kind != ND_LVAR
-		&& node->lhs->kind != ND_LVAR_GLOBAL
-		&& node->lhs->kind != ND_MEMBER_VALUE
-		&& node->lhs->kind != ND_MEMBER_PTR_VALUE
-		&& node->lhs->kind != ND_DEREF) // TODO 文字列リテラルは？
-			error_at(g_token->str, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
-
-		node->type = new_type_ptr_to(node->lhs->type);
-		return node;
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume("++"))
 	{
-		// TODO 左辺値かの検証はしていない
-		node = create_add(true, unary(), new_node_num(1), g_token);
-		node->kind = ND_COMP_ADD;
+		node = new_node(ND_COMP_ADD, unary(), new_node_num(1));
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume("--"))
 	{
-		node = create_add(false, unary(), new_node_num(1), g_token);
-		node->kind = ND_COMP_SUB;
+		node = new_node(ND_COMP_SUB, unary(), new_node_num(1));
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume("!"))
 	{
-		// TODO 生成する関数を作る
-		node = unary();
-		node = new_node(ND_EQUAL, node, new_node_num(0));
-		node->type = new_primitive_type(TY_INT);
+		node = new_node(ND_EQUAL, unary(), new_node_num(0));
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume("~"))
 	{
 		node = new_node(ND_BITWISE_NOT, unary(), NULL);
-		node->type = node->lhs->type;
-
-		if (!is_integer_type(node->lhs->type))
-			error_at(g_token->str, "整数ではない型に~を適用できません");
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume_with_type(TK_SIZEOF))
 	{
-		// とりあえずsizeof (型)を読めるように
+		// とりあえずsizeof (型)を読めるようにした
 		if (consume("("))
 		{
 			type = consume_type_before(true);
 			if (type == NULL)
-			{
-				node = unary();
-				node = new_node_num(get_type_size(node->type));
-			}
+				node = new_node(ND_SIZEOF, unary(), NULL);
 			else
 				node = new_node_num(get_type_size(type));
-		
 			if (!consume(")"))
 				error_at(g_token->str, ")が必要です");
-			return (node);
 		}
 		else
-		{
-			node = unary();
-			node = new_node_num(get_type_size(node->type));
-			return (node);
-		}
+			node = new_node(ND_SIZEOF, unary(), NULL);
+		return (node);
 	}
 
 	return arrow();
@@ -849,6 +553,7 @@ static Node *mul(void)
 	node = unary();
 	for (;;)
 	{
+		// TODO sourceが一こ先にずれてる
 		if (consume("*"))
 			node = create_mul(0, node, unary(), g_token);
 		else if (consume("/"))
@@ -856,53 +561,47 @@ static Node *mul(void)
 		else if (consume("%"))
 			node = create_mul(2, node, unary(), g_token);
 		else
-			return node;
+			return (node);
 	}
 }
 
 static Node	*add(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = mul();
 	for (;;)
 	{
+		source = g_token->str;
+
 		if (consume("+"))
-			node = create_add(true, node, mul(), g_token);
+			node = new_node(ND_ADD, node, mul());
 		else if (consume("-"))
-			node = create_add(false, node, mul(), g_token);
+			node = new_node(ND_SUB, node, mul());
 		else
 			return (node);
+
+		node->analyze_source = source;
 	}
 }
 
-// TODO 型チェック
 static Node	*shift(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = add();
+	source = g_token->str;
 	if (consume("<<"))
 	{
 		node = new_node(ND_SHIFT_LEFT, node, shift());
-		
-		if (!is_integer_type(node->lhs->type)
-			|| !is_integer_type(node->rhs->type))
-			error_at(g_token->str, "整数型ではない型にシフト演算子を適用できません");
-
-		// 左辺の型にする
-		node->type = node->lhs->type;
+		node->analyze_source = source;
 	}
 	else if (consume(">>"))
 	{
 		node = new_node(ND_SHIFT_RIGHT, node, shift());
-		
-		if (!is_integer_type(node->lhs->type)
-			|| !is_integer_type(node->rhs->type))
-			error_at(g_token->str, "整数型ではない型にシフト演算子を適用できません");
-
-		// 左辺の型にする
-		node->type = node->lhs->type;
+		node->analyze_source = source;
 	}
 	return (node);
 }
@@ -910,12 +609,13 @@ static Node	*shift(void)
 static Node	*relational(void)
 {
 	Node	*node;
-	Type	*l_to;
-	Type	*r_to;
+	char	*source;
 
 	node = shift();
 	for (;;)
 	{
+		source = g_token->str;
+
 		if (consume("<"))
 			node = new_node(ND_LESS, node, shift());
 		else if (consume("<="))
@@ -925,70 +625,44 @@ static Node	*relational(void)
 		else if (consume(">="))
 			node = new_node(ND_LESSEQ, shift(), node);
 		else
-			return node;
+			return (node);
 
-		node->type = new_primitive_type(TY_INT);
-
-		// 比較できるか確認
-		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
-			error_at(g_token->str,"%sと%sを比較することはできません",
-					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
-		// キャストする必要があるならキャスト
-		if (!type_equal(node->lhs->type, l_to))
-			node->lhs = cast(node->lhs, l_to);
-		if (!type_equal(node->rhs->type, r_to))
-			node->rhs = cast(node->rhs, r_to);
+		node->analyze_source = source;
 	}
 }
 
 static Node *equality(void)
 {
 	Node	*node;
-	Type	*l_to;
-	Type	*r_to;
+	char	*source;
 
 	node = relational();
 	for (;;)
 	{
+		source = g_token->str;
+
 		if (consume("=="))
 			node = new_node(ND_EQUAL, node, relational());
 		else if (consume("!="))
 			node = new_node(ND_NEQUAL, node, relational());
 		else
-			return node;
+			return (node);
 
-		node->type = new_primitive_type(TY_INT);
-
-		// 比較できるか確認
-		if (!can_compared(node->lhs->type, node->rhs->type, &l_to, &r_to))
-			error_at(g_token->str,"%sと%sを比較することはできません",
-					get_type_name(node->lhs->type), get_type_name(node->rhs->type));
-		// キャストする必要があるならキャスト
-		if (!type_equal(node->lhs->type, l_to))
-			node->lhs = cast(node->lhs, l_to);
-		if (!type_equal(node->rhs->type, r_to))
-			node->rhs = cast(node->rhs, r_to);
+		node->analyze_source = source;
 	}
 }
 
 static Node	*bitwise_and(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = equality();
+	source = g_token->str;
 	if (consume("&"))
 	{
 		node = new_node(ND_BITWISE_AND, node, bitwise_and());
-
-		if (!is_integer_type(node->lhs->type)
-			|| !is_integer_type(node->rhs->type))
-			error_at(g_token->str, "整数型ではない型に&を適用できません");
-
-		// TODO キャストしてから可能か考える
-		if (!type_equal(node->rhs->type, node->lhs->type))
-			error_at(g_token->str, "&の両辺の型が一致しません");
-
-		node->type = node->rhs->type;
+		node->analyze_source = source;
 	}
 	return (node);
 }
@@ -997,90 +671,69 @@ static Node	*bitwise_and(void)
 static Node	*bitwise_xor(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = bitwise_and();
+	source = g_token->str;
 	if (consume("^"))
 	{
 		node = new_node(ND_BITWISE_XOR, node, bitwise_xor());
-
-		if (!is_integer_type(node->lhs->type)
-			|| !is_integer_type(node->rhs->type))
-			error_at(g_token->str, "整数型ではない型に^を適用できません");
-
-		// TODO キャストしてから可能か考える
-		if (!type_equal(node->rhs->type, node->lhs->type))
-			error_at(g_token->str, "^の両辺の型が一致しません");
-
-		node->type = node->rhs->type;
+		node->analyze_source = source;
 	}
 	return (node);
 }
 
-// TODO 型チェック
 static Node	*bitwise_or(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = bitwise_xor();
+	source = g_token->str;
 	if (consume("|"))
 	{
 		node = new_node(ND_BITWISE_OR, node, bitwise_or());
-
-		if (!is_integer_type(node->lhs->type)
-			|| !is_integer_type(node->rhs->type))
-			error_at(g_token->str, "整数型ではない型に|を適用できません");
-
-		// TODO キャストしてから可能か考える
-		if (!type_equal(node->rhs->type, node->lhs->type))
-			error_at(g_token->str, "|の両辺の型が一致しません");
-
-		node->type = node->rhs->type;
+		node->analyze_source = source;
 	}
 	return (node);
 }
 
-// TODO 型チェック
 static Node	*conditional_and(void)
 {
 	Node	*node;
 
 	node = bitwise_or();
 	if (consume("&&"))
-	{
 		node = new_node(ND_COND_AND, node, conditional_and());
-		node->type = new_primitive_type(TY_INT);
-	}
 	return (node);
 }
 
-// TODO 型チェック
 static Node	*conditional_or(void)
 {
 	Node	*node;
 
 	node = conditional_and();
 	if (consume("||"))
-	{
 		node = new_node(ND_COND_OR, node, conditional_or());
-		node->type = new_primitive_type(TY_INT);
-	}
 	return (node);
 }
 
 static Node	*conditional_op(void)
 {
 	Node	*node;
+	char	*source;
 
+	source = g_token->str;
 	node = conditional_or();
 	if (consume("?"))
 	{
-		node = new_node(ND_IF, node, conditional_op());
+		node = new_node(ND_COND_OP, node, conditional_op());
+		node->analyze_source = source;
+
 		if (!consume(":"))
 			error_at(g_token->str, ":が必要です");
+
 		node->els = conditional_op();
-		if (!type_equal(node->rhs->type, node->els->type))
-			error_at(g_token->str, "条件演算子の型が一致しません");
-		node->type = node->rhs->type;
 	}
 	return (node);
 }
@@ -1088,19 +741,25 @@ static Node	*conditional_op(void)
 static Node	*assign(void)
 {
 	Node	*node;
+	char	*source;
 
 	node = conditional_op();
+
+	source = g_token->str;
 	if (consume("="))
-		node = create_assign(node, assign(), g_token);
+	{
+		node = new_node(ND_ASSIGN, node, assign());
+		node->analyze_source = source;
+	}
 	else if (consume("+="))
 	{
-		node = create_add(true, node, assign(), g_token);
-		node->kind = ND_COMP_ADD;
+		node = new_node(ND_COMP_ADD, node, assign());
+		node->analyze_source = source;
 	}
 	else if (consume("-="))
 	{
-		node = create_add(false, node, assign(), g_token);
-		node->kind = ND_COMP_SUB;
+		node = new_node(ND_COMP_SUB, node, assign());
+		node->analyze_source = source;
 	}
 	else if (consume("*="))
 	{
@@ -1162,25 +821,28 @@ static Node	*stmt(void)
 	Type	*type;
 	Token 	*ident;
 	int		number;
-	int		label;
-	SBData	*data;
 	Node	*start;
-	LVar	*created;
+	char	*source;
 
+	source = g_token->str;
 	if (consume_with_type(TK_RETURN))
 	{
-		// TODO 型チェック
 		if (consume(";"))
 		{
 			node = new_node(ND_RETURN, NULL, NULL);
-			return (node);
 		}
 		else
+		{
 			node = new_node(ND_RETURN, expr(), NULL);
+			expect_semicolon();
+		}
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume_with_type(TK_IF))
 	{
 		node = read_ifblock();
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume_with_type(TK_WHILE))
@@ -1189,23 +851,23 @@ static Node	*stmt(void)
 
 		if (!consume("("))
 			error_at(g_token->str, "(ではないトークンです");
+
 		node = new_node(ND_WHILE, expr(), NULL);
+		node->analyze_source = source;
+
 		if (!consume(")"))
 			error_at(g_token->str, ")ではないトークンです");
 
-		sb_forwhile_start(-1, -1);
 		if (!consume(";"))
 			node->rhs = stmt();
-		sb_end();
 
 		debug("  WHILE END");
 		return node;
 	}
 	else if (consume_with_type(TK_DO))
 	{
-		sb_forwhile_start(-1, -1);
 		node = new_node(ND_DOWHILE, stmt(), NULL);
-		sb_end();
+		node->analyze_source = source;
 
 		if (!consume_with_type(TK_WHILE))
 			error_at(g_token->str, "whileが必要です");
@@ -1225,6 +887,7 @@ static Node	*stmt(void)
 			error_at(g_token->str, "(ではないトークンです");
 
 		node = new_node(ND_FOR, NULL, NULL);
+		node->analyze_source = source;
 
 		// for init
 		if (!consume(";"))
@@ -1247,10 +910,8 @@ static Node	*stmt(void)
 		}
 
 		// stmt
-		sb_forwhile_start(-1, -1);
 		if (!consume(";"))
 			node->lhs = stmt();
-		sb_end();
 
 		debug("  FOR END");
 		return (node);
@@ -1259,20 +920,14 @@ static Node	*stmt(void)
 	{
 		if (!consume("("))
 			error_at(g_token->str, "(ではないトークンです");
+
 		node = new_node(ND_SWITCH, expr(), NULL);
+		node->analyze_source = source;
+
 		if (!consume(")"))
 			error_at(g_token->str, ")ではないトークンです");
 
-		// TODO exprの型チェック, キャストも
-		if (!is_integer_type(node->lhs->type))
-			error_at(g_token->str, "switch文で整数型以外の型で分岐することはできません");
-
-		sb_switch_start(node->lhs->type, -1, -1);
 		node->rhs = stmt();
-		data = sb_end();
-
-		node->switch_cases = data->cases;
-		node->switch_has_default = data->defaultLabel != -1;
 		return (node);
 	}
 	else if (consume_with_type(TK_CASE))
@@ -1291,47 +946,39 @@ static Node	*stmt(void)
 			error_at(g_token->str, ":が必要です");
 
 		node = new_node(ND_CASE, NULL, NULL);
-
-		data = sb_search(true);
-		if (data == NULL)
-			error_at(g_token->str, "caseに対応するswitchがありません");
-		label = add_switchcase(data, number);
-
+		node->analyze_source = source;
 		node->val = number;
-		node->switch_label = label;
 		return (node);
 	}
 	else if (consume_with_type(TK_BREAK))
 	{
-		data = sb_peek();
-		if (data == NULL)
-			error_at(g_token->str, "breakに対応するstatementがありません");
+		expect_semicolon();
+
 		node = new_node(ND_BREAK, NULL, NULL);
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume_with_type(TK_CONTINUE))
 	{
-		if (sb_search(false) == NULL)
-			error_at(g_token->str, "continueに対応するstatementがありません");
+		expect_semicolon();
+
 		node = new_node(ND_CONTINUE, NULL, NULL);
+		node->analyze_source = source;
+		return (node);
 	}
 	else if (consume_with_type(TK_DEFAULT))
 	{
 		if (!consume(":"))
 			error_at(g_token->str, ":が必要です");
-
-		data = sb_search(true);
-		if (data == NULL)
-			error_at(g_token->str, "defaultに対応するstatementがありません");
-		if (data->defaultLabel != -1)
-			error_at(g_token->str, "defaultが2個以上あります");
-
-		data->defaultLabel = 1;
 		node = new_node(ND_DEFAULT, NULL, NULL);
+		node->analyze_source = source;
 		return (node);
 	}
 	else if (consume("{"))
 	{
 		node = new_node(ND_BLOCK, NULL, NULL);
+		node->analyze_source = source;
+
 		start = node;
 
 		while (!consume("}"))
@@ -1413,22 +1060,15 @@ static Node	*stmt(void)
 
 			expect_type_after(&type);
 
-			// TODO voidチェックは違うパスでやりたい....
-			if (!is_declarable_type(type))
-				error_at(g_token->str, "宣言できない型の変数です");
-
-			created = create_local_var(ident->str, ident->len, type, false);
-
-			node = new_node(ND_NONE, NULL, NULL);
+			node = new_node(ND_VAR_DEF, NULL, NULL);
 			node->type = type;
-			node->lvar = created;
+			node->analyze_source = ident->str;
+			node->analyze_var_name = ident->str;
+			node->analyze_var_name_len = ident->len;
 
 			// 宣言と同時に代入
 			if (consume("="))
-			{
-				node->kind = ND_LVAR;
-				node = create_assign(node, expr(), g_token);
-			}
+				node->lvar_assign = expr();
 		}
 		else
 		{
@@ -1457,7 +1097,6 @@ static Node	*expect_constant(Type *type)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL);
 		node->def_str = get_str_literal(tok->str, tok->len);
-		node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
 	}
 	else if (type_equal(type, new_primitive_type(TY_CHAR)) 
 			&& (tok = consume_char_literal()) != NULL)
@@ -1731,11 +1370,7 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 {
 	t_deffunc	*def;
 	Token		*arg;
-	int			type_size;
-	LVar		*lvar;
 	int			i;
-
-	g_locals = NULL;
 
 	def							= calloc(1, sizeof(t_deffunc));
 	def->name					= ident->str;
@@ -1744,37 +1379,6 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 	def->argcount				= 0;
 	def->is_static				= is_static;
 	g_func_now = def;
-
-	// 返り値がMEMORYならダミーの変数を追加する
-	if (is_memory_type(def->type_return))
-	{
-		// RDIを保存する用	
-		lvar = calloc(1, sizeof(LVar));
-		lvar->name = "";
-		lvar->name_len = 0;
-		lvar->type = new_type_ptr_to(new_primitive_type(TY_VOID));
-		lvar->is_arg = true;
-		lvar->arg_regindex = 0;
-		lvar->is_dummy = true;
-		lvar->offset = 8;
-		lvar->next = NULL;
-		g_locals = lvar;
-
-		// とりあえずalign(typesize,16) * 2だけ隙間を用意しておく
-		// しかし使わない
-		type_size = align_to(get_type_size(def->type_return), 16);
-
-		lvar = calloc(1, sizeof(LVar));
-		lvar->name = "";
-		lvar->name_len = 0;
-		lvar->type = def->type_return;
-		lvar->is_arg = false;
-		lvar->arg_regindex = -1;
-		lvar->is_dummy = true;
-		lvar->offset = 8 + type_size * 2;
-		lvar->next = NULL;
-		g_locals->next = lvar;
-	}
 
 	// args
 	if (!consume(")"))
@@ -1814,19 +1418,14 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 				error_at(g_token->str, "仮引数が必要です");
 			}
 
-			// LVarを作成
-			create_local_var(arg->str, arg->len, type, true);
 			// arrayを読む
 			expect_type_after(&type);
 
-			type = type_array_to_ptr(type); // 配列からポインタにする
-
-			// TODO Voidチェックは違うパスでやりたい....
-			if (!is_declarable_type(type))
-				error_at(g_token->str, "宣言できない型の変数です");
-
-			// 型情報を保存
-			def->type_arguments[def->argcount++] = type;
+			// save
+			def->argument_names[def->argcount] = arg->str;
+			def->argument_name_lens[def->argcount] = arg->len;
+			def->type_arguments[def->argcount] = type;
+			def->argcount += 1;
 
 			// )か,
 			if (consume(")"))
@@ -1836,29 +1435,19 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 		}
 	}
 
-	debug(" END READ ARGS");
-
 	// func_defsに代入
-	// TODO 関数名被り
-	// TODO プロトタイプ宣言後の関数定義
 	if (consume(";"))
 	{
 		def->is_prototype = true;
 		for (i = 0; g_func_protos[i] != NULL; i++);
 		g_func_protos[i] = def;
-
-		def->locals = g_locals;
 	}
 	else
 	{
 		def->is_prototype = false;
-
 		for (i = 0; g_func_defs[i] != NULL; i++);
 		g_func_defs[i] = def;
-
-		def->locals = g_locals;
 		def->stmt = stmt();
-		def->locals = g_locals;
 	}
 
 	g_func_now = NULL;

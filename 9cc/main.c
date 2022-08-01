@@ -15,7 +15,6 @@ t_str_elem		*g_str_literals[1000];
 StructDef		*g_struct_defs[1000];
 EnumDef			*g_enum_defs[1000];
 UnionDef		*g_union_defs[1000];
-LVar			*g_locals;
 t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
 
@@ -42,7 +41,7 @@ int main(int argc, char **argv)
 	debug("parse end");
 
 	// analyze
-//	analyze();
+	analyze();
 
 	// codegen
 	codegen();

@@ -24,6 +24,31 @@ static int max(int a, int b)
 	return (b);
 }
 
+bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value)
+{
+	int	i;
+	int	j;
+
+	for (i = 0; g_enum_defs[i]; i++)
+	{
+		EnumDef	*def = g_enum_defs[i];
+		for (j = 0; j < def->kind_len; j++)
+		{
+			char *var = def->kinds[j];
+			if ((int)strlen(var) == len
+			&& strncmp(str, var, strlen(var)) == 0)
+			{
+				if (res_def != NULL)
+					*res_def = def;
+				if (res_value != NULL)
+					*res_value = j;
+				return (true);
+			}
+		}
+	}
+	return (false);
+}
+
 Type	*new_primitive_type(PrimitiveType pri)
 {
 	Type	*type = calloc(1, sizeof(Type));

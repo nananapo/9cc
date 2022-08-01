@@ -45,6 +45,7 @@ compile "stack"
 compile "tokenize"
 compile "typeutil"
 compile "varutil"
+compile "analyze"
 compile "error"
 
 #mgcc "charutil"
@@ -58,7 +59,8 @@ compile "error"
 #mgcc "tokenize"
 #mgcc "typeutil"
 #mgcc "varutil"
+#mgcc "analyze"
 #mgcc "error"
 
 cd $DIR
-gcc -o ../9cc charutil.s fileutil.s gen.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s error.s
+gcc -o ../9cc charutil.s fileutil.s gen.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s analyze.s error.s
