@@ -7,14 +7,14 @@
 
 char			*g_user_input;
 
-Token			*g_token;
+t_token			*g_token;
 t_deffunc		*g_func_defs[1000];
 t_deffunc		*g_func_protos[1000];
 t_defvar		*g_global_vars[1000];
 t_str_elem		*g_str_literals[1000];
-StructDef		*g_struct_defs[1000];
-EnumDef			*g_enum_defs[1000];
-UnionDef		*g_union_defs[1000];
+t_defstruct		*g_struct_defs[1000];
+t_defenum		*g_enum_defs[1000];
+t_defunion		*g_union_defs[1000];
 t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
 

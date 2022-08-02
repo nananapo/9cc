@@ -42,7 +42,7 @@
 
 # define ARGREG_SIZE 6
 
-typedef enum TokenKind
+typedef enum e_tokenkind
 {
 	TK_RESERVED,
 	TK_IDENT,
@@ -66,6 +66,10 @@ typedef enum TokenKind
 	TK_EOF,
 	TK_SIZEOF,
 
+	TK_INT,
+	TK_CHAR,
+ 	TK__BOOL,
+	TK_VOID,
 	TK_STRUCT,
 	TK_ENUM,
 	TK_UNION,
@@ -74,20 +78,20 @@ typedef enum TokenKind
 	TK_TYPEDEF,
 	TK_EXTERN,
  	TK_INLINE
-} TokenKind;
+} t_tokenkind;
 
-typedef struct Token
+typedef struct s_token
 {
-	TokenKind		kind;
-	struct Token	*next;
+	t_tokenkind		kind;
+	struct s_token	*next;
 
 	int				val;			// number
 	char			*str;			// token str
 	int				len;			// length
 	int				strlen_actual;	// charlit
-} Token;
+} t_token;
 
-typedef enum NodeKind
+typedef enum e_nodekind
 {
 	ND_NONE,
 	ND_ANALYZE_VAR,
@@ -159,9 +163,9 @@ typedef enum NodeKind
 
 	ND_ADD_UNARY,
 	ND_SUB_UNARY
-} NodeKind;
+} t_nodekind;
 
-typedef enum PrimitiveType
+typedef enum e_typekind
 {
 	TY_INT,
 	TY_CHAR,
@@ -172,73 +176,72 @@ typedef enum PrimitiveType
 	TY_UNION,
 	TY_BOOL,
 	TY_VOID
-} PrimitiveType;
+} t_typekind;
 
-typedef struct s_enum_definition
+typedef struct s_defenum
 {
 	char	*name;
 	int		name_len;
 
 	char	*kinds[1000];
 	int		kind_len;
-}	EnumDef;
+}	t_defenum;
 
-typedef struct Type
+typedef struct s_type
 {
-	PrimitiveType	ty;
-	struct Type		*ptr_to;
+	t_typekind		ty;
+	struct s_type	*ptr_to;
 
 	int 			array_size;
 
-	struct s_struct_definition
+	struct s_defstruct
 	{
 		char				*name;
 		int					name_len;
 		int					mem_size; // -1ならまだ定義されていない
-		struct s_members
+		struct s_member
 		{
-			struct Type			*type;
-			char				*name;
-			int					name_len;
-			int					offset;
-			struct s_members	*next;
+			struct s_type	*type;
+			char			*name;
+			int				name_len;
+			int				offset;
+			struct s_member	*next;
 		} *members;
 	}	*strct;
 
-	EnumDef			*enm;
+	t_defenum			*enm;
 
-	struct s_union_definition
+	struct s_defunion
 	{
-		char				*name;
-		int					name_len;
-		int					mem_size;
-		struct s_members	*members;
+		char			*name;
+		int				name_len;
+		int				mem_size;
+		struct s_member	*members;
 	}	*unon;
-} Type;
+} t_type;
 
-typedef struct s_struct_definition	StructDef;
-typedef struct s_members			MemberElem;
-typedef struct s_union_definition	UnionDef;
+typedef struct s_defstruct	t_defstruct;
+typedef struct s_defunion	t_defunion;
+typedef struct s_member		t_member;
 
 typedef struct	s_switchcase
 {
 	int					value;
 	int					label;
 	struct s_switchcase	*next;
-}	SwitchCase;
+}	t_switchcase;
 
-typedef struct s_sbdata
+typedef struct s_labelstack
 {
-	bool		isswitch;
+	bool			isswitch;
 
-	int			startlabel;
-	int			endlabel;
+	int				startLabel;
+	int				endLabel;
+	int				defaultLabel;
 
-	Type		*type;
-	SwitchCase	*cases;
-
-	int			defaultLabel;
-}	SBData;
+	t_type			*type;
+	t_switchcase	*cases;
+}	t_labelstack;
 
 typedef struct s_lvar
 {
@@ -252,8 +255,8 @@ typedef struct s_lvar
 	int			arg_regindex;
 	bool		is_dummy;
 
-	Type		*type;
-} LVar;
+	t_type		*type;
+} t_lvar;
 
 typedef struct s_str_literal_elem
 {
@@ -262,79 +265,79 @@ typedef struct s_str_literal_elem
 	int		index;
 }	t_str_elem;
 
-typedef struct Node
+typedef struct s_node
 {
-	NodeKind	kind;
-	struct Node	*lhs;
-	struct Node	*rhs;
+	t_nodekind		kind;
+	struct s_node	*lhs;
+	struct s_node	*rhs;
 
-	Type		*type;
+	t_type			*type;
 
-	LVar		*lvar; // local var
-	struct Node	*lvar_assign; // type ident = expr;
+	t_lvar			*lvar; // local var
+	struct s_node	*lvar_assign; // type ident = expr;
 
-	t_str_elem	*def_str;
+	t_str_elem		*def_str;
 struct s_defvar
 {
-	char		*name;
-	int			name_len;
+	char			*name;
+	int				name_len;
 
-	Type		*type;
+	t_type			*type;
 
 	// for global variable
-	bool		is_extern;
-	bool		is_static;
-	struct Node	*assign;
+	bool			is_extern;
+	bool			is_static;
+	struct s_node	*assign;
 }	*var_global;
 
-	struct Node	*global_assign_next;
+	struct s_node	*global_assign_next;
 
 	// num
-	int			val;
+	int				val;
 
 	// else of if
-	struct Node	*elsif;
-	struct Node	*els;
+	struct s_node	*elsif;
+	struct s_node	*els;
 
-	struct Node	*for_expr[3]; // for (0; 1; 2)
+	struct s_node	*for_expr[3]; // for (0; 1; 2)
 
 	// call
 struct s_deffunc
 {
-	char	*name;
-	int		name_len;
+	char		*name;
+	int			name_len;
 
-	Type	*type_return;
+	t_type		*type_return;
 
-	int		argcount;
+	int			argcount;
 
-	char	*argument_names[20];
-	int		argument_name_lens[20];
-	Type	*type_arguments[20];
+	char		*argument_names[20];
+	int			argument_name_lens[20];
+	t_type		*type_arguments[20];
 
-	bool	is_static;
-	bool	is_prototype;
-	bool	is_zero_argument;		// func(void)
-	bool	is_variable_argument;	// func(, ...)
+	bool		is_static;
+	bool		is_prototype;
+	bool		is_zero_argument;		// func(void)
+	bool		is_variable_argument;	// func(, ...)
 
-	LVar	*locals;
-	struct Node	*stmt;
+	t_lvar		*locals;
+	struct s_node	*stmt;
 }	*funcdef;
-	int		funccall_argcount;
-	struct Node	*funccall_args[20];
-	LVar	*funccall_argdefs[20];
+	int				funccall_argcount;
+	struct s_node	*funccall_args[20];
+	t_lvar			*funccall_argdefs[20];
 
 	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
-	LVar		*call_mem_stack;
+	t_lvar			*call_mem_stack;
 
-	MemberElem	*elem;
+	t_member		*elem;
 
 	// valとlabelでswicth-case
-	SwitchCase	*switch_cases;
-	SwitchCase	*case_label;
-	bool		switch_has_default;
+	t_switchcase	*case_label;
+	bool			switch_has_default; // TODO labelstackに移動する
 
-	SBData		*block_sbdata;
+	t_labelstack	*block_sbdata;
+
 
 
 
@@ -350,7 +353,7 @@ struct s_deffunc
 
 	char		*analyze_member_name;
 	int			analyze_member_name_len;
-}	Node;
+}	t_node;
 
 typedef struct s_deffunc t_deffunc;
 typedef struct s_defvar	t_defvar;
@@ -359,48 +362,48 @@ typedef struct s_typedefpair
 {
 	char	*name;
 	int		name_len;
-	Type	*type;
-}	TypedefPair;
+	t_type	*type;
+}	t_typedefpair;
 
 
 void	debug(char *fmt, ...);
 
 char	*read_file(char	*name);
 
-int	align_to(int a, int to);
+int		align_to(int a, int to);
 
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
 
-Token	*tokenize(char *p);
+t_token	*tokenize(char *p);
 
-Node	*new_node(NodeKind kind, Node *lhs, Node *rhs);
-Node	*new_node_num(int val);
+t_node	*new_node(t_nodekind kind, t_node *lhs, t_node *rhs);
+t_node	*new_node_num(int val);
 
-// Type
-Type	*new_primitive_type(PrimitiveType pri);
-int		get_type_size(Type *type);
-Type	*new_type_ptr_to(Type *ptr_to);
-Type	*new_type_array(Type *ptr_to);
-Type	*new_struct_type(char *name, int len);
-Type	*new_enum_type(char *name, int len);
-Type	*new_union_type(char *name, int len);
-bool	is_integer_type(Type *type);
-bool	is_pointer_type(Type *type);
-bool	is_declarable_type(Type *type);
-bool	can_compared(Type *l, Type *r, Type **lt, Type **rt);
-bool	type_equal(Type *t1, Type *t2);
-MemberElem	*get_member_by_name(Type *type, char *name, int len);
-int		max_type_size(Type *type);
-char	*get_type_name(Type *type);
-bool	type_can_cast(Type *from, Type *to, bool is_explicit);
-Type	*type_array_to_ptr(Type *type);
-bool	can_use_arrow(Type *type);
-bool	can_use_dot(Type *type);
-bool	is_memory_type(Type *type);
+// t_type
+t_type	*new_primitive_type(t_typekind pri);
+int		get_type_size(t_type *type);
+t_type	*new_type_ptr_to(t_type *ptr_to);
+t_type	*new_type_array(t_type *ptr_to);
+t_type	*new_struct_type(char *name, int len);
+t_type	*new_enum_type(char *name, int len);
+t_type	*new_union_type(char *name, int len);
+bool	is_integer_type(t_type *type);
+bool	is_pointer_type(t_type *type);
+bool	is_declarable_type(t_type *type);
+bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
+bool	type_equal(t_type *t1, t_type *t2);
+t_member	*get_member_by_name(t_type *type, char *name, int len);
+int		max_type_size(t_type *type);
+char	*get_type_name(t_type *type);
+bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
+t_type	*type_array_to_ptr(t_type *type);
+bool	can_use_arrow(t_type *type);
+bool	can_use_dot(t_type *type);
+bool	is_memory_type(t_type *type);
 
-bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value);
-LVar	*find_lvar(t_deffunc *func, char *str, int len);
+bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value);
+t_lvar	*find_lvar(t_deffunc *func, char *str, int len);
 t_defvar	*find_global(char *str, int len);
 
 void	parse(void);

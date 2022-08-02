@@ -12,33 +12,33 @@ static void	pop(char *reg);
 static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
 static void	cmps(char *dst, char *from);
-static void	cmp(Type *dst, Type *from);
+static void	cmp(t_type *dst, t_type *from);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
-static void	load(Type *type);
-static void	lval(Node *node);
-static void	call(Node *node);
-static void	cast(Type *from, Type *to);
-static void	arrow(Node *node, bool as_addr);
-static void	create_add(bool is_add, Type *l, Type *r);
-static void	load_lval_addr(Node *node);
-static void	print_global_constant(Node *node, Type *type);
-static void	gen(Node *node);
+static void	load(t_type *type);
+static void	lval(t_node *node);
+static void	call(t_node *node);
+static void	cast(t_type *from, t_type *to);
+static void	arrow(t_node *node, bool as_addr);
+static void	create_add(bool is_add, t_type *l, t_type *r);
+static void	load_lval_addr(t_node *node);
+static void	print_global_constant(t_node *node, t_type *type);
+static void	gen(t_node *node);
 
 static int				jumpLabelCount = 0;
 static char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int				stack_count = 0;
 
 // main
-extern Token			*g_token;
+extern t_token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
-extern LVar				*g_locals;
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
+extern t_lvar			*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
@@ -81,7 +81,7 @@ static void	cmps(char *dst, char *from)
 
 // TODO 構造体の比較
 // rax, rdi
-static void	cmp(Type *dst, Type *from)
+static void	cmp(t_type *dst, t_type *from)
 {
 	if (type_equal(dst, from))
 	{
@@ -196,7 +196,7 @@ static void store_ptr(int size, bool minus_step)
 }
 
 // raxをraxに読み込む
-static void	load(Type *type)
+static void	load(t_type *type)
 {
 	if (type->ty == TY_PTR)
 	{
@@ -228,12 +228,12 @@ static void	load(Type *type)
 }
 
 // 変数のアドレスをraxに移動する
-static void	lval(Node *node)
+static void	lval(t_node *node)
 {
 	int	offset;
 
 	if (node->kind != ND_VAR_LOCAL && node->kind != ND_VAR_GLOBAL)
-		error("変数ではありません Kind:%d Type:%d", node->kind, node->type->ty);
+		error("変数ではありません Kind:%d t_type:%d", node->kind, node->type->ty);
 
 	if (node->kind == ND_VAR_LOCAL)
 	{
@@ -250,19 +250,19 @@ static void	lval(Node *node)
 	}
 }
 
-static void	call(Node *node)
+static void	call(t_node *node)
 {
 	int		size;
 	int 	rbp_offset;
 	int		push_count = 0;
 	bool	is_aligned;
-	Node	*tmp;
+	t_node	*tmp;
 	int		i;
 	int		j;
 	int		count;
 	int		pop_count;
 
-	LVar	*lvtmp;
+	t_lvar	*lvtmp;
 	int		min_offset;
 	int		max_argregindex;
 
@@ -312,7 +312,7 @@ static void	call(Node *node)
 		return ;
 	}
 
-	LVar	*lvar_defargs;
+	t_lvar	*lvar_defargs;
 
 	for (count = 0; count < node->funccall_argcount; count++)
 	{
@@ -482,7 +482,7 @@ static void	call(Node *node)
 }
 
 // raxに入っている型fromをtoに変換する
-static void	cast(Type *from, Type *to)
+static void	cast(t_type *from, t_type *to)
 {
 	int		size1;
 	int		size2;
@@ -555,7 +555,7 @@ static void	cast(Type *from, Type *to)
 	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
-static void	arrow(Node *node, bool as_addr)
+static void	arrow(t_node *node, bool as_addr)
 {
 	int offset;
 
@@ -576,7 +576,7 @@ static void	arrow(Node *node, bool as_addr)
 		load(node->elem->type);
 }
 
-static void	mul_prologue(Node *node)
+static void	mul_prologue(t_node *node)
 {
 	gen(node->rhs);
 	push();
@@ -585,7 +585,7 @@ static void	mul_prologue(Node *node)
 }
 
 // rax, rdi
-static void	create_add(bool is_add, Type *l, Type *r)
+static void	create_add(bool is_add, t_type *l, t_type *r)
 {
 	int	size;
 
@@ -640,7 +640,7 @@ static void	create_add(bool is_add, Type *l, Type *r)
 		printf("    sub rax, rdi\n");
 }
 
-static void	relational_prologue(Node *node)
+static void	relational_prologue(t_node *node)
 {
 	gen(node->rhs);
 	push();
@@ -648,7 +648,7 @@ static void	relational_prologue(Node *node)
 	pop("rdi");
 }
 
-static void	equality_prologue(Node *node)
+static void	equality_prologue(t_node *node)
 {
 	gen(node->rhs);
 	push();
@@ -656,14 +656,14 @@ static void	equality_prologue(Node *node)
 	pop("rdi");
 }
 
-static void	assign_prologue(Node *node)
+static void	assign_prologue(t_node *node)
 {
 	debug("ASSIGN %d", node->lhs->kind);
 	load_lval_addr(node->lhs);	
 	push();
 }
 
-static void	load_lval_addr(Node *node)
+static void	load_lval_addr(t_node *node)
 {
 	if (node->kind == ND_VAR_LOCAL)
 		lval(node);
@@ -681,7 +681,7 @@ static void	load_lval_addr(Node *node)
 		error("左辺値が識別子かアドレスではありません");
 }
 
-static void	assign_epilogue(Type *type)
+static void	assign_epilogue(t_type *type)
 {
 	pop("r10");
 
@@ -700,7 +700,7 @@ static void	assign_epilogue(Type *type)
 static void	gen_deffunc(t_deffunc *node)
 {
 	char	*funcname;
-	LVar	*lvtmp;
+	t_lvar	*lvtmp;
 	int		stack_size;
 	int		maxoff;
 	int		index;
@@ -812,9 +812,9 @@ static void	gen_deffunc(t_deffunc *node)
 	g_func_now = NULL;
 }
 
-static void	print_global_constant(Node *node, Type *type)
+static void	print_global_constant(t_node *node, t_type *type)
 {
-	Node	*notmp;
+	t_node	*notmp;
 
 	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
@@ -862,19 +862,19 @@ static void gen_defglobal(t_defvar *node)
 	}
 }
 
-static void	gen(Node *node)
+static void	gen(t_node *node)
 {
-	int			lend;
-	int			lbegin;
-	int			lbegin2;
-	int			lelse;
-	SwitchCase	*cases;
+	int				lend;
+	int				lbegin;
+	int				lbegin2;
+	int				lelse;
+	t_switchcase	*cases;
 
 	//fprintf(stderr, "# kind: %d\n", node->kind);
 
 	if (!node->is_analyzed)
 	{
-		error("Node is not analyzed");
+		error("t_node is not analyzed");
 	}
 
 
@@ -931,8 +931,8 @@ static void	gen(Node *node)
 			lbegin = jumpLabelCount++;
 			lend = jumpLabelCount++;
 
-			node->block_sbdata->startlabel = lbegin;
-			node->block_sbdata->endlabel = lend;
+			node->block_sbdata->startLabel = lbegin;
+			node->block_sbdata->endLabel = lend;
 
 			printf(".Lbegin%d:\n", lbegin); // continue先
 			
@@ -959,8 +959,8 @@ static void	gen(Node *node)
 			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
 
-			node->block_sbdata->startlabel = lbegin2;
-			node->block_sbdata->endlabel = lend;
+			node->block_sbdata->startLabel = lbegin2;
+			node->block_sbdata->endLabel = lend;
 			
 			printf(".Lbegin%d:\n", lbegin);
 
@@ -983,8 +983,8 @@ static void	gen(Node *node)
 			lbegin2 = jumpLabelCount++;
 			lend = jumpLabelCount++;
 			
-			node->block_sbdata->startlabel = lbegin2;
-			node->block_sbdata->endlabel = lend;
+			node->block_sbdata->startLabel = lbegin2;
+			node->block_sbdata->endLabel = lend;
 
 			// init
 			if (node->for_expr[0] != NULL)
@@ -1023,7 +1023,7 @@ static void	gen(Node *node)
 
 			// ケースのラベルに数字を振る
 			for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
-				cases->	label = jumpLabelCount++;
+				cases->label = jumpLabelCount++;
 	
 			// 評価
 			gen(node->lhs);
@@ -1031,13 +1031,12 @@ static void	gen(Node *node)
 
 			// if
 			debug("    switch def:%d, end:%d", lbegin, lend);
-			SwitchCase	*sw_tmp;
-			for (sw_tmp = node->switch_cases; sw_tmp; sw_tmp = sw_tmp->next)
+			for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
 			{
 				printf("    mov rax, [rsp - 8]\n");
-				movi(RDI, sw_tmp->value);
+				movi(RDI, cases->value);
 				cmp(node->lhs->type, node->lhs->type);
-				printf("    je .Lswitch%d\n", sw_tmp->label);
+				printf("    je .Lswitch%d\n", cases->label);
 			}
 			// defaultかendに飛ばす
 			if (node->switch_has_default)
@@ -1048,8 +1047,8 @@ static void	gen(Node *node)
 			debug("    switch in");
 
 			// 文を出力
-			node->block_sbdata->startlabel = -1;
-			node->block_sbdata->endlabel = lend;
+			node->block_sbdata->startLabel = -1;
+			node->block_sbdata->endLabel = lend;
 			node->block_sbdata->defaultLabel = lbegin;
 			
 			gen(node->rhs);
@@ -1066,13 +1065,13 @@ static void	gen(Node *node)
 		case ND_BREAK:
 		{
 			debug("break");
-			printf("jmp .Lend%d\n", node->block_sbdata->endlabel);
+			printf("jmp .Lend%d\n", node->block_sbdata->endLabel);
 			return ;
 		}
 		case ND_CONTINUE:
 		{
 			debug("continue");
-			printf("jmp .Lbegin%d\n", node->block_sbdata->startlabel);
+			printf("jmp .Lbegin%d\n", node->block_sbdata->startLabel);
 			return ;
 		}
 		case ND_DEFAULT:

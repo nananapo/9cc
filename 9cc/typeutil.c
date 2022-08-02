@@ -5,15 +5,15 @@
 
 
 // main
-extern Token			*g_token;
+extern t_token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
-extern t_str_elem		*g_str_literals;
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
-extern LVar				*g_locals;
+extern t_str_elem		*g_str_literals[1000];
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
+extern t_lvar			*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
@@ -24,14 +24,14 @@ static int max(int a, int b)
 	return (b);
 }
 
-bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value)
+bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value)
 {
 	int	i;
 	int	j;
 
 	for (i = 0; g_enum_defs[i]; i++)
 	{
-		EnumDef	*def = g_enum_defs[i];
+		t_defenum	*def = g_enum_defs[i];
 		for (j = 0; j < def->kind_len; j++)
 		{
 			char *var = def->kinds[j];
@@ -49,31 +49,31 @@ bool	find_enum(char *str, int len, EnumDef **res_def, int *res_value)
 	return (false);
 }
 
-Type	*new_primitive_type(PrimitiveType pri)
+t_type	*new_primitive_type(t_typekind pri)
 {
-	Type	*type = calloc(1, sizeof(Type));
+	t_type	*type = calloc(1, sizeof(t_type));
 	type->ty = pri;
 	type->ptr_to = NULL;
 	return type;
 }
 
-Type	*new_type_ptr_to(Type *ptr_to)
+t_type	*new_type_ptr_to(t_type *ptr_to)
 {
-	Type	*type = new_primitive_type(TY_PTR);
+	t_type	*type = new_primitive_type(TY_PTR);
 	type->ptr_to = ptr_to;
 	return type;
 }
 
-Type	*new_type_array(Type *ptr_to)
+t_type	*new_type_array(t_type *ptr_to)
 {
-	Type	*type = new_primitive_type(TY_ARRAY);
+	t_type	*type = new_primitive_type(TY_ARRAY);
 	type->ptr_to = ptr_to;
 	return type;
 }
 
-Type	*new_enum_type(char *name, int len)
+t_type	*new_enum_type(char *name, int len)
 {
-	Type	*type;
+	t_type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_ENUM);
@@ -91,9 +91,9 @@ Type	*new_enum_type(char *name, int len)
 	return (type);
 }
 
-Type	*new_struct_type(char *name, int len)
+t_type	*new_struct_type(char *name, int len)
 {
-	Type	*type;
+	t_type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_STRUCT);
@@ -111,9 +111,9 @@ Type	*new_struct_type(char *name, int len)
 	return (type);
 }
 
-Type	*new_union_type(char *name, int len)
+t_type	*new_union_type(char *name, int len)
 {
-	Type	*type;
+	t_type	*type;
 	int		i;
 
 	type = new_primitive_type(TY_UNION);
@@ -131,8 +131,8 @@ Type	*new_union_type(char *name, int len)
 	return (type);
 }
 
-// 2つのTypeが一致するかどうか
-bool	type_equal(Type *t1, Type *t2)
+// 2つのt_typeが一致するかどうか
+bool	type_equal(t_type *t1, t_type *t2)
 {
 	if (t1->ty != t2->ty)
 	{
@@ -155,7 +155,7 @@ bool	type_equal(Type *t1, Type *t2)
 }
 
 // typeのサイズを取得する
-int	get_type_size(Type *type)
+int	get_type_size(t_type *type)
 {
 	if (type->ty == TY_INT)
 		return (4);
@@ -179,7 +179,7 @@ int	get_type_size(Type *type)
 }
 
 // 整数型かどうか判定する
-bool	is_integer_type(Type *type)
+bool	is_integer_type(t_type *type)
 {
 	return (type->ty == TY_INT
 			|| type->ty == TY_CHAR
@@ -188,14 +188,14 @@ bool	is_integer_type(Type *type)
 }
 
 // 配列かどうか確認する
-bool	is_pointer_type(Type *type)
+bool	is_pointer_type(t_type *type)
 {
 	return (type->ty == TY_ARRAY
 			|| type->ty == TY_PTR);
 }
 
 // 比較可能か調べる
-bool	can_compared(Type *l, Type *r, Type **lt, Type **rt)
+bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt)
 {
 	if (l->ty == TY_VOID || r->ty == TY_VOID)
 		return (false);
@@ -227,9 +227,9 @@ bool	can_compared(Type *l, Type *r, Type **lt, Type **rt)
 	return (false);
 }
 
-MemberElem	*struct_get_member(StructDef *strct, char *name, int len)
+t_member	*struct_get_member(t_defstruct *strct, char *name, int len)
 {
-	MemberElem	*mem;
+	t_member	*mem;
 
 	if (strct == NULL)
 		return (NULL);
@@ -242,9 +242,9 @@ MemberElem	*struct_get_member(StructDef *strct, char *name, int len)
 }
 
 // struct_get_memberのunion版
-MemberElem	*union_get_member(UnionDef *strct, char *name, int len)
+t_member	*union_get_member(t_defunion *strct, char *name, int len)
 {
-	MemberElem	*mem;
+	t_member	*mem;
 
 	if (strct == NULL)
 		return (NULL);
@@ -257,7 +257,7 @@ MemberElem	*union_get_member(UnionDef *strct, char *name, int len)
 }
 
 // structかunionの時にstruct_get_memberかunion_get_memberを呼ぶ
-MemberElem	*get_member_by_name(Type *type, char *name, int len)
+t_member	*get_member_by_name(t_type *type, char *name, int len)
 {
 	if (type->ty == TY_STRUCT)
 		return (struct_get_member(type->strct, name, len));
@@ -266,9 +266,9 @@ MemberElem	*get_member_by_name(Type *type, char *name, int len)
 	return (NULL);
 }
 
-int	max_type_size(Type *type)
+int	max_type_size(t_type *type)
 {
-	MemberElem	*tmp;
+	t_member	*tmp;
 	int			size;
 
 	if (type->ty == TY_STRUCT)
@@ -287,7 +287,7 @@ int	max_type_size(Type *type)
 	return get_type_size(type);
 }
 
-static void	typename_loop(Type *type, char *str)
+static void	typename_loop(t_type *type, char *str)
 {
 	if (type->ty == TY_INT)
 		strcat(str, "int");
@@ -321,12 +321,12 @@ static void	typename_loop(Type *type, char *str)
 
 // 宣言可能な型かを確かめる
 // Voidか確かめるだけ
-bool	is_declarable_type(Type *type)
+bool	is_declarable_type(t_type *type)
 {
 	return (type->ty != TY_VOID);
 }
 
-bool	type_can_cast(Type *from, Type *to, bool is_explicit)
+bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
 {
 	int	size1;
 	int	size2;
@@ -359,7 +359,7 @@ bool	type_can_cast(Type *from, Type *to, bool is_explicit)
 	return (true);
 }
 
-Type	*type_cast_forarg(Type *type)
+t_type	*type_cast_forarg(t_type *type)
 {
 	if (type->ty == TY_PTR)
 		return (new_type_ptr_to(type->ptr_to));
@@ -367,7 +367,7 @@ Type	*type_cast_forarg(Type *type)
 		return (type);
 }
 
-char	*get_type_name(Type *type)
+char	*get_type_name(t_type *type)
 {
 	char	*ret;
 
@@ -378,24 +378,24 @@ char	*get_type_name(Type *type)
 	return ret;
 }
 
-Type	*type_array_to_ptr(Type *type)
+t_type	*type_array_to_ptr(t_type *type)
 {
 	if (type->ty != TY_ARRAY)
 		return (type);
 	return (new_type_ptr_to(type->ptr_to));
 }
 
-bool	can_use_arrow(Type *type)
+bool	can_use_arrow(t_type *type)
 {
 	return (is_pointer_type(type) && can_use_dot(type->ptr_to));
 }
 
-bool	can_use_dot(Type *type)
+bool	can_use_dot(t_type *type)
 {
 	return (type->ty == TY_STRUCT || type->ty == TY_UNION);
 }
 
-bool	is_memory_type(Type *type)
+bool	is_memory_type(t_type *type)
 {
 	if (type->ty != TY_STRUCT)
 		return (false);

@@ -2,26 +2,26 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static Stack	*create_stack(void *data)
+static t_stack	*create_stack(void *data)
 {
-	Stack	*stack;
+	t_stack	*stack;
 
-	stack = (Stack *)malloc(sizeof(Stack));
+	stack = (t_stack *)malloc(sizeof(t_stack));
 	stack->data = data;
 	stack->prev = NULL;
 	return (stack);
 }
 
-void	stack_push(Stack **stack, void *data)
+void	stack_push(t_stack **stack, void *data)
 {
-	Stack	*tmp;
+	t_stack	*tmp;
 
 	tmp = create_stack(data);
 	tmp->prev = *stack;
 	*stack = tmp;
 }
 
-void	*stack_pop(Stack **stack)
+void	*stack_pop(t_stack **stack)
 {
 	void	*tmp;
 
@@ -36,7 +36,7 @@ void	*stack_pop(Stack **stack)
 	return (tmp);
 }
 
-void	*stack_peek(Stack *stack)
+void	*stack_peek(t_stack *stack)
 {
 	if (stack != NULL)
 		return (stack->data);

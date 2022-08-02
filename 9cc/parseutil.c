@@ -2,20 +2,20 @@
 #include <string.h>
 #include <stdbool.h>
 
-Node	*read_struct_block(Token *ident);
-Node	*read_enum_block(Token *ident);
-Node	*read_union_block(Token *ident);
+t_node	*read_struct_block(t_token *ident);
+t_node	*read_enum_block(t_token *ident);
+t_node	*read_union_block(t_token *ident);
 
 // main
-extern Token			*g_token;
+extern t_token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals;
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
-extern LVar				*g_locals;
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum			*g_enum_defs[1000];
+extern t_defunion			*g_union_defs[1000];
+extern t_lvar				*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
@@ -38,7 +38,7 @@ bool consume_number(int *result)
 	return true;	
 }
 
-bool	consume_with_type(TokenKind kind)
+bool	consume_with_type(t_tokenkind kind)
 {
 	if (g_token->kind != kind)
 		return false;
@@ -46,9 +46,9 @@ bool	consume_with_type(TokenKind kind)
 	return true;
 }
 
-Token	*consume_ident(void)
+t_token	*consume_ident(void)
 {
-	Token	*ret;
+	t_token	*ret;
 	if (g_token->kind != TK_IDENT)
 		return NULL;
 	ret = g_token;
@@ -56,9 +56,9 @@ Token	*consume_ident(void)
 	return ret;
 }
 
-Token	*consume_ident_str(char *p)
+t_token	*consume_ident_str(char *p)
 {
-	Token	*ret;
+	t_token	*ret;
 	if (g_token->kind != TK_IDENT)
 		return NULL;
 	if (strncmp(p, g_token->str, strlen(p)) != 0)
@@ -68,9 +68,9 @@ Token	*consume_ident_str(char *p)
 	return ret;
 }
 
-Token	*consume_str_literal(void)
+t_token	*consume_str_literal(void)
 {
-	Token	*ret;
+	t_token	*ret;
 	if (g_token->kind != TK_STR_LITERAL)
 		return NULL;
 	ret = g_token;
@@ -78,9 +78,9 @@ Token	*consume_str_literal(void)
 	return ret;
 }
 
-Token	*consume_char_literal(void)
+t_token	*consume_char_literal(void)
 {
-	Token	*ret;
+	t_token	*ret;
 	if (g_token->kind != TK_CHAR_LITERAL)
 		return NULL;
 	ret = g_token;
@@ -88,9 +88,9 @@ Token	*consume_char_literal(void)
 	return ret;
 }
 
-void	consume_type_ptr(Type **type)
+void	consume_type_ptr(t_type **type)
 {
-	Type	*tmp;
+	t_type	*tmp;
 
 	while (consume("*"))
 	{
@@ -100,9 +100,9 @@ void	consume_type_ptr(Type **type)
 	}
 }
 
-static bool	consume_type_alias(Type **type)
+static bool	consume_type_alias(t_type **type)
 {
-	TypedefPair	*pair;
+	t_typedefpair	*pair;
 
 	if (g_token->kind != TK_IDENT)
 		return (false);
@@ -116,19 +116,19 @@ static bool	consume_type_alias(Type **type)
 
 // 型宣言の前部分 (type ident arrayのtype部分)を読む
 // read_def	: structの宣言を読むかどうか
-Type	*consume_type_before(bool read_def)
+t_type	*consume_type_before(bool read_def)
 {
-	Type	*type;
-	Token	*ident;
+	t_type	*type;
+	t_token	*ident;
 
 	// type name
-	if (consume_ident_str("int"))
+	if (consume_with_type(TK_INT))
 		type = new_primitive_type(TY_INT);
-	else if (consume_ident_str("char"))
+	else if (consume_with_type(TK_CHAR))
 		type = new_primitive_type(TY_CHAR);
-	else if (consume_ident_str("_Bool"))
+	else if (consume_with_type(TK__BOOL))
 		type = new_primitive_type(TY_BOOL);
-	else if (consume_ident_str("void"))
+	else if (consume_with_type(TK_VOID))
 		type = new_primitive_type(TY_VOID);
 	else if (consume_with_type(TK_STRUCT))
 	{
@@ -177,7 +177,7 @@ Type	*consume_type_before(bool read_def)
 }
 
 // 型宣言のarray部分を読む
-void	expect_type_after(Type **type)// expect size
+void	expect_type_after(t_type **type)// expect size
 {
 	int		size;
 
@@ -193,10 +193,10 @@ void	expect_type_after(Type **type)// expect size
 	return;
 }
 
-bool	consume_enum_key(Type **type, int *value)
+bool	consume_enum_key(t_type **type, int *value)
 {
-	Token	*tok;
-	EnumDef	*res_def;
+	t_token	*tok;
+	t_defenum	*res_def;
 
 	if (g_token->kind != TK_IDENT)
 		return (false);

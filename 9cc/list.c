@@ -6,10 +6,10 @@
 
 static int	cmp(void *a, void *t)
 {
-	TypedefPair	*pair;
-	char		*target;
+	t_typedefpair	*pair;
+	char			*target;
 
-	pair = (TypedefPair *)a;
+	pair = (t_typedefpair *)a;
 	target = (char *)t;
 	if (pair->name_len != (int)strlen(target))
 		return (-1);

@@ -7,20 +7,20 @@
 #include <stdlib.h>
 
 // main
-extern Token			*g_token;
+extern t_token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals;
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
-LVar	*find_lvar(t_deffunc *func, char *str, int len)
+t_lvar	*find_lvar(t_deffunc *func, char *str, int len)
 {
-	LVar	*var;
+	t_lvar	*var;
 
 	for (var = func->locals; var; var = var->next)
 		if (!var->is_dummy && var->name_len == len
@@ -42,22 +42,22 @@ t_defvar	*find_global(char *str, int len)
 	return NULL;
 }
 
-LVar	*copy_lvar(LVar *f)
+t_lvar	*copy_lvar(t_lvar *f)
 {
-	LVar	*lvar;
+	t_lvar	*lvar;
 
-	lvar = calloc(1, sizeof(LVar));
+	lvar = calloc(1, sizeof(t_lvar));
 	*lvar = *f;
 	return (lvar);
 }
 
-void	alloc_argument_simu(LVar *first, LVar *lvar)
+void	alloc_argument_simu(t_lvar *first, t_lvar *lvar)
 {
 	int		size;
 	int		regindex_max;
 	int		offset_min;
 	int		offset_max;
-	LVar	*tmp;
+	t_lvar	*tmp;
 
 	regindex_max = -1;
 	// rbpをプッシュした分を考慮する
@@ -95,16 +95,16 @@ void	alloc_argument_simu(LVar *first, LVar *lvar)
 
 
 // TODO サイズ0はどうなるか確かめる
-static void	alloc_argument(t_deffunc *func, LVar *lvar)
+static void	alloc_argument(t_deffunc *func, t_lvar *lvar)
 {
 	alloc_argument_simu(func->locals, lvar);
 }
 
-static void alloc_local_var(t_deffunc *func, LVar *lvar)
+static void alloc_local_var(t_deffunc *func, t_lvar *lvar)
 {
 	int		size;
 	int 	offset_max;
-	LVar	*tmp;
+	t_lvar	*tmp;
 
 	// 引数のオフセットの正の最大値を求める
 	offset_max = 0;
@@ -129,12 +129,12 @@ static void alloc_local_var(t_deffunc *func, LVar *lvar)
 }
 
 // TODO 同じ名前の変数がないかチェックする
-LVar	*create_lvar(t_deffunc *func, char *name, int name_len, Type *type, bool is_arg)
+t_lvar	*create_lvar(t_deffunc *func, char *name, int name_len, t_type *type, bool is_arg)
 {
-	LVar	*lvar;
-	LVar	*tmp;
+	t_lvar	*lvar;
+	t_lvar	*tmp;
 
-	lvar				= calloc(1, sizeof(LVar));
+	lvar				= calloc(1, sizeof(t_lvar));
 	lvar->name			= name;
 	lvar->name_len		= name_len;
 	lvar->type			= type;

@@ -18,9 +18,9 @@ static char *operators[42] = {
 	""
 };
 
-static Token *new_token(TokenKind kind, Token *last, char *str, int len)
+static t_token *new_token(t_tokenkind kind, t_token *last, char *str, int len)
 {
-	Token *tok = calloc(1, sizeof(Token));
+	t_token *tok = calloc(1, sizeof(t_token));
 	tok->kind = kind;
 	tok->str = str;
 	tok->len = len;
@@ -55,7 +55,7 @@ static bool	skipspace(char **str)
 	return (false);
 }
 
-static int	match_operators(char **str, Token **last)
+static int	match_operators(char **str, t_token **last)
 {
 	int	i;
 	int	len;
@@ -70,7 +70,7 @@ static int	match_operators(char **str, Token **last)
 	return 0;
 }
 
-static int	match_word(char **str, Token **last, char *needle, TokenKind kind)
+static int	match_word(char **str, t_token **last, char *needle, t_tokenkind kind)
 {
 	int		len;
 
@@ -85,7 +85,7 @@ static int	match_word(char **str, Token **last, char *needle, TokenKind kind)
 	return len;
 }
 
-static bool	match_var_name(char **str, Token **last)
+static bool	match_var_name(char **str, t_token **last)
 {
 	if (!can_use_beginning_of_var(**str))
 		return (false);
@@ -94,7 +94,7 @@ static bool	match_var_name(char **str, Token **last)
 	return (true);
 }
 
-static bool	match_number(char **str, Token **last)
+static bool	match_number(char **str, t_token **last)
 {
 	if (!isdigit(**str))
 		return (false);
@@ -103,7 +103,7 @@ static bool	match_number(char **str, Token **last)
 	return (true);
 }
 
-static bool	match_strlit(char **str, Token **last)
+static bool	match_strlit(char **str, t_token **last)
 {
 	if (**str != '"')
 		return (false);
@@ -131,7 +131,7 @@ static bool	match_strlit(char **str, Token **last)
 	return (true);
 }
 
-static bool	match_charlit(char **str, Token **last)
+static bool	match_charlit(char **str, t_token **last)
 {
 	if (**str != '\'')
 		return (false);
@@ -154,10 +154,10 @@ static bool	match_charlit(char **str, Token **last)
 	return (true);
 }
 
-Token	*tokenize(char *p)
+t_token	*tokenize(char *p)
 {
-	Token	head;
-	Token	*last;
+	t_token	head;
+	t_token	*last;
 
 	last = &head;
 	while (*p)
@@ -174,6 +174,10 @@ Token	*tokenize(char *p)
 		if (match_word(&p, &last, "switch",	TK_SWITCH))		continue ;
 		if (match_word(&p, &last, "sizeof",	TK_SIZEOF))		continue ;
 		if (match_word(&p, &last, "struct",	TK_STRUCT))		continue ;
+		if (match_word(&p, &last, "int",	TK_INT))		continue ;
+		if (match_word(&p, &last, "char",	TK_CHAR))		continue ;
+		if (match_word(&p, &last, "_Bool",	TK__BOOL))		continue ;
+		if (match_word(&p, &last, "void",	TK_VOID))		continue ;
 		if (match_word(&p, &last, "union",	TK_UNION))		continue ;
 		if (match_word(&p, &last, "enum",	TK_ENUM))		continue ;
 		if (match_word(&p, &last, "case",	TK_CASE))		continue ;
@@ -191,7 +195,7 @@ Token	*tokenize(char *p)
 		if (match_strlit(&p, &last))						continue ;
 		if (match_charlit(&p, &last))						continue ;
 
-		error_at(p, "failed to Tokenize");
+		error_at(p, "failed to t_tokenize");
 	}
 	
 	new_token(TK_EOF, last, p, 0);

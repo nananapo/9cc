@@ -2,6 +2,7 @@
 #include "parse.h"
 #include "charutil.h"
 #include "stack.h"
+#include "mymath.h"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -11,62 +12,56 @@
 #include <stdbool.h>
 
 t_deffunc	*get_function_by_name(char *name, int len);
-Node		*new_node(NodeKind kind, Node *lhs, Node *rhs);
-Node		*new_node_num(int val);
-bool		consume_enum_key(Type **type, int *value);
+t_node		*new_node(t_nodekind kind, t_node *lhs, t_node *rhs);
+t_node		*new_node_num(int val);
+bool		consume_enum_key(t_type **type, int *value);
 t_str_elem	*get_str_literal(char *str, int len);
 
-Node	 	*cast(Node *node, Type *to);
-static Node	*call(Token *tok);
-static Node	*read_suffix_increment(Node *node);
-static Node	*read_deref_index(Node *node);
-static Node	*primary(void);
-static Node	*arrow_loop(Node *node);
-static Node	*arrow(void);
-static Node	*unary(void);
-static Node	*mul(void);
-static Node	*add(void);
-static Node	*shift(void);
-static Node	*relational(void);
-static Node	*equality(void);
-static Node	*bitwise_and(void);
-static Node	*bitwise_or(void);
-static Node	*bitwise_xor(void);
-static Node	*conditional_and(void);
-static Node	*conditional_or(void);
-static Node	*conditional_op(void);
-static Node	*assign(void);
-static Node	*expr(void);
-static Node	*read_ifblock(void);
-static Node	*stmt(void);
-static Node	*expect_constant(Type *type);
-static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static);
-Type		*read_struct_block(Token *ident);
-Type		*read_enum_block(Token *ident);
-Type		*read_union_block(Token *ident);
-static void	funcdef(Type *type, Token *ident, bool is_static);
+t_node	 	*cast(t_node *node, t_type *to);
+static t_node	*call(t_token *tok);
+static t_node	*read_suffix_increment(t_node *node);
+static t_node	*read_deref_index(t_node *node);
+static t_node	*primary(void);
+static t_node	*arrow_loop(t_node *node);
+static t_node	*arrow(void);
+static t_node	*unary(void);
+static t_node	*mul(void);
+static t_node	*add(void);
+static t_node	*shift(void);
+static t_node	*relational(void);
+static t_node	*equality(void);
+static t_node	*bitwise_and(void);
+static t_node	*bitwise_or(void);
+static t_node	*bitwise_xor(void);
+static t_node	*conditional_and(void);
+static t_node	*conditional_or(void);
+static t_node	*conditional_op(void);
+static t_node	*assign(void);
+static t_node	*expr(void);
+static t_node	*read_ifblock(void);
+static t_node	*stmt(void);
+static t_node	*expect_constant(t_type *type);
+static void	global_var(t_type *type, t_token *ident, bool is_extern, bool is_static);
+t_type		*read_struct_block(t_token *ident);
+t_type		*read_enum_block(t_token *ident);
+t_type		*read_union_block(t_token *ident);
+static void	funcdef(t_type *type, t_token *ident, bool is_static);
 static void	read_typedef(void);
 static void	filescope(void);
 void		parse(void);
 
 // main
-extern Token			*g_token;
+extern t_token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
+extern t_lvar			*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
-
-static int max(int a, int b)
-{
-	if (a < b)
-		return (b);
-	return (a);
-}
 
 t_deffunc	*get_function_by_name(char *name, int len)
 {
@@ -93,20 +88,20 @@ t_deffunc	*get_function_by_name(char *name, int len)
 	return NULL;
 }
 
-Node	*new_node(NodeKind kind, Node *lhs, Node *rhs)
+t_node	*new_node(t_nodekind kind, t_node *lhs, t_node *rhs)
 {
-	Node *node;
+	t_node *node;
 
-	node = calloc(1, sizeof(Node));
+	node = calloc(1, sizeof(t_node));
 	node->kind = kind;
 	node->lhs = lhs;
 	node->rhs = rhs;
 	return node;
 }
 
-Node	*new_node_num(int val)
+t_node	*new_node_num(int val)
 {
-	Node *node;
+	t_node *node;
 
 	node = new_node(ND_NUM, NULL, NULL);
 	node->val = val;
@@ -140,7 +135,7 @@ t_str_elem	*get_str_literal(char *str, int len)
 }
 
 // TODO analyze用と分けて、analyze版はanalyze_nodeをしてしまう
-Node	*cast(Node *node, Type *to)
+t_node	*cast(t_node *node, t_type *to)
 {
 	node = new_node(ND_CAST, node, NULL);
 	node->type = to;
@@ -148,9 +143,9 @@ Node	*cast(Node *node, Type *to)
 	return (node);
 }
 
-static Node *call(Token *tok)
+static t_node *call(t_token *tok)
 {
-	Node		*node;
+	t_node		*node;
 
 	debug("CALL %s", strndup(tok->str, tok->len));
 
@@ -178,7 +173,7 @@ static Node *call(Token *tok)
 }
 
 // 後置インクリメント, デクリメント
-static Node	*read_suffix_increment(Node *node)
+static t_node	*read_suffix_increment(t_node *node)
 {
 	char	*source;
 
@@ -204,7 +199,7 @@ static Node	*read_suffix_increment(Node *node)
 
 // 添字によるDEREF
 // TODO エラーメッセージが足し算用になってしまう
-static Node	*read_deref_index(Node *node)
+static t_node	*read_deref_index(t_node *node)
 {
 	char	*source;
 
@@ -225,11 +220,11 @@ static Node	*read_deref_index(Node *node)
 	return (read_suffix_increment(node));
 }
 
-static Node *primary(void)
+static t_node *primary(void)
 {
-	Token	*tok;
-	Node	*node;
-	Type	*type_cast;
+	t_token	*tok;
+	t_node	*node;
+	t_type	*type_cast;
 	int 	number;
 
 	// 括弧
@@ -254,7 +249,7 @@ static Node *primary(void)
 	}
 
 	// enumの値
-	Type	*enum_type;
+	t_type	*enum_type;
 	int		enum_value;
 
 	if (consume_enum_key(&enum_type, &enum_value))
@@ -302,7 +297,7 @@ static Node *primary(void)
 			error_at(tok->str, "不明なエスケープシーケンスです (primary)");
 		node = new_node_num(number);
 		node->type = new_primitive_type(TY_CHAR);
-		return read_deref_index(node); // charの後ろに[]はおかしいけれど、とりあえず許容
+		return read_deref_index(node);
 	}
 
 	// 数
@@ -314,9 +309,9 @@ static Node *primary(void)
 }
 
 
-static Node	*arrow_loop(Node *node)
+static t_node	*arrow_loop(t_node *node)
 {
-	Token		*ident;
+	t_token		*ident;
 	char		*source;
 
 	source = g_token->str;
@@ -351,18 +346,18 @@ static Node	*arrow_loop(Node *node)
 		return (node);
 }
 
-static Node	*arrow(void)
+static t_node	*arrow(void)
 {
-	Node	*node;
+	t_node	*node;
 
 	node = primary();
 	return (arrow_loop(node));
 }
 
-static Node *unary(void)
+static t_node *unary(void)
 {
-	Node	*node;
-	Type	*type;
+	t_node	*node;
+	t_type	*type;
 	char	*source;
 
 	source = g_token->str;
@@ -435,9 +430,9 @@ static Node *unary(void)
 	return arrow();
 }
 
-static Node *mul(void)
+static t_node *mul(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = unary();
@@ -457,9 +452,9 @@ static Node *mul(void)
 	}
 }
 
-static Node	*add(void)
+static t_node	*add(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = mul();
@@ -478,9 +473,9 @@ static Node	*add(void)
 	}
 }
 
-static Node	*shift(void)
+static t_node	*shift(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = add();
@@ -498,9 +493,9 @@ static Node	*shift(void)
 	return (node);
 }
 
-static Node	*relational(void)
+static t_node	*relational(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = shift();
@@ -523,9 +518,9 @@ static Node	*relational(void)
 	}
 }
 
-static Node *equality(void)
+static t_node *equality(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = relational();
@@ -544,9 +539,9 @@ static Node *equality(void)
 	}
 }
 
-static Node	*bitwise_and(void)
+static t_node	*bitwise_and(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = equality();
@@ -560,9 +555,9 @@ static Node	*bitwise_and(void)
 }
 
 
-static Node	*bitwise_xor(void)
+static t_node	*bitwise_xor(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = bitwise_and();
@@ -575,9 +570,9 @@ static Node	*bitwise_xor(void)
 	return (node);
 }
 
-static Node	*bitwise_or(void)
+static t_node	*bitwise_or(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = bitwise_xor();
@@ -590,9 +585,9 @@ static Node	*bitwise_or(void)
 	return (node);
 }
 
-static Node	*conditional_and(void)
+static t_node	*conditional_and(void)
 {
-	Node	*node;
+	t_node	*node;
 
 	node = bitwise_or();
 	if (consume("&&"))
@@ -600,9 +595,9 @@ static Node	*conditional_and(void)
 	return (node);
 }
 
-static Node	*conditional_or(void)
+static t_node	*conditional_or(void)
 {
-	Node	*node;
+	t_node	*node;
 
 	node = conditional_and();
 	if (consume("||"))
@@ -610,9 +605,9 @@ static Node	*conditional_or(void)
 	return (node);
 }
 
-static Node	*conditional_op(void)
+static t_node	*conditional_op(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	source = g_token->str;
@@ -630,9 +625,9 @@ static Node	*conditional_op(void)
 	return (node);
 }
 
-static Node	*assign(void)
+static t_node	*assign(void)
 {
-	Node	*node;
+	t_node	*node;
 	char	*source;
 
 	node = conditional_op();
@@ -671,15 +666,15 @@ static Node	*assign(void)
 	return (node);
 }
 
-static Node	*expr(void)
+static t_node	*expr(void)
 {
 	return assign();
 }
 
 // ifの後ろの括弧から読む
-static Node	*read_ifblock(void)
+static t_node	*read_ifblock(void)
 {
-	Node	*node;
+	t_node	*node;
 
 	debug("  IF START");
 
@@ -707,13 +702,13 @@ static Node	*read_ifblock(void)
 }
 
 // TODO 条件の中身がintegerか確認する
-static Node	*stmt(void)
+static t_node	*stmt(void)
 {
-	Node	*node;
-	Type	*type;
-	Token 	*ident;
+	t_node	*node;
+	t_type	*type;
+	t_token *ident;
 	int		number;
-	Node	*start;
+	t_node	*start;
 	char	*source;
 
 	source = g_token->str;
@@ -973,12 +968,12 @@ static Node	*stmt(void)
 	return node;
 }
 
-static Node	*expect_constant(Type *type)
+static t_node	*expect_constant(t_type *type)
 {
-	Node	*node;
-	Node	**next;
+	t_node	*node;
+	t_node	**next;
 	int		number;
-	Token	*tok;
+	t_token	*tok;
 
 	if (is_integer_type(type) && consume_number(&number))
 	{
@@ -1020,7 +1015,7 @@ static Node	*expect_constant(Type *type)
 	return (node);
 }
 
-static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static)
+static void	global_var(t_type *type, t_token *ident, bool is_extern, bool is_static)
 {
 	int			i;
 	t_defvar	*defvar;
@@ -1059,16 +1054,16 @@ static void	global_var(Type *type, Token *ident, bool is_extern, bool is_static)
 }
 
 // {以降を読む
-Type	*read_struct_block(Token *ident)
+t_type	*read_struct_block(t_token *ident)
 {
-	Type		*type;
-	StructDef	*def;
-	MemberElem	*tmp;
+	t_type		*type;
+	t_defstruct	*def;
+	t_member	*tmp;
 	int			typesize;
 	int			maxsize;
 	int			i;
 
-	def = calloc(1, sizeof(StructDef));
+	def = calloc(1, sizeof(t_defstruct));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->mem_size = -1;
@@ -1096,7 +1091,7 @@ Type	*read_struct_block(Token *ident)
 
 		expect_semicolon();
 
-		tmp = calloc(1, sizeof(MemberElem));
+		tmp = calloc(1, sizeof(t_member));
 		tmp->name = ident->str;
 		tmp->name_len = ident->len;
 		tmp->type = type;
@@ -1155,13 +1150,13 @@ Type	*read_struct_block(Token *ident)
 }
 
 // {以降を読む
-Type	*read_enum_block(Token *ident)
+t_type	*read_enum_block(t_token *ident)
 {
-	int		i;
-	EnumDef	*def;
-	Type	*type;
+	int			i;
+	t_defenum	*def;
+	t_type		*type;
 
-	def = calloc(1, sizeof(EnumDef));
+	def = calloc(1, sizeof(t_defenum));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->kind_len = 0;
@@ -1195,15 +1190,15 @@ Type	*read_enum_block(Token *ident)
 }
 
 // {以降を読む
-Type	*read_union_block(Token *ident)
+t_type	*read_union_block(t_token *ident)
 {
-	UnionDef	*def;
-	MemberElem	*tmp;
-	Type		*type;
+	t_defunion	*def;
+	t_member	*tmp;
+	t_type		*type;
 	int			i;
 	int			typesize;
 
-	def = calloc(1, sizeof(UnionDef));
+	def = calloc(1, sizeof(t_defunion));
 	def->name = ident->str;
 	def->name_len = ident->len;
 	def->mem_size = 0;
@@ -1232,7 +1227,7 @@ Type	*read_union_block(Token *ident)
 
 		expect_semicolon();
 
-		tmp = calloc(1, sizeof(MemberElem));
+		tmp = calloc(1, sizeof(t_member));
 		tmp->name = ident->str;
 		tmp->name_len = ident->len;
 		tmp->type = type;
@@ -1258,10 +1253,10 @@ Type	*read_union_block(Token *ident)
 // TODO ブロックを抜けたらlocalsを戻す
 // TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
-static void	funcdef(Type *type, Token *ident, bool is_static)
+static void	funcdef(t_type *type, t_token *ident, bool is_static)
 {
 	t_deffunc	*def;
-	Token		*arg;
+	t_token		*arg;
 	int			i;
 
 	def							= calloc(1, sizeof(t_deffunc));
@@ -1349,9 +1344,9 @@ static void	funcdef(Type *type, Token *ident, bool is_static)
 
 static void	read_typedef(void)
 {
-	Type		*type;
-	Token		*token;
-	TypedefPair	*pair;
+	t_type		*type;
+	t_token		*token;
+	t_typedefpair	*pair;
 
 	// 型を読む
 	type = consume_type_before(true);
@@ -1365,7 +1360,7 @@ static void	read_typedef(void)
 		error_at(g_token->str, "識別子が必要です");
 
 	// ペアを追加
-	pair = malloc(sizeof(TypedefPair));
+	pair = malloc(sizeof(t_typedefpair));
 	pair->name = token->str;
 	pair->name_len = token->len;
 	pair->type = type;
@@ -1376,8 +1371,8 @@ static void	read_typedef(void)
 
 static void	filescope(void)
 {
-	Token	*ident;
-	Type	*type;
+	t_token	*ident;
+	t_type	*type;
 	bool	is_static;
 	bool	is_inline;
 

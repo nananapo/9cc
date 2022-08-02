@@ -4,43 +4,43 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-Node		*new_node(NodeKind kind, Node *lhs, Node *rhs);
+t_node		*new_node(t_nodekind kind, t_node *lhs, t_node *rhs);
 
-LVar		*create_lvar(t_deffunc *func, char *name, int name_len, Type *type, bool is_arg);
-LVar		*copy_lvar(LVar *f);
-Type		*type_cast_forarg(Type *type);
-void		alloc_argument_simu(LVar *first, LVar *lvar);
+t_lvar		*create_lvar(t_deffunc *func, char *name, int name_len, t_type *type, bool is_arg);
+t_lvar		*copy_lvar(t_lvar *f);
+t_type		*type_cast_forarg(t_type *type);
+void		alloc_argument_simu(t_lvar *first, t_lvar *lvar);
 
-Node		 *cast(Node *node, Type *to);
+t_node		*cast(t_node *node, t_type *to);
 
-static Node *analyze_var_def(Node *node);
-static Node *analyze_var(Node *node);
-static Node	*analyze_deref(Node *node);
-static Node	*analyze_addr(Node *node);
-static Node	*analyze_member_value(Node *node);
-static Node	*analyze_member_value_ptr(Node *node);
-static Node	*analyze_call(Node *node);
-static Node	*analyze_bitwise_not(Node *node);
-static Node	*analyze_mul(Node *node);
-static Node	*analyze_add(Node *node);
-static Node *analyze_shift(Node *node);
-static Node	*analyze_relational(Node *node);
-static Node	*analyze_equality(Node *node);
-static Node	*analyze_bitwise_and(Node *node);
-static Node	*analyze_bitwise_xor(Node *node);
-static Node	*analyze_bitwise_or(Node *node);
-static Node	*analyze_conditional_op(Node *node);
-static Node	*analyze_assign(Node *node);
-static Node	*analyze_if(Node *node);
-static Node	*analyze_dowhile(Node *node);
-static Node	*analyze_while(Node *node);
-static Node	*analyze_for(Node *node);
-static Node	*analyze_switch(Node *node);
-static Node	*analyze_case(Node *node);
-static Node	*analyze_break(Node *node);
-static Node	*analyze_continue(Node *node);
-static Node	*analyze_default(Node *node);
-static Node	*analyze_node(Node *node);
+static t_node	*analyze_var_def(t_node *node);
+static t_node	*analyze_var(t_node *node);
+static t_node	*analyze_deref(t_node *node);
+static t_node	*analyze_addr(t_node *node);
+static t_node	*analyze_member_value(t_node *node);
+static t_node	*analyze_member_value_ptr(t_node *node);
+static t_node	*analyze_call(t_node *node);
+static t_node	*analyze_bitwise_not(t_node *node);
+static t_node	*analyze_mul(t_node *node);
+static t_node	*analyze_add(t_node *node);
+static t_node	*analyze_shift(t_node *node);
+static t_node	*analyze_relational(t_node *node);
+static t_node	*analyze_equality(t_node *node);
+static t_node	*analyze_bitwise_and(t_node *node);
+static t_node	*analyze_bitwise_xor(t_node *node);
+static t_node	*analyze_bitwise_or(t_node *node);
+static t_node	*analyze_conditional_op(t_node *node);
+static t_node	*analyze_assign(t_node *node);
+static t_node	*analyze_if(t_node *node);
+static t_node	*analyze_dowhile(t_node *node);
+static t_node	*analyze_while(t_node *node);
+static t_node	*analyze_for(t_node *node);
+static t_node	*analyze_switch(t_node *node);
+static t_node	*analyze_case(t_node *node);
+static t_node	*analyze_break(t_node *node);
+static t_node	*analyze_continue(t_node *node);
+static t_node	*analyze_default(t_node *node);
+static t_node	*analyze_node(t_node *node);
 
 
 // main
@@ -49,30 +49,30 @@ extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern StructDef		*g_struct_defs[1000];
-extern EnumDef			*g_enum_defs[1000];
-extern UnionDef			*g_union_defs[1000];
+extern t_defstruct		*g_struct_defs[1000];
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
-Stack	*sbstack;
 
-static SBData		*sbdata_new(bool isswitch, int start, int end);
-static SBData		*sb_forwhile_start(int startlabel, int endlabel);
-static SBData		*sb_switch_start(Type *type, int endlabel, int defaultLabel);
-static SBData		*sb_end(void);
-static SBData		*sb_peek(void);
-static SBData		*sb_search(bool	isswitch);
-static SwitchCase	*add_switchcase(SBData *sbdata, int number);
+static t_stack		*sbstack;
+static t_labelstack	*sbdata_new(bool isswitch, int start, int end);
+static t_labelstack	*sb_forwhile_start(int startlabel, int endlabel);
+static t_labelstack	*sb_switch_start(t_type *type, int endlabel, int defaultLabel);
+static t_labelstack	*sb_end(void);
+static t_labelstack	*sb_peek(void);
+static t_labelstack	*sb_search(bool	isswitch);
+static t_switchcase	*add_switchcase(t_labelstack *sbdata, int number);
 
-static SBData	*sbdata_new(bool isswitch, int start, int end)
+static t_labelstack	*sbdata_new(bool isswitch, int start, int end)
 {
-	SBData	*tmp;
+	t_labelstack	*tmp;
 
-	tmp = (SBData *)calloc(1, sizeof(SBData));
+	tmp = (t_labelstack *)calloc(1, sizeof(t_labelstack));
 	tmp->isswitch = isswitch;
-	tmp->startlabel = start;
-	tmp->endlabel = end;
+	tmp->startLabel = start;
+	tmp->endLabel = end;
 
 	tmp->type = NULL;
 	tmp->cases = NULL;
@@ -80,18 +80,18 @@ static SBData	*sbdata_new(bool isswitch, int start, int end)
 	return (tmp);
 }
 
-static SBData	*sb_forwhile_start(int startlabel, int endlabel)
+static t_labelstack	*sb_forwhile_start(int startlabel, int endlabel)
 {
-	SBData	*tmp;
+	t_labelstack	*tmp;
 
 	tmp = sbdata_new(false, startlabel, endlabel);
 	stack_push(&sbstack, tmp);
 	return (tmp);
 }
 
-static SBData	*sb_switch_start(Type *type, int endlabel, int defaultLabel)
+static t_labelstack	*sb_switch_start(t_type *type, int endlabel, int defaultLabel)
 {
-	SBData	*tmp;
+	t_labelstack	*tmp;
 
 	tmp = sbdata_new(true, -1, endlabel);
 	tmp->type = type;
@@ -101,40 +101,38 @@ static SBData	*sb_switch_start(Type *type, int endlabel, int defaultLabel)
 }
 
 
-static SBData	*sb_end(void)
+static t_labelstack	*sb_end(void)
 {
-	SBData	*result;
+	t_labelstack	*result;
 
 	result = stack_pop(&sbstack);
 	return (result);
 }
 
-static SBData	*sb_peek(void)
+static t_labelstack	*sb_peek(void)
 {
-	return (SBData *)stack_peek(sbstack);
+	return (t_labelstack *)stack_peek(sbstack);
 }
 
-static SBData	*sb_search(bool	isswitch)
+static t_labelstack	*sb_search(bool	isswitch)
 {
-	Stack	*tmp;
-	SBData	*data;
+	t_stack			*tmp;
+	t_labelstack	*data;
 
-	tmp = sbstack;
-	while (tmp != NULL)
+	for (tmp = sbstack; tmp != NULL; tmp = tmp->prev)
 	{
-		data = (SBData *)tmp->data;
+		data = (t_labelstack *)tmp->data;
 		if (data->isswitch == isswitch)
 			return (data);
-		tmp = tmp->prev;
 	}
 	return (NULL);
 }
 
-static SwitchCase	*add_switchcase(SBData *sbdata, int number)
+static t_switchcase	*add_switchcase(t_labelstack *sbdata, int number)
 {
-	SwitchCase	*tmp;
+	t_switchcase	*tmp;
 
-	tmp = (SwitchCase *)malloc(sizeof(SwitchCase));
+	tmp = (t_switchcase *)malloc(sizeof(t_switchcase));
 	tmp->value = number;
 	tmp->label = 0;
 	tmp->next = sbdata->cases;
@@ -148,9 +146,9 @@ static SwitchCase	*add_switchcase(SBData *sbdata, int number)
 
 
 
-static Node *analyze_var_def(Node *node)
+static t_node *analyze_var_def(t_node *node)
 {
-	LVar	*lvar;
+	t_lvar	*lvar;
 	char	*source;
 
 	if (!is_declarable_type(node->type))
@@ -175,11 +173,11 @@ static Node *analyze_var_def(Node *node)
 	return (node);
 }
 
-static Node *analyze_var(Node *node)
+static t_node *analyze_var(t_node *node)
 {
-	LVar		*lvar;
+	t_lvar		*lvar;
 	t_defvar	*defvar;
-	Node		*assign;
+	t_node		*assign;
 
 	lvar = find_lvar(g_func_now, node->analyze_var_name, node->analyze_var_name_len);
 	if (lvar != NULL)
@@ -215,7 +213,7 @@ static Node *analyze_var(Node *node)
 }
 
 // *lhs
-static Node	*analyze_deref(Node *node)
+static t_node	*analyze_deref(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 
@@ -227,7 +225,7 @@ static Node	*analyze_deref(Node *node)
 }
 
 // &lhs
-static Node	*analyze_addr(Node *node)
+static t_node	*analyze_addr(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 
@@ -243,9 +241,9 @@ static Node	*analyze_addr(Node *node)
 	return (node);
 }
 
-static Node	*analyze_member_value_ptr(Node *node)
+static t_node	*analyze_member_value_ptr(t_node *node)
 {
-	MemberElem	*elem;
+	t_member	*elem;
 
 	node->lhs = analyze_node(node->lhs);
 	if (!can_use_arrow(node->lhs->type))
@@ -263,9 +261,9 @@ static Node	*analyze_member_value_ptr(Node *node)
 	return (node);
 }
 
-static Node	*analyze_member_value(Node *node)
+static t_node	*analyze_member_value(t_node *node)
 {
-	MemberElem	*elem;
+	t_member	*elem;
 
 	node->lhs = analyze_node(node->lhs);
 	if (!can_use_dot(node->lhs->type))
@@ -283,12 +281,12 @@ static Node	*analyze_member_value(Node *node)
 	return (node);
 }
 
-static Node	*analyze_call(Node *node)
+static t_node	*analyze_call(t_node *node)
 {
-	LVar	*def;
-	LVar	*lastdef;
-	LVar	*firstdef;
-	LVar	*lvtmp;
+	t_lvar	*def;
+	t_lvar	*lastdef;
+	t_lvar	*firstdef;
+	t_lvar	*lvtmp;
 	int		i;
 
 	// function exist?
@@ -348,7 +346,7 @@ static Node	*analyze_call(Node *node)
 	firstdef = def;
 	lastdef = NULL;
 
-	Node	*args;
+	t_node	*args;
 	for (i = 0; i < node->funccall_argcount; i++)
 	{
 		debug("  READ ARG(%d) START", i);
@@ -379,7 +377,7 @@ static Node	*analyze_call(Node *node)
 			debug("  is VA");
 
 			// create_local_varからのコピペ
-			def = calloc(1, sizeof(LVar));
+			def = calloc(1, sizeof(t_lvar));
 			def->name = "VA";
 			def->name_len = 2;
 			def->type = type_cast_forarg(args->type);
@@ -413,7 +411,7 @@ static Node	*analyze_call(Node *node)
 	return (node);
 }
 
-static Node *analyze_bitwise_not(Node *node)
+static t_node *analyze_bitwise_not(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 
@@ -424,7 +422,7 @@ static Node *analyze_bitwise_not(Node *node)
 	return (node);
 }
 
-static Node	*analyze_mul(Node *node)
+static t_node	*analyze_mul(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -439,12 +437,12 @@ static Node	*analyze_mul(Node *node)
 	return (node);
 }
 
-static Node	*analyze_add(Node *node)
+static t_node	*analyze_add(t_node *node)
 {
-	Type	*l;
-	Type	*r;
-	Type	*tmp;
-	Node	*node_tmp;
+	t_type	*l;
+	t_type	*r;
+	t_type	*tmp;
+	t_node	*node_tmp;
 	int		size;
 
 	node->lhs = analyze_node(node->lhs);
@@ -517,7 +515,7 @@ static Node	*analyze_add(Node *node)
 	return (NULL);
 }
 
-static Node *analyze_shift(Node *node)
+static t_node *analyze_shift(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -532,10 +530,10 @@ static Node *analyze_shift(Node *node)
 	return (node);
 }
 
-static Node	*analyze_relational(Node *node)
+static t_node	*analyze_relational(t_node *node)
 {
-	Type	*l_to;
-	Type	*r_to;
+	t_type	*l_to;
+	t_type	*r_to;
 
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -555,10 +553,10 @@ static Node	*analyze_relational(Node *node)
 	return (node);
 }
 
-static Node	*analyze_equality(Node *node)
+static t_node	*analyze_equality(t_node *node)
 {
-	Type	*l_to;
-	Type	*r_to;
+	t_type	*l_to;
+	t_type	*r_to;
 
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -578,7 +576,7 @@ static Node	*analyze_equality(Node *node)
 	return (node);
 }
 
-static Node	*analyze_bitwise_and(Node *node)
+static t_node	*analyze_bitwise_and(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -595,7 +593,7 @@ static Node	*analyze_bitwise_and(Node *node)
 	return (node);
 }
 
-static Node	*analyze_bitwise_xor(Node *node)
+static t_node	*analyze_bitwise_xor(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -612,7 +610,7 @@ static Node	*analyze_bitwise_xor(Node *node)
 	return (node);
 }
 
-static Node	*analyze_bitwise_or(Node *node)
+static t_node	*analyze_bitwise_or(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -631,7 +629,7 @@ static Node	*analyze_bitwise_or(Node *node)
 
 // lhs && rhs
 // lhs || rhs
-static Node	*analyze_conditional(Node *node)
+static t_node	*analyze_conditional(t_node *node)
 {
 	// TODO 比較可能な型かチェックする
 	node->lhs = analyze_node(node->lhs);
@@ -641,7 +639,7 @@ static Node	*analyze_conditional(Node *node)
 }
 
 // lhs ? rhs : els
-static Node	*analyze_conditional_op(Node *node)
+static t_node	*analyze_conditional_op(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -659,7 +657,7 @@ static Node	*analyze_conditional_op(Node *node)
 	return (node);
 }
 
-static Node	*analyze_assign(Node *node)
+static t_node	*analyze_assign(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -691,9 +689,9 @@ static Node	*analyze_assign(Node *node)
 }
 
 // sizeof lhs
-static Node	*analyze_sizeof(Node *node)
+static t_node	*analyze_sizeof(t_node *node)
 {
-	Node	*result;
+	t_node	*result;
 
 	node->lhs = analyze_node(node->lhs);
 	result = new_node_num(get_type_size(node->lhs->type));
@@ -704,7 +702,7 @@ static Node	*analyze_sizeof(Node *node)
 //   rhs
 // els
 // elsif
-static Node	*analyze_if(Node *node)
+static t_node	*analyze_if(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
@@ -718,9 +716,9 @@ static Node	*analyze_if(Node *node)
 }
 
 // while (lhs) rhs
-static Node	*analyze_while(Node *node)
+static t_node	*analyze_while(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	node->lhs = analyze_node(node->lhs);
 
@@ -734,9 +732,9 @@ static Node	*analyze_while(Node *node)
 }
 
 // do lhs while (rhs)
-static Node	*analyze_dowhile(Node *node)
+static t_node	*analyze_dowhile(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	data = sb_forwhile_start(-1, -1);
 	node->lhs = analyze_node(node->lhs);
@@ -748,9 +746,9 @@ static Node	*analyze_dowhile(Node *node)
 }
 
 // for (0; 1; 2) lhs
-static Node	*analyze_for(Node *node)
+static t_node	*analyze_for(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 	int		i;
 
 	for (i = 0; i < 3; i++)
@@ -767,9 +765,9 @@ static Node	*analyze_for(Node *node)
 }
 
 // switch (lhs) rhs
-static Node	*analyze_switch(Node *node)
+static t_node	*analyze_switch(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	node->lhs = analyze_node(node->lhs);
 
@@ -782,15 +780,14 @@ static Node	*analyze_switch(Node *node)
 	data = sb_end();
 
 	node->block_sbdata = data;
-	node->switch_cases = data->cases;
 	node->switch_has_default = data->defaultLabel != -1;
 
 	return (node);
 }
 
-static Node	*analyze_case(Node *node)
+static t_node	*analyze_case(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	data = sb_search(true);
 	if (data == NULL)
@@ -802,9 +799,9 @@ static Node	*analyze_case(Node *node)
 	return (node);
 }
 
-static Node	*analyze_break(Node *node)
+static t_node	*analyze_break(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	data = sb_peek();
 	if (data == NULL)
@@ -813,9 +810,9 @@ static Node	*analyze_break(Node *node)
 	return (node);
 }
 
-static Node	*analyze_continue(Node *node)
+static t_node	*analyze_continue(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	data = sb_search(false);
 	if (data == NULL)
@@ -824,9 +821,9 @@ static Node	*analyze_continue(Node *node)
 	return (node);
 }
 
-static Node	*analyze_default(Node *node)
+static t_node	*analyze_default(t_node *node)
 {
-	SBData	*data;
+	t_labelstack	*data;
 
 	data = sb_search(true);
 	if (data == NULL)
@@ -838,7 +835,7 @@ static Node	*analyze_default(Node *node)
 	return (node);
 }
 
-static Node	*analyze_node(Node *node)
+static t_node	*analyze_node(t_node *node)
 {
 	if (node->is_analyzed)
 		return (node);
@@ -978,10 +975,10 @@ static Node	*analyze_node(Node *node)
 static void	analyze_func(t_deffunc *func)
 {
 	int		i;
-	LVar	*lvar;
+	t_lvar	*lvar;
 	char	*name;
 	int		name_len;
-	Type	*type;
+	t_type	*type;
 
 	g_func_now = func;
 
@@ -989,7 +986,7 @@ static void	analyze_func(t_deffunc *func)
 	if (is_memory_type(func->type_return))
 	{
 		// for save rdi
-		lvar				= calloc(1, sizeof(LVar));
+		lvar				= calloc(1, sizeof(t_lvar));
 		lvar->name			= "";
 		lvar->name_len 		= 0;
 		lvar->type			= new_type_ptr_to(new_primitive_type(TY_VOID));
@@ -1001,7 +998,7 @@ static void	analyze_func(t_deffunc *func)
 		func->locals		= lvar;
 
 		// padding
-		lvar				= calloc(1, sizeof(LVar));
+		lvar				= calloc(1, sizeof(t_lvar));
 		lvar->name			= "";
 		lvar->name_len		= 0;
 		lvar->type			= func->type_return;
@@ -1027,7 +1024,7 @@ static void	analyze_func(t_deffunc *func)
 		if (!is_declarable_type(type))
 			error_at(name, "宣言できない型の変数です");
 
-		// LVarを作成
+		// t_lvarを作成
 		create_lvar(func, name, name_len, type, true);
 
 		// TODO 引数の名前の被りチェック
