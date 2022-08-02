@@ -21,6 +21,7 @@ static t_node	*analyze_member_value(t_node *node);
 static t_node	*analyze_member_value_ptr(t_node *node);
 static t_node	*analyze_call(t_node *node);
 static t_node	*analyze_bitwise_not(t_node *node);
+static void		analyze_replace_lval(t_node *node);
 static t_node	*analyze_mul(t_node *node);
 static t_node	*analyze_add(t_node *node);
 static t_node	*analyze_shift(t_node *node);
@@ -160,16 +161,13 @@ static t_node *analyze_var_def(t_node *node)
 	if (node->lvar_assign != NULL)
 	{
 		source = node->analyze_source;
-
 		node->kind = ND_VAR_LOCAL;
 		node = new_node(ND_ASSIGN, node, node->lvar_assign);
 		node->analyze_source = source;
 		node = analyze_node(node);
 	}
 	else
-	{
 		node->kind = ND_NONE;
-	}
 	return (node);
 }
 
@@ -228,15 +226,7 @@ static t_node	*analyze_deref(t_node *node)
 static t_node	*analyze_addr(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
-
-	// 変数と構造体、ND_DEREFに対する&
-	if (node->lhs->kind != ND_VAR_LOCAL
-	&& node->lhs->kind != ND_VAR_GLOBAL
-	&& node->lhs->kind != ND_MEMBER_VALUE
-	&& node->lhs->kind != ND_MEMBER_PTR_VALUE
-	&& node->lhs->kind != ND_DEREF) // TODO 文字列リテラルは？
-		error_at(node->analyze_source, "変数以外に&演算子を適用できません Kind: %d", node->lhs->kind);
-
+	analyze_replace_lval(node->lhs);
 	node->type = new_type_ptr_to(node->lhs->type);
 	return (node);
 }
@@ -422,6 +412,23 @@ static t_node *analyze_bitwise_not(t_node *node)
 	return (node);
 }
 
+static void	analyze_replace_lval(t_node *node)
+{
+	// TODO 文字列も
+	if (node->kind == ND_VAR_LOCAL)
+		node->kind = ND_VAR_LOCAL_ADDR;
+	else if (node->kind == ND_VAR_GLOBAL)
+		node->kind = ND_VAR_GLOBAL_ADDR;
+	else if (node->kind == ND_DEREF)
+		node->kind = ND_DEREF_ADDR;
+	else if (node->kind == ND_MEMBER_VALUE)
+		node->kind = ND_MEMBER_VALUE_ADDR;
+	else if (node->kind == ND_MEMBER_PTR_VALUE)
+		node->kind = ND_MEMBER_PTR_VALUE_ADDR;
+	else
+		error_at(node->analyze_source, "左辺値ではありません");
+}
+
 static t_node	*analyze_mul(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
@@ -434,6 +441,10 @@ static t_node	*analyze_mul(t_node *node)
 		error_at(node->analyze_source, "%sに演算子を適用できません(R*/%)", get_type_name(node->rhs->type));
 
 	node->type = new_primitive_type(TY_INT);
+
+	// assignは置き換える
+	if (node->kind == ND_COMP_MUL || node->kind == ND_COMP_DIV || node->kind == ND_COMP_MOD)
+		analyze_replace_lval(node->lhs);	
 	return (node);
 }
 
@@ -447,6 +458,10 @@ static t_node	*analyze_add(t_node *node)
 
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
+
+	// assignは置き換える
+	if (node->kind == ND_COMP_ADD || node->kind == ND_COMP_SUB)
+		analyze_replace_lval(node->lhs);
 
 	l = node->lhs->type;
 	r = node->rhs->type;
@@ -506,7 +521,6 @@ static t_node	*analyze_add(t_node *node)
 			node->type = l;
 		else
 			node->type = r;
-		//fprintf(stderr, "-> %s\n", get_type_name(node->type));
 		return (node);
 	}
 
@@ -684,6 +698,8 @@ static t_node	*analyze_assign(t_node *node)
 		}
 	}
 
+	analyze_replace_lval(node->lhs);
+
 	node->type = node->lhs->type;
 	return (node);
 }
@@ -854,7 +870,14 @@ static t_node	*analyze_node(t_node *node)
 		case ND_BLOCK:
 		{
 			if (node->lhs != NULL)
+			{
 				node->lhs = analyze_node(node->lhs);
+
+				// 結果がND_NONEなら省略する
+				// popを行うために必要
+				if (node->lhs->kind == ND_NONE && node->rhs != NULL)
+					return (analyze_node(node->rhs));
+			}
 			if (node->rhs != NULL)
 				node->rhs = analyze_node(node->rhs);
 			return (node);
@@ -897,8 +920,7 @@ static t_node	*analyze_node(t_node *node)
 		case ND_PARENTHESES:
 		{
 			node->lhs = analyze_node(node->lhs);
-			node->type = node->lhs->type;
-			return (node);
+			return (node->lhs);
 		}
 		case ND_SHIFT_LEFT:
 		case ND_SHIFT_RIGHT:
@@ -941,6 +963,7 @@ static t_node	*analyze_node(t_node *node)
 			if (node->lhs != NULL)
 				node->lhs = analyze_node(node->lhs);
 			// TODO 型チェック, キャスト
+			node->funcdef = g_func_now;
 			return (node);
 		}
 		case ND_SIZEOF:

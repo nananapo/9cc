@@ -1,9 +1,8 @@
 #include "9cc.h"
 #include "list.h"
+#include "il.h"
 #include <stdio.h>
 #include <string.h>
-
-# define N_MAX 100
 
 char			*g_user_input;
 
@@ -17,6 +16,7 @@ t_defenum		*g_enum_defs[1000];
 t_defunion		*g_union_defs[1000];
 t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
+t_il			*g_il;
 
 int main(int argc, char **argv)
 {
@@ -42,6 +42,8 @@ int main(int argc, char **argv)
 
 	// analyze
 	analyze();
+
+	translate_il();
 
 	// codegen
 	codegen();

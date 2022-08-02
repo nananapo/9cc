@@ -93,7 +93,7 @@ typedef struct s_token
 
 typedef enum e_nodekind
 {
-	ND_NONE,
+	ND_NONE, // 式ではないものはND_NONEにする
 	ND_ANALYZE_VAR,
 	ND_CALL,
 	ND_BLOCK,
@@ -162,7 +162,14 @@ typedef enum e_nodekind
 	ND_SIZEOF,
 
 	ND_ADD_UNARY,
-	ND_SUB_UNARY
+	ND_SUB_UNARY,
+	ND_DEF_VAR,
+	
+	ND_VAR_LOCAL_ADDR,
+	ND_VAR_GLOBAL_ADDR,
+	ND_DEREF_ADDR,
+	ND_MEMBER_VALUE_ADDR,
+	ND_MEMBER_PTR_VALUE_ADDR
 } t_nodekind;
 
 typedef enum e_typekind

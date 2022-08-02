@@ -1,6 +1,8 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 bool	issymbol(char c)
 {
@@ -67,4 +69,14 @@ void	put_str_literal(char *str, int len)
 		}
 		printf("%c", str[i]);
 	}
+}
+
+char	*my_strcat(char *a, char *b)
+{
+	char	*res;
+
+	res = calloc(1, sizeof(char) * (strlen(a) + strlen(b) + 1));
+	strcat(res, a);
+	strcat(res, b);
+	return (res);
 }
