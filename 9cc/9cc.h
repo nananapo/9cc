@@ -169,7 +169,9 @@ typedef enum e_nodekind
 	ND_VAR_GLOBAL_ADDR,
 	ND_DEREF_ADDR,
 	ND_MEMBER_VALUE_ADDR,
-	ND_MEMBER_PTR_VALUE_ADDR
+	ND_MEMBER_PTR_VALUE_ADDR,
+
+	ND_CALL_MACRO_VA_START
 } t_nodekind;
 
 typedef enum e_typekind

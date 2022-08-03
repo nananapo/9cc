@@ -38,13 +38,13 @@ assert_async(){
 
     echo "$input" | $prpr - | $ncc > $asmname
 	if [ "$?" != "0" ]; then
-		echo "$1 => 9cc KO" >> tmp/err
+		echo "9CC KO => $1" >> tmp/err
 		exit 1
 	fi
 	
 	cc -o $targetname $asmname $module
 	if [ "$?" != "0" ]; then
-		echo "$1 => 9cc gcc compile KO" >> tmp/err
+		echo "9CC COMPILE KO => $1" >> tmp/err
 		exit 1
 	fi
 
@@ -54,7 +54,7 @@ assert_async(){
 	echo "$input" > $cname
 	cc -w -o $targetname $cname $module
 	if [ "$?" != "0" ]; then
-		echo "$1 => gcc segv KO" >> tmp/err
+		echo "GCC FAIL => $1" >> tmp/err
 		exit 1
 	fi
 
@@ -62,14 +62,14 @@ assert_async(){
 	expected_status="${PIPESTATUS[0]}"
 
 	if [ "$actual_status" != "$expected_status" ]; then
-  	  echo "status $1 => KO" >> tmp/err
+  	  echo "STATUS KO => $1" >> tmp/err
   	  exit 1
 	fi
 
   	if [ "$actual" = "$expected" ]; then
   	  echo "$1 => OK"
   	else
-  	  echo "output $1 => KO" >> tmp/err
+  	  echo "OUTPUT KO => $1" >> tmp/err
   	  exit 1
   	fi
 }
@@ -328,6 +328,9 @@ assert "increments5.c"
 assert "increments6.c"
 assert "increments7.c"
 assert "increments8.c"
+assert "increments9.c"
+assert "increments10.c"
+assert "increments11.c"
 
 assert "not.c"
 
@@ -393,7 +396,8 @@ assert "ret_struct2.c"
 wait
 
 if [ "`cat tmp/err | wc -l | tr -d ¥" ¥"`" != "0" ]; then
-	cat tmp/err
+	echo "--- report ---------------"
+	cat tmp/err | sort
 	echo "test failed"
 	exit 1
 fi

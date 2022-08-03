@@ -16,6 +16,7 @@ static int	jumpLabelCount;
 
 static void	translate_condtional_and(t_node *node);
 static void	translate_condtional_or(t_node *node);
+static void	translate_call(t_node *node);
 static void	translate_return(t_node *node);
 static void	translate_block(t_node *node);
 static void	translate_if(t_node *node);
@@ -151,7 +152,37 @@ static void	translate_condtional_or(t_node *node)
 	code->label_str	= get_label_str(lend);
 }
 
-// return以外の文は値をpushする
+static void	translate_call(t_node *node)
+{
+	int		i;
+	t_il	*code;
+
+	code					= append_il(IL_CALL_START);
+	code->funccall_caller	= node->funccall_caller;
+	code->funccall_callee	= node->funcdef;
+	code->funccall_argcount	= node->funccall_argcount;
+	code->funccall_argdefs	= node->funccall_argdefs;
+	code->funccall_save_pos	= node->call_mem_stack;
+
+	for (i = 0;	i < node->funccall_argcount; i++)
+	{
+		translate_node(node->funccall_args[i]);
+		code						= append_il(IL_CALL_ADD_ARG);
+		code->funccall_caller		= node->funccall_caller;
+		code->funccall_callee		= node->funcdef;
+		code->funccall_arg_index	= i;
+		code->funccall_arg_def		= node->funccall_argdefs[i];
+		code->type					= type_array_to_ptr(node->funccall_args[i]->type); //TODO これanalyzeにやらせたい
+	}
+
+	code					= append_il(IL_CALL_EXEC);
+	code->funccall_caller	= node->funccall_caller;
+	code->funccall_callee	= node->funcdef;
+	code->funccall_argcount	= node->funccall_argcount;
+	code->funccall_argdefs	= node->funccall_argdefs;
+	code->funccall_save_pos	= node->call_mem_stack;
+}
+
 static void	translate_return(t_node *node)
 {
 	t_il	*code;
@@ -315,7 +346,7 @@ static void	translate_dowhile(t_node *node)
 
 	// continue
 	code			= append_il(IL_LABEL);
-	code->label_str	= get_label_str(lbegin);
+	code->label_str	= get_label_str(lbegin2);
 
 	// if
 	translate_node(node->rhs);
@@ -424,14 +455,15 @@ static void	translate_switch(t_node *node)
 	translate_node(node->lhs);
 
 	// 結果を保存
-	code		= append_il(IL_ASSIGN);
-	code->lvar	= node->switch_save;
+	code			= append_il(IL_ASSIGN);
+	code->type		= node->lhs->type; // TODO これint?
+	code->var_local	= node->switch_save;
 
 	// if
 	for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
 	{
-		code		= append_il(IL_VAR_LOCAL);
-		code->lvar	= node->switch_save;
+		code			= append_il(IL_VAR_LOCAL);
+		code->var_local	= node->switch_save;
 
 		append_il_pushnum(cases->value);
 
@@ -483,6 +515,11 @@ static void	translate_node(t_node *node)
 		case ND_NEQUAL:
 		case ND_LESS:
 		case ND_LESSEQ:
+		case ND_BITWISE_AND:
+		case ND_BITWISE_OR:
+		case ND_BITWISE_XOR:
+		case ND_SHIFT_LEFT:
+		case ND_SHIFT_RIGHT:
 		{
 			translate_node(node->lhs);
 			translate_node(node->rhs);
@@ -503,10 +540,64 @@ static void	translate_node(t_node *node)
 				code = append_il(IL_NEQUAL);
 			else if (node->kind == ND_LESS)
 				code = append_il(IL_LESS);
-			else// if (node->kind == ND_LESSEQ)
+			else if (node->kind == ND_LESSEQ)
 				code = append_il(IL_LESSEQ);
+			else if (node->kind == ND_BITWISE_AND)
+				code = append_il(IL_BITWISE_AND);
+			else if (node->kind == ND_BITWISE_OR)
+				code = append_il(IL_BITWISE_OR);
+			else if (node->kind == ND_BITWISE_XOR)
+				code = append_il(IL_BITWISE_XOR);
+			else if (node->kind == ND_SHIFT_LEFT)
+				code = append_il(IL_SHIFT_LEFT);
+			else //if (node->kind == ND_SHIFT_RIHGT)
+				code = append_il(IL_SHIFT_RIGHT);
 
 			code->type = node->type;
+			return ;
+		}
+		case ND_BITWISE_NOT:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_BITWISE_NOT);
+			code->type	= node->lhs->type;
+			return ;
+		}
+		case ND_COMP_ADD:
+		case ND_COMP_SUB:
+		case ND_COMP_MUL:
+		case ND_COMP_DIV:
+		case ND_COMP_MOD:
+		{
+			// 左辺を二回push -> load -> 右辺をpush -> swap -> op -> assign
+			translate_node(node->lhs);
+			code		= append_il(IL_PUSH_AGAIN);
+			code->type	= node->lhs->type;
+
+			code		= append_il(IL_LOAD);
+			code->type	= node->lhs->type->ptr_to;
+
+			translate_node(node->rhs);
+
+			code			= append_il(IL_STACK_SWAP);
+			code->stack_up	= node->rhs->type;
+			code->stack_down= node->lhs->type->ptr_to;
+
+			// op
+			if (node->kind == ND_COMP_ADD)
+				code	= append_il(IL_ADD);
+			else if (node->kind == ND_COMP_SUB)
+				code	= append_il(IL_SUB);
+			else if (node->kind == ND_COMP_MUL)
+				code	= append_il(IL_MUL);
+			else if (node->kind == ND_COMP_DIV)
+				code	= append_il(IL_DIV);
+			else if (node->kind == ND_COMP_MOD)
+				code	= append_il(IL_MOD);
+			code->type	= node->type;
+
+			code		= append_il(IL_ASSIGN);
+			code->type	= node->type;
 			return ;
 		}
 		case ND_ASSIGN:
@@ -519,14 +610,26 @@ static void	translate_node(t_node *node)
 		}
 		case ND_VAR_LOCAL:
 		{
-			code		= append_il(IL_VAR_LOCAL);
-			code->lvar	= node->lvar;
+			code			= append_il(IL_VAR_LOCAL);
+			code->var_local	= node->lvar;
 			return ;
 		}
 		case ND_VAR_LOCAL_ADDR:
 		{
-			code		= append_il(IL_VAR_LOCAL_ADDR);
-			code->lvar	= node->lvar;
+			code			= append_il(IL_VAR_LOCAL_ADDR);
+			code->var_local	= node->lvar;
+			return ;
+		}
+		case ND_VAR_GLOBAL:
+		{
+			code			= append_il(IL_VAR_GLOBAL);
+			code->var_global= node->var_global;
+			return ;
+		}
+		case ND_VAR_GLOBAL_ADDR:
+		{
+			code			= append_il(IL_VAR_GLOBAL_ADDR);
+			code->var_global= node->var_global;
 			return ;
 		}
 		case ND_COND_AND:
@@ -535,9 +638,102 @@ static void	translate_node(t_node *node)
 		case ND_COND_OR:
 			translate_condtional_or(node);
 			return ;
+		case ND_CAST:
+		{
+			translate_node(node->lhs);
+			code			= append_il(IL_CAST);
+			code->cast_from	= node->lhs->type;
+			code->cast_to	= node->type;
+			return ;
+		}
+		case ND_DEREF:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_LOAD);
+			code->type	= node->type;
+			return ;
+		}
+		case ND_DEREF_ADDR:
+		{
+			translate_node(node->lhs);
+			return ;
+		}
+		case ND_MEMBER_VALUE:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_MEMBER);
+			code->member= node->elem;
+			return ;
+		}
+		case ND_MEMBER_VALUE_ADDR:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_MEMBER_ADDR);
+			code->member= node->elem;
+			return ;
+		}
+		case ND_MEMBER_PTR_VALUE:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_MEMBER_PTR);
+			code->member= node->elem;
+			return ;
+		}
+		case ND_MEMBER_PTR_VALUE_ADDR:
+		{
+			translate_node(node->lhs);
+			code		= append_il(IL_MEMBER_PTR_ADDR);
+			code->member= node->elem;
+			return ;
+		}
+		case ND_CALL_MACRO_VA_START:
+		{
+			translate_node(node->funccall_args[0]);
+			code					= append_il(IL_MACRO_VASTART);
+			code->funccall_caller	= node->funccall_caller;
+			append_il_pushnum(0);
+			return ;
+		}
+		case ND_STR_LITERAL: // 文字列リテラルのアドレスは?
+		{
+			code			= append_il(IL_STR_LIT);
+			code->def_str	= node->def_str;
+			return ;
+		}
+		case ND_CALL:
+			translate_call(node);
+			return ;
 		case ND_RETURN:
 			translate_return(node);
 			return ;
+		case ND_CONTINUE:
+		{
+			code			= append_il(IL_JUMP);
+			code->label_str	= get_label_str(node->block_sbdata->startLabel);
+			append_il_pushnum(0);
+			return;
+		}
+		case ND_BREAK:
+		{
+			code			= append_il(IL_JUMP);
+			code->label_str	= get_label_str(node->block_sbdata->endLabel);
+			append_il_pushnum(0);
+			return;
+		}
+		case ND_CASE:
+		{
+			code			= append_il(IL_LABEL);
+			code->label_str	= get_label_str(node->case_label->label);
+			append_il_pushnum(0);
+			return;
+		}
+		case ND_DEFAULT:
+		{
+			code			= append_il(IL_LABEL);
+			code->label_str	= get_label_str(node->block_sbdata->defaultLabel);
+			append_il_pushnum(0);
+			return;
+		}
 		case ND_IF:
 			translate_if(node);
 			return ;
@@ -558,7 +754,7 @@ static void	translate_node(t_node *node)
 			node->type = new_primitive_type(TY_INT);
 			return ;
 		case ND_SIZEOF:
-			fprintf(stderr, "sizeof not allowed\n");
+			fprintf(stderr, "sizeof not allowed\n"); // TODO genまで持っていく
 			error("Error");
 			return ;
 		default:
@@ -579,12 +775,14 @@ static void	translate_func(t_deffunc *func)
 	code->label_str			= strndup(func->name, func->name_len);
 	code->label_is_deffunc	= true;
 
-	append_il(IL_FUNC_PROLOGUE);
+	code				= append_il(IL_FUNC_PROLOGUE);
+	code->deffunc_def	= func;
+
 	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
 	{
 		// TODO register
 		code = append_il(IL_DEF_VAR_LOCAL);
-		code->lvar = lvar;
+		code->var_local = lvar;
 	}
 	append_il(IL_DEF_VAR_END);
 
@@ -595,6 +793,7 @@ static void	translate_func(t_deffunc *func)
 
 	code		= append_il(IL_FUNC_EPILOGUE);
 	code->type	= func->type_return;
+	code->deffunc_def	= func;
 }
 
 void	translate_il(void)

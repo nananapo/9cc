@@ -228,7 +228,7 @@ static t_node	*analyze_addr(t_node *node)
 	node->lhs = analyze_node(node->lhs);
 	analyze_replace_lval(node->lhs);
 	node->type = new_type_ptr_to(node->lhs->type);
-	return (node);
+	return (node->lhs);
 }
 
 static t_node	*analyze_member_value_ptr(t_node *node)
@@ -281,6 +281,23 @@ static t_node	*analyze_call(t_node *node)
 
 	// set caller
 	node->funccall_caller = g_func_now;
+
+	// is va_start macro?
+	if (node->analyze_funccall_name_len == 8
+	&& strncmp(node->analyze_funccall_name, "va_start", 8) == 0)
+	{
+		node->kind = ND_CALL_MACRO_VA_START;
+		
+		// analyze arguments
+		for (i = 0; i < node->funccall_argcount; i++)
+			node->funccall_args[i] = analyze_node(node->funccall_args[i]);
+
+		if (node->funccall_argcount == 0)
+			error_at(node->analyze_source, "va_startに引数がありません");
+
+		analyze_replace_lval(node->funccall_args[0]);
+		return (node);
+	}
 
 	// function exist?
 	if (node->funcdef == NULL)
@@ -347,8 +364,11 @@ static t_node	*analyze_call(t_node *node)
 		args = node->funccall_args[i];
 
 		if (def != NULL && def->is_arg)
-		{
+		{	
 			debug("  is ARG");
+
+			def->type = type_array_to_ptr(def->type);
+
 			// 型の確認
 			if (!type_equal(def->type, args->type))
 			{
@@ -415,6 +435,7 @@ static t_node *analyze_bitwise_not(t_node *node)
 	return (node);
 }
 
+// kindとtypeを変える副作用があるので、関数の最後で実行する
 static void	analyze_replace_lval(t_node *node)
 {
 	// TODO 文字列も
@@ -430,6 +451,8 @@ static void	analyze_replace_lval(t_node *node)
 		node->kind = ND_MEMBER_PTR_VALUE_ADDR;
 	else
 		error_at(node->analyze_source, "左辺値ではありません");
+
+	node->type = new_type_ptr_to(node->type);
 }
 
 static t_node	*analyze_mul(t_node *node)
@@ -462,10 +485,6 @@ static t_node	*analyze_add(t_node *node)
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
 
-	// assignは置き換える
-	if (node->kind == ND_COMP_ADD || node->kind == ND_COMP_SUB)
-		analyze_replace_lval(node->lhs);
-
 	l = node->lhs->type;
 	r = node->rhs->type;
 
@@ -474,7 +493,7 @@ static t_node	*analyze_add(t_node *node)
 	{
 		if (!type_equal(l, r))
 			error_at(node->analyze_source, "型が一致しないポインタ型どうしの加減算はできません");
-		node->type = new_primitive_type(TY_INT);// TODO size_tにする
+		node->type = new_primitive_type(TY_INT); //size_t
 
 		size = get_type_size(l->ptr_to);
 		if (size == 0 || size > 1)
@@ -486,50 +505,52 @@ static t_node	*analyze_add(t_node *node)
 			node->type	= new_primitive_type(TY_INT);
 			node		= analyze_node(node);
 		}
-		return (node);
 	}
-
 	// 左辺をポインタにする
 	// 両辺がポインタなら入れ替えない
-	if ((node->kind == ND_ADD || node->kind == ND_SUB)
-		&& is_pointer_type(r) && !is_pointer_type(l))
-	{
-		tmp = l;
-		l = r;
-		r = tmp;
+	else
+	{	if ((node->kind == ND_ADD || node->kind == ND_SUB)
+			&& is_pointer_type(r) && !is_pointer_type(l))
+		{
+			tmp = l;
+			l = r;
+			r = tmp;
 
-		node_tmp = node->lhs;
-		node->lhs = node->rhs;
-		node->rhs = node_tmp;
-	}
+			node_tmp = node->lhs;
+			node->lhs = node->rhs;
+			node->rhs = node_tmp;
+		}
 
-	// ポインタと整数の演算
-	if (is_pointer_type(l) && is_integer_type(r))
-	{
-		node->type = l;
-
-		// 右辺を掛け算に置き換える
-		node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to)));
-		node->rhs->type = new_primitive_type(TY_INT);
-		node->rhs->analyze_source = node->rhs->lhs->analyze_source;
-		analyze_node(node->rhs);
-		return (node);
-	}
-
-	// 両方整数なら型の優先順位を考慮
-	if (is_integer_type(l) || is_integer_type(r))
-	{
-		// TODO とりあえずサイズの大きいほうの型にしている
-		if (get_type_size(l) > get_type_size(r))
+		// ポインタと整数の演算
+		if (is_pointer_type(l) && is_integer_type(r))
+		{
 			node->type = l;
+
+			// 右辺を掛け算に置き換える
+			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to)));
+			node->rhs->type = new_primitive_type(TY_INT);
+			node->rhs->analyze_source = node->rhs->lhs->analyze_source;
+			analyze_node(node->rhs);
+		}
+		// 両方整数なら型の優先順位を考慮
+		else if (is_integer_type(l) || is_integer_type(r))
+		{
+			// TODO とりあえずサイズの大きいほうの型にしている
+			if (get_type_size(l) > get_type_size(r))
+				node->type = l;
+			else
+				node->type = r;
+		}
 		else
-			node->type = r;
-		return (node);
+			error_at(node->analyze_source, "演算子が%sと%sの間に定義されていません",
+				get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 	}
 
-	error_at(node->analyze_source, "演算子が%sと%sの間に定義されていません",
-			get_type_name(node->lhs->type), get_type_name(node->rhs->type));
-	return (NULL);
+	// assignは置き換える
+	if (node->kind == ND_COMP_ADD || node->kind == ND_COMP_SUB)
+		analyze_replace_lval(node->lhs);
+
+	return (node);
 }
 
 static t_node *analyze_shift(t_node *node)
@@ -701,9 +722,9 @@ static t_node	*analyze_assign(t_node *node)
 		}
 	}
 
-	analyze_replace_lval(node->lhs);
-
 	node->type = node->lhs->type;
+
+	analyze_replace_lval(node->lhs);
 	return (node);
 }
 

@@ -648,6 +648,9 @@ assert_gcc "increments5.c"
 assert_gcc "increments6.c"
 assert_gcc "increments7.c"
 assert_gcc "increments8.c"
+assert_gcc "increments9.c"
+assert_gcc "increments10.c"
+assert_gcc "increments11.c"
 
 assert_gcc "not.c"
 

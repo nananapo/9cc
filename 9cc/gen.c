@@ -17,13 +17,8 @@ static void	cmp(t_type *type);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(t_type *type);
-static void	lval(t_node *node);
-static void	call(t_node *node);
 static void	cast(t_type *from, t_type *to);
-static void	arrow(t_node *node, bool as_addr);
-static void	load_lval_addr(t_node *node);
 static void	print_global_constant(t_node *node, t_type *type);
-static void	gen(t_node *node);
 
 static char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int				stack_count = 0;
@@ -204,272 +199,9 @@ static void	load(t_type *type)
 		return ;
 	}
 	else if (type->ty == TY_ARRAY)
-	{
 		return ;
-	}
 	else if (type->ty == TY_STRUCT || type->ty == TY_UNION)
-	{
-		// TODO とりあえず8byteまで
-		// mov(RAX, "[rax]");
 		return ;
-	}
-}
-
-// 変数のアドレスをraxに移動する
-static void	lval(t_node *node)
-{
-	int	offset;
-
-	if (node->kind != ND_VAR_LOCAL && node->kind != ND_VAR_GLOBAL)
-		error("変数ではありません Kind:%d t_type:%d", node->kind, node->type->ty);
-
-	if (node->kind == ND_VAR_LOCAL)
-	{
-		offset = node->lvar->offset;
-		mov(RAX, RBP);
-		if (offset > 0)
-			printf("    sub %s, %d\n", RAX, offset);
-		else if (offset < 0)
-			printf("    add %s, %d\n", RAX, - offset);
-	}
-	else if (node->kind == ND_VAR_GLOBAL)
-	{
-		printf("    mov rax, [rip + _%s@GOTPCREL]\n", strndup(node->var_global->name, node->var_global->name_len));
-	}
-}
-
-static void	call(t_node *node)
-{
-	int		size;
-	int 	rbp_offset;
-	int		push_count = 0;
-	bool	is_aligned;
-	t_node	*tmp;
-	int		i;
-	int		j;
-	int		count;
-	int		pop_count;
-
-	t_lvar	*lvtmp;
-	int		min_offset;
-	int		max_argregindex;
-
-	// va_startマクロ
-	if (node->funcdef->name_len == 8
-	&& strncmp(node->funcdef->name, "va_start", 8) == 0)
-	{
-		// register save
-		printf("    sub rsp, 48\n");
-		printf("    mov [rsp + 0], rdi\n");
-		printf("    mov [rsp + 8], rsi\n");
-		printf("    mov [rsp + 16], rdx\n");
-		printf("    mov [rsp + 24], rcx\n");
-		printf("    mov [rsp + 32], r8\n");
-		printf("    mov [rsp + 40], r9\n");
-
-		// overflow arg area
-		min_offset = 0;
-		max_argregindex = -1;
-
-		// TODO g_func_nowをcallで設定する
-
-		for (lvtmp = node->funccall_caller->locals; lvtmp; lvtmp = lvtmp->next)
-		{
-			min_offset = min(lvtmp->offset, min_offset);
-			max_argregindex = max(max_argregindex, lvtmp->arg_regindex);
-			debug(" # LOOP %d\n", lvtmp->arg_regindex);
-		}
-
-		// 一つめの引数を読み込み
-		if (node->funccall_argcount == 0)
-			error("va_startに引数がありません");
-
-		lval(node->funccall_args[0]);
-		mov(RDI, RAX);
-
-		printf("    mov dword ptr [rdi], %d\n", (1 + max_argregindex) * 8); // gp offset
-		printf("    mov dword ptr [rdi + 4], 0\n\n"); // fp_offset
-
-		printf("    mov rax, rbp\n");
-		printf("    add rax, %d\n", - min_offset);
-		printf("    mov [rdi + 8], rax\n\n"); // overflow arg area
-
-		printf("    mov [rdi + 16], rsp\n\n"); // reg save area
-
-		debug("    VA_START");
-		debug("    gp_offset : %d", (1 + max_argregindex) * 8);
-		debug("    fp_offset : %d", 0 * 8);
-
-		return ;
-	}
-
-	t_lvar	*lvar_defargs;
-
-	for (count = 0; count < node->funccall_argcount; count++)
-	{
-		tmp = node->funccall_args[count];
-		lvar_defargs = node->funccall_argdefs[count];
-
-		size = get_type_size(type_array_to_ptr(lvar_defargs->type));
-
-		debug("PUSH ARG %s (%d)",
-			strndup(lvar_defargs->name, lvar_defargs->name_len),size);
-
-		gen(tmp);
-
-		if (lvar_defargs->arg_regindex != -1)
-		{
-			if (size <= 8)
-			{
-				push();
-				push_count++;
-				continue ;
-			}
-			// size > 8はstructなので、スタックに積む
-			mov(RDI, RAX);
-			for (i = 0; i < size; i += 8)
-			{
-				if (i == 0)
-					printf("    %s %s, [%s]\n",
-						ASM_MOV, RAX, RDI);
-				else
-					printf("    %s %s, [%s + %d]\n",
-						ASM_MOV, RAX, RDI, i);
-				push();
-				push_count++;
-			}
-		}
-		else
-		{
-			push();
-			push_count++;
-		}
-	}
-
-	// 16 byteアラインチェック
-	rbp_offset = 0;
-	for (i = 0; i < node->funccall_argcount; i++)
-	{
-		tmp = node->funccall_args[i];
-		lvar_defargs = node->funccall_argdefs[i];
-
-		if (lvar_defargs->arg_regindex != -1)
-			continue ;
-		rbp_offset = min(rbp_offset, lvar_defargs->offset - align_to(get_type_size(lvar_defargs->type), 8) + 8);
-	}
-
-	// マイナスなのでプラスにする
-	rbp_offset = - rbp_offset;
-
-	is_aligned = (stack_count + rbp_offset + 8) % 16 == 0;
-	if (!is_aligned)
-		rbp_offset += 8;
-
-	debug("RBP_OFFSET %d (is_aligned : %d)", rbp_offset, is_aligned);
-	
-	pop_count = 0;
-	// 後ろから格納していく
-	for (i = node->funccall_argcount - 1; i >= 0; i--)
-	{
-		tmp = node->funccall_args[i];
-		lvar_defargs = node->funccall_argdefs[i];
-
-		debug("POP %s", strndup(lvar_defargs->name, lvar_defargs->name_len));
-	
-		size = get_type_size(type_array_to_ptr(lvar_defargs->type));
-
-		// レジスタに入れる
-		if (lvar_defargs->arg_regindex != -1)
-		{
-			if (size <= 8)
-			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
-				mov(arg_regs[lvar_defargs->arg_regindex], RAX);
-				continue ;
-			}
-			// size > 8なものは必ずstructであると願います( ;∀;)
-			// RAXにアドレスが入っていると想定
-			for (j = size - 8; j >= 0; j -= 8)
-			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV,
-					arg_regs[lvar_defargs->arg_regindex - j / 8],
-					 RSP, pop_count++ * 8);
-			}
-			continue ;
-		}
-
-		debug("OFFSET %d", lvar_defargs->offset);
-
-		// スタックに積む
-		// 必ず8byteアラインなので楽々実装
-		size = align_to(size, 8);
-
-		printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
-		mov(R10, RSP);
-
-		printf("    sub %s, %d\n", R10,
-				(lvar_defargs->offset + 16) + rbp_offset);
-
-		// ptr先を渡すのはSTRUCTだけ
-		if (tmp->type->ty == TY_STRUCT
-			|| tmp->type->ty == TY_UNION)
-			store_ptr(size, false);
-		else
-			store_value(size);
-	}
-
-	// rspを移動する
-	if (rbp_offset != 0)
-	{
-		if (!is_aligned)
-			debug("aligned + 8");
-		debug("rbp_offset");
-		printf("    sub %s, %d\n", RSP, rbp_offset);
-	}
-
-	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
-	if (is_memory_type(node->type))
-	{
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, node->call_mem_stack->offset);
-	}
-
-	// call
-	debug("CALL RBP_OFFSET: %d", rbp_offset);
-	if (node->funcdef->is_variable_argument)
-		movi(AL, 0);
-		printf("    mov %s, 0\n", AL);
-	printf("    call _%s\n", strndup(node->funcdef->name, node->funcdef->name_len));
-
-	// rspを元に戻す
-	if (rbp_offset != 0)
-	{
-		debug("rbp_offset");
-		printf("    add %s, %d\n", RSP, rbp_offset);
-	}
-
-	// stack_countをあわせる
-	debug("pop_count");
-	printf("    add %s, %d\n", RSP, pop_count * 8);
-	debug("POP ALL %d -> %d", stack_count, stack_count - pop_count * 8);
-	stack_count -= pop_count * 8;
-
-	// 返り値がMEMORYなら、raxにアドレスを入れる
-	if (is_memory_type(node->type))
-	{
-		printf("    lea %s, [%s - %d]\n", RAX, RBP, node->call_mem_stack->offset);
-	}
-	// 返り値がstructなら、rax, rdxを移動する
-	else if (node->type->ty == TY_STRUCT)
-	{
-		size = align_to(get_type_size(node->type), 8);
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, node->call_mem_stack->offset);
-		if (size > 0)
-			printf("    mov [%s], %s\n", RDI, RAX);
-		if (size > 8)
-			printf("    mov [%s + 8], %s\n", RDI, RDX);
-		mov(RAX, RDI);
-	}
-	return;
 }
 
 // raxに入っている型fromをtoに変換する
@@ -546,27 +278,6 @@ static void	cast(t_type *from, t_type *to)
 	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
-static void	arrow(t_node *node, bool as_addr)
-{
-	int offset;
-
-	// arrowかその他の可能性がある
-	if (node->lhs->kind == ND_MEMBER_VALUE
-	|| node->lhs->kind == ND_MEMBER_PTR_VALUE)
-		arrow(node->lhs, node->kind == ND_MEMBER_VALUE);
-	else
-		gen(node->lhs);
-
-	// offsetを足す
-	offset = node->elem->offset;
-	debug("offset");
-	printf("    add rax, %d\n", offset);
-
-	// 値として欲しいなら値にする
-	if (!as_addr)
-		load(node->elem->type);
-}
-
 /* rax, rdi
 static void	create_add(bool is_add, t_type *l, t_type *r)
 {
@@ -603,47 +314,6 @@ static void	create_add(bool is_add, t_type *l, t_type *r)
 	else
 		printf("    sub rax, rdi\n");
 }*/
-
-static void	assign_prologue(t_node *node)
-{
-	debug("ASSIGN %d", node->lhs->kind);
-	load_lval_addr(node->lhs);	
-	push();
-}
-
-static void	load_lval_addr(t_node *node)
-{
-	if (node->kind == ND_VAR_LOCAL)
-		lval(node);
-	else if (node->kind == ND_VAR_GLOBAL)
-		lval(node);
-	else if (node->kind == ND_DEREF)
-		gen(node->lhs);// ここもDEREFと同じようにやってる！！！！！
-	else if (node->kind == ND_MEMBER_VALUE)
-		arrow(node, true);
-	else if (node->kind == ND_MEMBER_PTR_VALUE)
-		arrow(node, true);
-	else if (node->kind == ND_PARENTHESES)
-		load_lval_addr(node->lhs);
-	else
-		error("左辺値が識別子かアドレスではありません");
-}
-
-static void	assign_epilogue(t_type *type)
-{
-	pop("r10");
-
-	// storeする
-	if (type->ty == TY_ARRAY)
-		// TODO これOKなの？
-		// ARRAYに対する代入がうまくいかない気がする
-		store_value(8);
-	else if(type->ty == TY_STRUCT
-			|| type->ty == TY_UNION)
-		store_ptr(get_type_size(type), false);
-	else
-		store_value(get_type_size(type));
-}
 
 static void	print_global_constant(t_node *node, t_type *type)
 {
@@ -695,238 +365,340 @@ static void gen_defglobal(t_defvar *node)
 	}
 }
 
-static void	gen(t_node *node)
+static t_lvar	*g_funcnow_locals;
+static int		g_funcnow_offset;
+
+static void	gen_call_start(t_il *code)
 {
+	debug("start %s", strndup(code->funccall_callee->name, code->funccall_callee->name_len));
+}
 
-	switch(node->kind)
+static void	gen_call_add_arg(t_il *code)
+{
+	int		i;
+	int		size;
+	t_lvar	*def;
+
+	size	= get_type_size(code->type);
+	def		= code->funccall_arg_def;
+
+	debug("PUSH ARG %s(%d)", strndup(def->name, def->name_len), size);
+
+	// popする TODO floatとかは?
+	pop(RAX);
+
+	if (def->arg_regindex != -1)
 	{
-		case ND_CASE:
+		if (size <= 8)
 		{
-			debug("case %d", node->val);
-			printf(".Lswitch%d:\n", node->case_label->label);
-			return ;
-		}
-		case ND_BREAK:
-		{
-			debug("break");
-			printf("jmp .Lend%d\n", node->block_sbdata->endLabel);
-			return ;
-		}
-		case ND_CONTINUE:
-		{
-			debug("continue");
-			printf("jmp .Lbegin%d\n", node->block_sbdata->startLabel);
-			return ;
-		}
-		case ND_DEFAULT:
-		{
-			debug("default");
-			printf(".Lswitch%d:\n", node->block_sbdata->defaultLabel);
-			return ;
-		}
-		case ND_ASSIGN:
-		{
-			assign_prologue(node);
-			gen(node->rhs);
-			assign_epilogue(node->type);
-			return ;
-		}
-		case ND_COMP_ADD:
-		{
-			assign_prologue(node);
-
 			push();
-
-			gen(node->rhs);
-			pop(RDI);
-
-			if (node->type->ty == TY_ARRAY)
-				printf("    add rax, rdi\n");
-			else
-				printf("    add rax, [rdi]\n");
-
-			assign_epilogue(node->type);
 			return ;
 		}
-		case ND_COMP_SUB:
+		// size > 8はstructなので、スタックに積む
+		mov(RDI, RAX);
+		for (i = 0; i < size; i += 8)
 		{
-			assign_prologue(node);
-
-			push();
-
-			gen(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			if (node->type->ty == TY_ARRAY)
-				printf("    sub rax, rdi\n");
+			if (i == 0)
+				printf("    %s %s, [%s]\n", ASM_MOV, RAX, RDI);
 			else
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RDI, i);
+			push();
+		}
+	}
+	else
+		push();
+}
+
+static void	gen_call_exec(t_il *code)
+{
+	int			i;
+	int			j;
+	int			pop_count;
+	int 		rbp_offset;
+	bool		is_aligned;
+	int			size;
+	t_deffunc	*deffunc;
+	t_lvar		*defarg;
+
+	deffunc = code->funccall_callee;
+
+	// 16 byteアラインチェック
+	rbp_offset = 0;
+	for (i = 0; i < code->funccall_argcount; i++)
+	{
+		defarg = code->funccall_argdefs[i];
+		if (defarg->arg_regindex != -1)
+			continue ;
+		rbp_offset = min(rbp_offset, defarg->offset - align_to(get_type_size(defarg->type), 8) + 8);
+	}
+
+	// マイナスなのでプラスにする
+	rbp_offset = - rbp_offset;
+
+	is_aligned = (stack_count + rbp_offset + 8) % 16 == 0;
+	if (!is_aligned)
+		rbp_offset += 8;
+
+	debug("RBP_OFFSET %d (is_aligned : %d)", rbp_offset, is_aligned);
+	
+	pop_count = 0;
+	// 後ろから格納していく
+	for (i = code->funccall_argcount - 1; i >= 0; i--)
+	{
+		defarg			= code->funccall_argdefs[i];
+		defarg->type	= type_array_to_ptr(defarg->type);
+		size			= get_type_size(defarg->type);
+
+		debug("POP %s", strndup(defarg->name, defarg->name_len));
+
+		// レジスタに入れる
+		if (defarg->arg_regindex != -1)
+		{
+			if (size <= 8)
 			{
-				printf("    mov rax, [rax]\n");
-				printf("    sub rax, rdi\n");
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
+				mov(arg_regs[defarg->arg_regindex], RAX);
+				continue ;
 			}
+			for (j = size - 8; j >= 0; j -= 8)
+			{
+				printf("    %s %s, [%s + %d]\n", ASM_MOV,
+					arg_regs[defarg->arg_regindex - j / 8],
+					 RSP, pop_count++ * 8);
+			}
+			continue ;
+		}
 
-			assign_epilogue(node->type);
-			return ;
-		}
-		case ND_COMP_MUL:
-		{
-			assign_prologue(node);
+		debug("OFFSET %d", defarg->offset);
 
-			push();
-			gen(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    imul rax, rdi\n");
+		// スタックに積む
+		// 必ず8byteアラインなので楽々実装
+		size = align_to(size, 8);
 
-			assign_epilogue(node->type);
-			return;
-		}
-		case ND_COMP_DIV:
-		{
-			assign_prologue(node);
+		printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
+		mov(R10, RSP);
 
-			push();
-			gen(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    cdq\n");
-			printf("    idiv edi\n");
+		printf("    sub %s, %d\n", R10,
+				(defarg->offset + 16) + rbp_offset);
 
-			assign_epilogue(node->type);
-			return ;
-		}
-		case ND_COMP_MOD:
-		{
-			assign_prologue(node);
+		// STRUCTならptr先を渡す
+		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
+			store_ptr(size, false);
+		else
+			store_value(size);
+	}
 
-			push();
-			gen(node->rhs);
-			mov(RDI, RAX);
-			pop(RAX);
-			// TODO 整数だけ？
-			printf("    mov rax, [rax]\n");
-			printf("    cdq\n");
-			printf("    idiv edi\n");
-			mov(RAX, RDX);
+	// rspを移動する
+	if (rbp_offset != 0)
+	{
+		if (!is_aligned)
+			debug("aligned + 8");
+		debug("rbp_offset");
+		printf("    sub %s, %d\n", RSP, rbp_offset);
+	}
 
-			assign_epilogue(node->type);
-			return ;
-		}
-		case ND_BITWISE_AND:
-		{
-			gen(node->lhs);
-			push();
-			gen(node->rhs);
-			pop(RDI);
+	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
+	if (is_memory_type(deffunc->type_return))
+	{
+		printf("    lea %s, [%s - %d]\n", RDI, RBP, code->funccall_save_pos->offset);
+	}
 
-			printf("   and %s, %s\n", RAX, RDI);
-			return ;
-		}
-		case ND_BITWISE_XOR:
-		{
-			gen(node->lhs);
-			push();
-			gen(node->rhs);
-			pop(RDI);
+	// call
+	debug("CALL RBP_OFFSET: %d", rbp_offset);
+	if (deffunc->is_variable_argument)
+		movi(AL, 0);
+	printf("    call _%s\n", strndup(deffunc->name, deffunc->name_len));
 
-			printf("   xor %s, %s\n", RAX, RDI);
-			return ;
-		}
-		case ND_BITWISE_OR:
-		{
-			gen(node->lhs);
-			push();
-			gen(node->rhs);
-			pop(RDI);
+	// rspを元に戻す
+	if (rbp_offset != 0)
+	{
+		debug("rbp_offset");
+		printf("    add %s, %d\n", RSP, rbp_offset);
+	}
 
-			printf("    or %s, %s\n", RAX, RDI);
-			return ;
-		}
-		case ND_SHIFT_RIGHT:
-		{
-			gen(node->rhs);
-			push();
-			gen(node->lhs);
-			pop(RDI);
-			mov(CL, DIL);
+	// stack_countをあわせる
+	debug("pop_count");
+	printf("    add %s, %d\n", RSP, pop_count * 8);
+	debug("POP ALL %d -> %d", stack_count, stack_count - pop_count * 8);
+	stack_count -= pop_count * 8;
 
-			printf("    shr %s, %s\n", RAX, CL);
-			return;
-		}
-		case ND_SHIFT_LEFT:
-		{
-			gen(node->rhs);
-			push();
-			gen(node->lhs);
-			pop(RDI);
-			mov(CL, DIL);
+	// 返り値がMEMORYなら、raxにアドレスを入れる
+	if (is_memory_type(deffunc->type_return))
+	{
+		printf("    lea %s, [%s - %d]\n", RAX, RBP, code->funccall_save_pos->offset);
+		push();
+	}
+	// 返り値がstructなら、rax, rdxを移動する
+	else if (deffunc->type_return->ty == TY_STRUCT)
+	{
+		size = align_to(get_type_size(deffunc->type_return), 8);
+		printf("    lea %s, [%s - %d]\n", RDI, RBP, code->funccall_save_pos->offset);
+		if (size > 0)
+			printf("    mov [%s], %s\n", RDI, RAX);
+		if (size > 8)
+			printf("    mov [%s + 8], %s\n", RDI, RDX);
+		mov(RAX, RDI);
+		push();
+	}
+	// それ以外(int, char, ptrとか)ならraxをpushする
+	else
+	{
+		push();
+	}
+}
 
-			printf("    shl %s, %s\n", RAX, CL);
-			return;
-		}
-		case ND_DEREF:
+static void	gen_macro_va_start(t_il *code)
+{
+	int		min_offset;
+	int		max_argregindex;
+	t_lvar	*def;
+
+	pop(RAX);
+
+	printf("    sub rsp, 48\n");
+	printf("    mov [rsp + 0], rdi\n");
+	printf("    mov [rsp + 8], rsi\n");
+	printf("    mov [rsp + 16], rdx\n");
+	printf("    mov [rsp + 24], rcx\n");
+	printf("    mov [rsp + 32], r8\n");
+	printf("    mov [rsp + 40], r9\n");
+
+	// overflow arg area
+	min_offset = 0;
+	max_argregindex = -1;
+
+	for (def = code->funccall_caller->locals; def; def = def->next)
+	{
+		min_offset = min(def->offset, min_offset);
+		max_argregindex = max(max_argregindex, def->arg_regindex);
+		debug(" # LOOP %d\n", def->arg_regindex);
+	}
+
+	mov(RDI, RAX);
+
+	printf("    mov dword ptr [rdi], %d\n", (1 + max_argregindex) * 8); // gp offset
+	printf("    mov dword ptr [rdi + 4], 0\n\n"); // fp_offset
+
+	printf("    mov rax, rbp\n");
+	printf("    add rax, %d\n", - min_offset);
+	printf("    mov [rdi + 8], rax\n"); // overflow arg area
+	printf("    mov [rdi + 16], rsp\n\n"); // reg save area
+
+	debug("    VA_START");
+	debug("    gp_offset : %d", (1 + max_argregindex) * 8);
+	debug("    fp_offset : %d", 0 * 8);
+}
+
+static void gen_func_prologue(t_il *code)
+{
+	stack_count = 0;
+
+	mov(RAX, RBP);
+	push();
+	mov(RBP, RSP);
+	g_funcnow_locals = NULL;
+	g_funcnow_offset = 0;
+
+	// 返り値がMEMORYなら、rdiからアドレスを取り出す
+	if (is_memory_type(code->deffunc_def->type_return))
+	{
+		printf("    mov [rbp - %d], %s\n", code->deffunc_def->locals->offset, RDI);
+	}	
+}
+
+static void	gen_func_epilogue(t_il *code)
+{
+	int	size;
+
+	// MEMORYなら、rdiのアドレスに格納
+	if (is_memory_type(code->type))
+	{
+		printf("    mov %s, [rbp - %d]\n", R10, code->deffunc_def->locals->offset);
+		store_ptr(get_type_size(code->type), false);
+
+		// RDIを復元する
+		printf("    mov %s, [rbp - %d]\n", RDI, code->deffunc_def->locals->offset);
+	}
+	// STRUCTなら、rax, rdxに格納
+	else if (code->type->ty == TY_STRUCT)
+	{
+		size = align_to(get_type_size(code->type), 8);
+		if (size > 8)
+			printf("    mov %s, [%s  - 8]\n", RDX, RAX);
+		if (size > 0)
+			printf("    mov %s, [%s]\n", RAX, RAX);
+	}
+	else if (code->type->ty != TY_VOID)
+		pop(RAX);
+
+	mov(RSP, RBP);
+	pop(RBP);
+	printf("    ret\n");
+
+	g_funcnow_locals = NULL;
+
+	stack_count = 0;
+}
+
+static void	gen_def_var_local(t_il *code)
+{
+	t_lvar	*def;
+	int		size;
+	int		index;
+	int		offset_before;
+
+	// TODO 引数の配列型
+	def		= code->var_local;
+	size	= get_type_size(def->type);
+
+	// offsetを設定する
+	if (!def->is_arg || def->arg_regindex != -1)
+	{
+		offset_before	= g_funcnow_offset;
+		g_funcnow_offset= align_to(g_funcnow_offset + size, 8);
+		def->offset		= g_funcnow_offset;
+
+		printf("    sub %s, %d\n", RSP, g_funcnow_offset - offset_before);
+		stack_count += g_funcnow_offset - offset_before;
+	}
+
+	if (def->is_arg)
+	{
+		debug("ARG %s", strndup(def->name, def->name_len));
+		if (def->arg_regindex != -1)
 		{
-			gen(node->lhs);// ここと同じ
-			load(node->type);
-			return;
-		}
-		case ND_BITWISE_NOT:
-		{
-			gen(node->lhs);
-			printf("    xor %s, -1\n", RAX);
-			return;
-		}
-		case ND_MEMBER_VALUE:
-		case ND_MEMBER_PTR_VALUE:
-		{
-			arrow(node, false);
-			return;
-		}
-		case ND_CAST:
-		{
-			gen(node->lhs);
-			cast(node->lhs->type, node->type);
-			return;
-		}
-		case ND_VAR_LOCAL:
-		{
-			lval(node);
-			load(node->type);
-			return ;
-		}
-		case ND_VAR_GLOBAL:
-		{
-			lval(node);
-			load(node->type);
-			return;
-		}
-		case ND_STR_LITERAL:
-		{
-			printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, RAX, node->def_str->index);
-			return;
-		}
-		case ND_CALL:
-		{
-			call(node);
-			return;
-		}
-		default:
-		{
-			error("不明なノード kind:%d type:%d", node->kind, node->type->ty);
-			return;
+			index = def->arg_regindex;
+			size = align_to(get_type_size(def->type), 8);
+	
+			mov(R10, RBP);
+			printf("    sub %s, %d\n", R10, def->offset);
+	
+			// とりあえず、かならず8byte境界になっている
+			// ↑ は？
+			while (size >= 8)
+			{
+				mov(RAX, arg_regs[index--]);
+				store_value(8);
+				size -= 8;
+				if (size != 0)
+				printf("    add %s, 8\n", R10);
+			}
 		}
 	}
 }
 
-static	t_lvar	*g_funcnow_locals;
+static void	gen_def_var_end(void)
+{
+	int	to;
+
+	to = align_to(stack_count, 16);
+	if (stack_count != to)
+		printf("    sub %s, %d\n", RSP, to - stack_count);
+	stack_count = to;
+}
 
 static void	gen_il(t_il *code)
 {
-
 	printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
@@ -957,26 +729,17 @@ static void	gen_il(t_il *code)
 			return;
 		}
 		case IL_FUNC_PROLOGUE:
-		{
-			mov(RAX, RBP);
-			push();
-			mov(RBP, RSP);
-			g_funcnow_locals = NULL;
+			gen_func_prologue(code);
 			return ;
-		}
 		case IL_FUNC_EPILOGUE:
-		{
-			// typeには返り値の型が入っている
-			// TODO 型を考慮する
-			if (code->type->ty != TY_VOID)
-				pop(RAX);
-
-			mov(RSP, RBP);
-			pop(RBP);
-			printf("    ret\n");
-			g_funcnow_locals = NULL;
+			gen_func_epilogue(code);
 			return ;
-		}
+		case IL_DEF_VAR_LOCAL:
+			gen_def_var_local(code);
+			return ;
+		case IL_DEF_VAR_END:
+			gen_def_var_end();
+			return ;
 
 		case IL_PUSH_AGAIN:
 		{
@@ -987,17 +750,23 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_NUM:
 			pushi(code->number_int);
 			return ;
+		case IL_STACK_SWAP:
+		{
+			// とりあえず型を何も考えずに交換する
+			pop(RAX);
+			mov(R10, RAX);
+
+			pop(RDI);
+			mov(RAX, RDI);
+			push();
+
+			mov(RAX, R10);
+			push();
+			return ;
+		}
 		case IL_POP:
 			// TODO 型
 			pop(RAX);
-			return ;
-
-		case IL_DEF_VAR_LOCAL:
-			// TODO 引数の配列型
-			printf("    sub %s, %d\n", RSP, get_type_size(code->lvar->type));
-			return ;
-		case IL_DEF_VAR_END:
-			// TODO アラインする
 			return ;
 
 		// TODO 型を考慮
@@ -1031,6 +800,7 @@ static void	gen_il(t_il *code)
 			pop(RAX);
 			printf("    cdq\n"); // d -> q -> o
 			printf("    idiv edi\n");
+			mov(RAX, RDX);
 			push();
 			return ;
 
@@ -1066,13 +836,60 @@ static void	gen_il(t_il *code)
 			printf("    movzx rax, al\n");
 			push();
 			return ;
+		case IL_BITWISE_AND:
+			pop(RAX);
+			pop(RDI);
+			printf("   and %s, %s\n", RAX, RDI);
+			push();
+			return ;
+		case IL_BITWISE_XOR:
+			pop(RAX);
+			pop(RDI);
+			printf("   xor %s, %s\n", RAX, RDI);
+			push();
+			return ;
+		case IL_BITWISE_OR:
+			pop(RAX);
+			pop(RDI);
+			printf("    or %s, %s\n", RAX, RDI);
+			push();
+			return ;
+		case IL_BITWISE_NOT:
+			pop(RAX);
+			printf("    xor %s, -1\n", RAX);
+			push();
+			return;
+		case IL_SHIFT_RIGHT:
+			pop(RDI);
+			pop(RAX);
+			mov(CL, DIL);
+			printf("    shr %s, %s\n", RAX, CL);
+			push();
+			return;
+		case IL_SHIFT_LEFT:
+			pop(RDI);
+			pop(RAX);
+			mov(CL, DIL);
+			printf("    shl %s, %s\n", RAX, CL);
+			push();
+			return;
 
 		case IL_ASSIGN:
 			pop(RAX);
 			pop(R10);
-			// TODO 型を考慮する
-			store_value(get_type_size(code->type));
-			push();
+			// TODO ARRAYに対する代入 ? 
+			if (code->type->ty == TY_ARRAY)
+			{
+				store_value(8);
+				push();
+			}
+			else if(code->type->ty == TY_STRUCT || code->type->ty == TY_UNION)
+				store_ptr(get_type_size(code->type), false);
+			else
+			{
+				store_value(get_type_size(code->type));
+				push();
+			}
 			return ;
 
 		case IL_VAR_LOCAL:
@@ -1080,16 +897,75 @@ static void	gen_il(t_il *code)
 			gen_il(code);
 			code->kind = IL_VAR_LOCAL;
 			pop(RAX);
-			load(code->lvar->type);
+			load(code->var_local->type);
 			push();
 			return ;
-
 		case IL_VAR_LOCAL_ADDR:
 			mov(RAX, RBP);
-			if (code->lvar->offset > 0)
-				printf("    sub %s, %d\n", RAX, code->lvar->offset);
-			else if (code->lvar->offset < 0)
-				printf("    add %s, %d\n", RAX, -code->lvar->offset);
+			if (code->var_local->offset > 0)
+				printf("    sub %s, %d\n", RAX, code->var_local->offset);
+			else if (code->var_local->offset < 0)
+				printf("    add %s, %d\n", RAX, -code->var_local->offset);
+			push();
+			return ;
+		case IL_VAR_GLOBAL:
+			code->kind = IL_VAR_GLOBAL_ADDR;
+			gen_il(code);
+			code->kind = IL_VAR_GLOBAL;
+			pop(RAX);
+			load(code->var_global->type);
+			push();
+			return ;
+		case IL_VAR_GLOBAL_ADDR:
+			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
+					strndup(code->var_global->name, code->var_global->name_len));
+			push();
+			return ;
+		// TODO genでoffsetの解決 , analyzeで宣言のチェック
+		case IL_MEMBER:
+		case IL_MEMBER_PTR:
+			pop(RAX);
+			printf("    add %s, %d\n", RAX, code->member->offset);
+			load(code->member->type);
+			push();
+			return ;
+		case IL_MEMBER_ADDR:
+		case IL_MEMBER_PTR_ADDR:
+			pop(RAX);
+			printf("    add %s, %d\n", RAX, code->member->offset);
+			push();
+			return ;
+		case IL_STR_LIT:
+			printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, RAX, code->def_str->index);
+			push();
+			return;
+
+		case IL_CALL_START:
+			gen_call_start(code);
+			return ;
+		case IL_CALL_ADD_ARG:
+			gen_call_add_arg(code);
+			return ;
+		case IL_CALL_EXEC:
+			gen_call_exec(code);
+			return ;
+		case IL_MACRO_VASTART:
+			gen_macro_va_start(code);
+			return ;
+
+		case IL_CAST:
+			// TODO とりあえずpop / pushしてます
+			printf("#CAST\n");
+			pop(RAX);
+			cast(code->cast_from, code->cast_to);
+			push();
+			printf("#CAST END\n");
+			return ;
+
+		case IL_LOAD:
+			// TODO とりあえずpop / pushしてます
+			pop(RAX);
+			load(code->type);
 			push();
 			return ;
 
