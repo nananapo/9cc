@@ -11,7 +11,7 @@ typedef enum	e_ilkind
 
 	IL_FUNC_PROLOGUE,
 	IL_FUNC_EPILOGUE,
-	IL_PUSH,
+	IL_PUSH_AGAIN,
 	IL_PUSH_NUM,
 	IL_POP,
 
@@ -33,13 +33,17 @@ typedef enum	e_ilkind
 
 	IL_VAR_LOCAL,
 	IL_VAR_LOCAL_ADDR,
+
+	IL_CALL_START,
+	IL_CALL_ADD_ARG,
+	IL_CALL_EXEC,
+	IL_MACRO_VASTART,
+
 // TODO
 // 関数開始時の変数準備
 // 関数終了時のstructとかのリターン
 // pushpopで型
-//
-// 左辺値は全てアドレスとして読む
-// 右辺値はLOAD命令をはさむ
+// ラベルとリターン, 変数宣言とか以外は結果をpush
 }	t_ilkind;
 
 typedef struct	s_il

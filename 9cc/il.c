@@ -14,12 +14,15 @@ static int	jumpLabelCount;
 
 
 
+static void	translate_condtional_and(t_node *node);
+static void	translate_condtional_or(t_node *node);
 static void	translate_return(t_node *node);
+static void	translate_block(t_node *node);
 static void	translate_if(t_node *node);
-static void	translate_while(t_node *node)
-static void	translate_dowhile(t_node *node)
-static void	translate_for(t_node *node)
-static void	translate_switch(t_node *node)
+static void	translate_while(t_node *node);
+static void	translate_dowhile(t_node *node);
+static void	translate_for(t_node *node);
+static void	translate_switch(t_node *node);
 static void	translate_node(t_node *node);
 static void	translate_func(t_deffunc *func);
 void		translate_il(void);
@@ -60,19 +63,124 @@ static t_il	*append_il_pushnum(int i)
 	return (code);
 }
 
+static t_il	*append_il_pop(t_type *type)
+{
+	t_il	*code;
+	code		= append_il(IL_POP);
+	code->type	= type;
+	return (code);
+}
+
+static void	translate_condtional_and(t_node *node)
+{
+	int		lend;
+	t_il	*code;
+
+	lend = ++jumpLabelCount;
+
+	// 左辺を評価
+	translate_node(node->lhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_NEQUAL);
+	code->type	= node->lhs->type; // TODO int?
+
+	// 結果をもう一回push
+	code		= append_il(IL_PUSH_AGAIN);
+	code->type	= node->type;
+
+	// 0ならジャンプ
+	code			= append_il(IL_JUMP_EQUAL);
+	code->label_str	= get_label_str(lend);
+
+	// 右辺を評価
+	translate_node(node->rhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_NEQUAL);
+	code->type	= node->rhs->type; // TODO int?
+
+	// 足し算 1 + 1
+	code		= append_il(IL_ADD);
+	code->type	= node->type;
+
+	// ラベル
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
+
+	// 2と比較
+	append_il_pushnum(2);
+	code		= append_il(IL_EQUAL);
+	code->type	= node->type; // TODO int?
+}
+
+static void	translate_condtional_or(t_node *node)
+{
+	int		lend;
+	t_il	*code;
+
+	lend = ++jumpLabelCount;
+
+	// 左辺を評価
+	translate_node(node->lhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_NEQUAL);
+	code->type	= node->lhs->type; // TODO int?
+
+	// 結果をもう一回push
+	code		= append_il(IL_PUSH_AGAIN);
+	code->type	= node->type;
+
+	// 0以外ならジャンプ
+	code			= append_il(IL_JUMP_NEQUAL);
+	code->label_str	= get_label_str(lend);
+
+	// 結果は使わないのでpopする
+	append_il_pop(node->type);
+
+	// 右辺を評価
+	translate_node(node->rhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_NEQUAL);
+	code->type	= node->rhs->type; // TODO int?
+
+	// ラベル
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
+}
+
+// return以外の文は値をpushする
 static void	translate_return(t_node *node)
 {
 	t_il	*code;
 
 	if (node->lhs != NULL)
-	{
 		translate_node(node->lhs);
-		code = append_il(IL_POP);
-		code->type = node->lhs->type;
-	}
 	code			= append_il(IL_JUMP);
 	code->label_str	= get_function_epi_label(node->funcdef->name, node->funcdef->name_len);
-	return ;
+}
+
+static void	translate_block(t_node *node)
+{
+	t_node	*last;
+	t_il	*code;
+
+	last = NULL;
+	for (;node != NULL && node->lhs != NULL; node = node->rhs)
+	{
+		translate_node(node->lhs);
+		append_il_pop(node->lhs->type);
+		last = node->lhs;
+	}
+
+	// 最後の結果をpushする
+	if (last != NULL)
+	{
+		code		= append_il(IL_PUSH_AGAIN);
+		code->type	= last->type;
+	}
 }
 
 static void	translate_if(t_node *node)
@@ -81,7 +189,6 @@ static void	translate_if(t_node *node)
 	int		lend;
 	int		lelse;
 
-	// assign label
 	lend	= ++jumpLabelCount;
 	lelse	= ++jumpLabelCount;
 
@@ -137,136 +244,216 @@ static void	translate_if(t_node *node)
 
 static void	translate_while(t_node *node)
 {
-			lbegin = jumpLabelCount++;
-			lend = jumpLabelCount++;
+	int		lbegin;
+	int		lend;
+	t_il	*code;
 
-			node->block_sbdata->startLabel = lbegin;
-			node->block_sbdata->endLabel = lend;
+	lbegin	= ++jumpLabelCount;
+	lend	= ++jumpLabelCount;
 
-			printf(".Lbegin%d:\n", lbegin); // continue先
-			
-			// if
-			gen(node->lhs);
-			mov(RDI, "0");
-			cmp(node->lhs->type);
-			printf("    je .Lend%d\n", lend);
-			
-			// while block
-			if (node->rhs != NULL)
-				gen(node->rhs);
-			
-			// next
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			// end
-			printf(".Lend%d:\n", lend); //break先
-			return;
+	// ラベルを割当
+	node->block_sbdata->startLabel	= lbegin;
+	node->block_sbdata->endLabel	= lend;
+
+	// continue先
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lbegin);
+
+	// while (lhs)
+	translate_node(node->lhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_EQUAL);
+	code->type	= node->lhs->type;
+
+	code			= append_il(IL_JUMP_EQUAL);
+	code->label_str	= get_label_str(lend);
+
+	// while () rhs
+	if (node->rhs != NULL)
+	{
+		translate_node(node->rhs);
+		append_il_pop(node->rhs->type);
+	}
+
+	// next
+	code			= append_il(IL_JUMP);
+	code->label_str	= get_label_str(lbegin);
+	
+	// end
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
+
+	append_il_pushnum(0);
 }
 
 static void	translate_dowhile(t_node *node)
 {
-			lbegin = jumpLabelCount++;
-			lbegin2 = jumpLabelCount++;
-			lend = jumpLabelCount++;
+	int		lbegin;
+	int		lbegin2;
+	int		lend;
+	t_il	*code;
 
-			node->block_sbdata->startLabel = lbegin2;
-			node->block_sbdata->endLabel = lend;
-			
-			printf(".Lbegin%d:\n", lbegin);
+	lbegin	= ++jumpLabelCount;
+	lbegin2	= ++jumpLabelCount;
+	lend	= ++jumpLabelCount;
 
-			// while block
-			if (node->lhs != NULL)
-				gen(node->lhs);
+	// ラベルを割当
+	node->block_sbdata->startLabel	= lbegin2;
+	node->block_sbdata->endLabel	= lend;
 
-			// if
-			printf(".Lbegin%d:\n", lbegin2); // continueで飛ぶ先
-			gen(node->rhs);
-			mov(RDI, "0");
-			cmp(node->rhs->type);
-			printf("    jne .Lbegin%d\n", lbegin);
-			printf(".Lend%d:\n", lend); // break先
-			return;
+	// start
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lbegin);
+
+	// while block
+	if (node->lhs != NULL)
+	{
+		translate_node(node->lhs);
+		append_il_pop(node->lhs->type);
+	}
+
+	// continue
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lbegin);
+
+	// if
+	translate_node(node->rhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_NEQUAL);
+	code->type	= node->rhs->type;
+
+	code			= append_il(IL_JUMP_NEQUAL);
+	code->label_str	= get_label_str(lbegin);
+
+	// end
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
+
+	append_il_pushnum(0);
 }
 
 static void	translate_for(t_node *node)
 {
-			lbegin = jumpLabelCount++;
-			lbegin2 = jumpLabelCount++;
-			lend = jumpLabelCount++;
-			
-			node->block_sbdata->startLabel = lbegin2;
-			node->block_sbdata->endLabel = lend;
+	int		lbegin;
+	int		lbegin2;
+	int		lend;
+	t_il	*code;
 
-			// init
-			if (node->for_expr[0] != NULL)
-				gen(node->for_expr[0]);
+	lbegin	= ++jumpLabelCount;
+	lbegin2	= ++jumpLabelCount;
+	lend	= ++jumpLabelCount;
 
-			printf(".Lbegin%d:\n", lbegin);
-			
-			// if
-			if(node->for_expr[1] != NULL)
-			{
-				gen(node->for_expr[1]);
-				mov(RDI, "0");
-				cmp(node->for_expr[1]->type);
-				printf("    je .Lend%d\n", lend);
-			}
+	// ラベルを割当
+	node->block_sbdata->startLabel	= lbegin2;
+	node->block_sbdata->endLabel	= lend;
 
-			// for-block
-			if (node->lhs != NULL)
-				gen(node->lhs);
+	// for (0;)
+	if (node->for_expr[0] != NULL)
+	{
+		translate_node(node->for_expr[0]);
+		append_il_pop(node->for_expr[0]->type);
+	}
 
-			printf(".Lbegin%d:\n", lbegin2); // continue先
-			// next
-			if(node->for_expr[2] != NULL)
-				gen(node->for_expr[2]);
+	// continue
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lbegin);
+	
+	// for (;1;)
+	if(node->for_expr[1] != NULL)
+	{
+		translate_node(node->for_expr[1]);
+		append_il_pushnum(0);
 
-			printf("    jmp .Lbegin%d\n", lbegin);
-			
-			//end
-			printf(".Lend%d:\n", lend); // break先
-			return;
+		code		= append_il(IL_EQUAL);
+		code->type	= node->for_expr[1]->type; // TODO これ、構造体かどうかとかのチェックしてます?
+
+		code			= append_il(IL_JUMP_EQUAL);
+		code->label_str = get_label_str(lend);
+	}
+
+	// for() lhs
+	if (node->lhs != NULL)
+	{
+		translate_node(node->lhs);
+		append_il_pop(node->lhs->type);
+	}
+
+	// continue
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lbegin2);
+
+	// for (;;2)
+	if(node->for_expr[2] != NULL)
+	{
+		translate_node(node->for_expr[2]);
+		append_il_pop(node->for_expr[2]->type);
+	}
+
+	code			= append_il(IL_JUMP);
+	code->label_str	= get_label_str(lbegin);
+	
+	//end
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
+
+	append_il_pushnum(0);
 }
 
 static void	translate_switch(t_node *node)
 {
-			lbegin = jumpLabelCount++;
-			lend = jumpLabelCount++;
+	int				lbegin;
+	int				lend;
+	t_il			*code;
+	t_switchcase	*cases;
 
-			// ケースのラベルに数字を振る
-			for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
-				cases->label = jumpLabelCount++;
-	
-			// 評価
-			gen(node->lhs);
-			printf("    mov [rsp - 8], rax\n"); //結果を格納
+	lbegin	= ++jumpLabelCount;
+	lend	= ++jumpLabelCount;
 
-			// if
-			debug("    switch def:%d, end:%d", lbegin, lend);
-			for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
-			{
-				printf("    mov rax, [rsp - 8]\n");
-				movi(RDI, cases->value);
-				cmp(node->lhs->type);
-				printf("    je .Lswitch%d\n", cases->label);
-			}
-			// defaultかendに飛ばす
-			if (node->switch_has_default)
-				printf("    jmp .Lswitch%d\n", lbegin);
-			else
-				printf("    jmp .Lend%d\n", lend);
+	// ラベルを割当
+	node->block_sbdata->startLabel		= -1; // TODO これ必要？
+	node->block_sbdata->endLabel		= lend;
+	node->block_sbdata->defaultLabel	= lbegin;
 
-			debug("    switch in");
+	// ケースのラベルに数字を振る
+	for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
+		cases->label = ++jumpLabelCount;
 
-			// 文を出力
-			node->block_sbdata->startLabel = -1;
-			node->block_sbdata->endLabel = lend;
-			node->block_sbdata->defaultLabel = lbegin;
-			
-			gen(node->rhs);
+	// switch (lhs)
+	translate_node(node->lhs);
 
-			printf(".Lend%d:\n", lend);
-			return ;
+	// 結果を保存
+	code		= append_il(IL_ASSIGN);
+	code->lvar	= node->switch_save;
+
+	// if
+	for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
+	{
+		code		= append_il(IL_VAR_LOCAL);
+		code->lvar	= node->switch_save;
+
+		append_il_pushnum(cases->value);
+
+		code		= append_il(IL_EQUAL);
+		code->type	= node->lhs->type;
+
+		code			= append_il(IL_JUMP_EQUAL);
+		code->label_str	= get_label_str(cases->label);
+	}
+
+	// defaultかendに飛ばす
+	code			= append_il(IL_JUMP);
+	if (node->switch_has_default)
+		code->label_str	= get_label_str(lbegin);
+	else
+		code->label_str	= get_label_str(lend);
+
+	translate_node(node->rhs);
+
+	//end
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
 }
 
 static void	translate_node(t_node *node)
@@ -280,23 +467,11 @@ static void	translate_node(t_node *node)
 	switch(node->kind)
 	{
 		case ND_BLOCK:
-		{
-			while (node != NULL)
-			{
-				if (node->lhs == NULL)
-					return ;
-				translate_node(node->lhs);
-				if (node->lhs->kind != ND_NONE)
-					append_il(IL_POP);
-				node = node->rhs;
-			}
+			translate_block(node);
 			return ;
-		}
 		case ND_NUM:
-		{
 			append_il_pushnum(node->val);
 			return ;
-		}
 
 		// TODO analyzeで両方の型が一致している状態にする
 		case ND_ADD:
@@ -354,6 +529,12 @@ static void	translate_node(t_node *node)
 			code->lvar	= node->lvar;
 			return ;
 		}
+		case ND_COND_AND:
+			translate_condtional_and(node);
+			return ;
+		case ND_COND_OR:
+			translate_condtional_or(node);
+			return ;
 		case ND_RETURN:
 			translate_return(node);
 			return ;
@@ -373,9 +554,11 @@ static void	translate_node(t_node *node)
 			translate_switch(node);
 			return ;
 		case ND_NONE:
+			append_il_pushnum(0);
+			node->type = new_primitive_type(TY_INT);
 			return ;
 		case ND_SIZEOF:
-			fprintf(stderr, "sizeof not allowed\n", node->kind);
+			fprintf(stderr, "sizeof not allowed\n");
 			error("Error");
 			return ;
 		default:
@@ -410,7 +593,8 @@ static void	translate_func(t_deffunc *func)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_function_epi_label(func->name, func->name_len);
 
-	append_il(IL_FUNC_EPILOGUE);
+	code		= append_il(IL_FUNC_EPILOGUE);
+	code->type	= func->type_return;
 }
 
 void	translate_il(void)

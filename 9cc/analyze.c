@@ -279,6 +279,9 @@ static t_node	*analyze_call(t_node *node)
 	t_lvar	*lvtmp;
 	int		i;
 
+	// set caller
+	node->funccall_caller = g_func_now;
+
 	// function exist?
 	if (node->funcdef == NULL)
 		error_at(node->analyze_source, "関数%sがみつかりません",
@@ -798,6 +801,9 @@ static t_node	*analyze_switch(t_node *node)
 	node->block_sbdata = data;
 	node->switch_has_default = data->defaultLabel != -1;
 
+	// lhsの保存用
+	node->switch_save = create_lvar(g_func_now, "", 0, node->lhs->type, false);
+	node->switch_save->is_dummy = true;
 	return (node);
 }
 

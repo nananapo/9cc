@@ -93,7 +93,7 @@ typedef struct s_token
 
 typedef enum e_nodekind
 {
-	ND_NONE, // 式ではないものはND_NONEにする
+	ND_NONE,
 	ND_ANALYZE_VAR,
 	ND_CALL,
 	ND_BLOCK,
@@ -333,6 +333,7 @@ struct s_deffunc
 	int				funccall_argcount;
 	struct s_node	*funccall_args[20];
 	t_lvar			*funccall_argdefs[20];
+	struct s_deffunc*funccall_caller;
 
 	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
 	t_lvar			*call_mem_stack;
@@ -342,6 +343,8 @@ struct s_deffunc
 	// valとlabelでswicth-case
 	t_switchcase	*case_label;
 	bool			switch_has_default; // TODO labelstackに移動する
+
+	t_lvar			*switch_save; // switch (lvar)
 
 	t_labelstack	*block_sbdata;
 
