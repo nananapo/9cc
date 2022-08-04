@@ -27,7 +27,6 @@ unique() {
 }
 
 assert_async(){
-
 	uni="$2"
 
 	input="$prefix`cat $testdir/$1`"
@@ -52,7 +51,6 @@ assert_async(){
 
 	./$targetname &> $actresname
 	actual_status="${PIPESTATUS[0]}"
-	actual="`cat -e $actresname`"
 
 	echo "$input" > $cname
 	cc -w -o $targetname $cname $module
@@ -63,15 +61,15 @@ assert_async(){
 
 	./$targetname &> $expresname
 	expected_status="${PIPESTATUS[0]}"
-	actual="`cat -e $expresname`"
 
 	if [ "$actual_status" != "$expected_status" ]; then
-  	  echo "STATUS KO => $1" >> tmp/err
+  	  echo "STATUS KO $1 act:$actual_status exp:$expected_status" >> tmp/err
   	  exit 1
 	fi
 
-  	if [ "$actual" = "$expected" ]; then
-  	  echo "$1 => OK"
+  	if [ "`diff $actresname $expresname`" = "" ]; then
+	  echo -n
+ # 	  echo "$1 => OK"
   	else
   	  echo "OUTPUT KO => $1" >> tmp/err
   	  exit 1

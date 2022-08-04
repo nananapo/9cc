@@ -1063,9 +1063,9 @@ static void	analyze_func(t_deffunc *func)
 	// check argument types
 	for (i = 0; i < func->argcount; i++)
 	{
-		name = func->argument_names[i];
-		name_len = func->argument_name_lens[i];
-		type = func->type_arguments[i];
+		name		= func->argument_names[i];
+		name_len	= func->argument_name_lens[i];
+		type		= func->type_arguments[i];
 
 		// if array type, change type to ptr
 		type = type_array_to_ptr(type);
@@ -1084,6 +1084,19 @@ static void	analyze_func(t_deffunc *func)
 	
 	if (!func->is_prototype)
 		func->stmt = analyze_node(func->stmt);
+
+	// main関数
+	// TODO 引数と返り値の型のチェック
+	if (func->name_len == 4 && strncmp(func->name, "main", 4) == 0)
+	{
+		if (!func->is_prototype)
+		{
+			func->stmt = new_node(ND_BLOCK,
+								func->stmt,
+								new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL));
+			func->stmt = analyze_node(func->stmt);
+		}	
+	}
 
 	g_func_now = NULL;
 }
