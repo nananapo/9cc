@@ -35,6 +35,8 @@ assert_async(){
 	asmname="./tmp/asm_$uni.s"
 	cname="./tmp/c_$uni.c"
 	targetname="./tmp/exe_$uni"
+	actresname="./tmp/act_$uni.txt"
+	expresname="./tmp/exp_$uni.txt"
 
     echo "$input" | $prpr - | $ncc > $asmname
 	if [ "$?" != "0" ]; then
@@ -48,8 +50,9 @@ assert_async(){
 		exit 1
 	fi
 
-	actual="`./$targetname | cat -e`"
+	./$targetname &> $actresname
 	actual_status="${PIPESTATUS[0]}"
+	actual="`cat -e $actresname`"
 
 	echo "$input" > $cname
 	cc -w -o $targetname $cname $module
@@ -58,8 +61,9 @@ assert_async(){
 		exit 1
 	fi
 
-	expected="`./$targetname | cat -e`"
+	./$targetname &> $expresname
 	expected_status="${PIPESTATUS[0]}"
+	actual="`cat -e $expresname`"
 
 	if [ "$actual_status" != "$expected_status" ]; then
   	  echo "STATUS KO => $1" >> tmp/err
@@ -382,6 +386,7 @@ assert "union3.c"
 assert "union4.c"
 
 assert "condop.c"
+assert "condop2.c"
 
 assert "bitwise_and.c"
 assert "bitwise_or.c"

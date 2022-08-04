@@ -716,6 +716,7 @@ assert_gcc "union3.c"
 assert_gcc "union4.c"
 
 assert_gcc "condop.c"
+assert_gcc "condop2.c"
 
 assert_gcc "bitwise_and.c"
 assert_gcc "bitwise_or.c"

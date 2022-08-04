@@ -115,63 +115,31 @@ static void store_ptr(int size, bool minus_step)
 		if (delta >= 8)
 		{
 			from = R11;
-			if (i != 0)
-			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV, from, RAX, i);
-				printf("    %s [%s %s %d], %s\n", ASM_MOV, dest, op, i, from);
-			}
-			else
-			{
-				printf("    %s %s, [%s]\n", ASM_MOV, from, RAX);
-				printf("    %s [%s], %s\n", ASM_MOV, dest, from);
-			}
+			printf("    %s %s, [%s + %d]\n", ASM_MOV, from, RAX, i);
+			printf("    %s [%s %s %d], %s\n", ASM_MOV, dest, op, i, from);
 			continue ;
 		}
 		if (delta >= 4)
 		{
 			from = R11D;
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, DWORD_PTR, RAX, i);
-				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, DWORD_PTR, dest, op,  i, from);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, from, DWORD_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, DWORD_PTR, dest, from);
-			}
+			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, DWORD_PTR, RAX, i);
+			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, DWORD_PTR, dest, op,  i, from);
 			i += 4;
 			delta -= 4;
 		}
 		if (delta >= 2)
 		{
 			from = R11W;
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, WORD_PTR, RAX, i);
-				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, WORD_PTR, dest, op, i, from);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, from, WORD_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, WORD_PTR, dest, from);
-			}
+			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, WORD_PTR, RAX, i);
+			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, WORD_PTR, dest, op, i, from);
 			i += 2;
 			delta -= 2;
 		}
 		if (delta >= 1)
 		{
 			from = R11B;
-			if (i != 0)
-			{
-				printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, BYTE_PTR, RAX, i);
-				printf("    %s %s [%s %s %d], %s\n", ASM_MOV, BYTE_PTR, dest, op, i, from);
-			}
-			else
-			{
-				printf("    %s %s, %s [%s]\n", ASM_MOV, from, BYTE_PTR, RAX);
-				printf("    %s %s [%s], %s\n", ASM_MOV, BYTE_PTR, dest, from);
-			}
+			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, BYTE_PTR, RAX, i);
+			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, BYTE_PTR, dest, op, i, from);
 			i += 1;
 			delta -= 1;
 		}
@@ -884,7 +852,10 @@ static void	gen_il(t_il *code)
 				push();
 			}
 			else if(code->type->ty == TY_STRUCT || code->type->ty == TY_UNION)
+			{
 				store_ptr(get_type_size(code->type), false);
+				push(); // TODO これOK?
+			}
 			else
 			{
 				store_value(get_type_size(code->type));

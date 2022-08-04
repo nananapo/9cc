@@ -18,6 +18,7 @@ int	main(void)
 	}
 	while (a++ < 100);
 
+
 	a = 0;
 	do
 	{

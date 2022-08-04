@@ -6,7 +6,7 @@ int	main(void)
 {
 	int	i;
 
-	for(i = -18; i < 18; i++)
+	for(i = -18; i < 18; i = i + 1)
 	{
 		pint(i);
 		pspace(1);
