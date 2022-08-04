@@ -47,6 +47,7 @@ compile "typeutil"
 compile "varutil"
 compile "analyze"
 compile "mymath"
+compile "il"
 compile "error"
 
 #mgcc "charutil"
@@ -62,7 +63,8 @@ compile "error"
 #mgcc "varutil"
 #mgcc "analyze"
 #mgcc "mymath"
+#mgcc "il"
 #mgcc "error"
 
 cd $DIR
-gcc -o ../9cc charutil.s fileutil.s gen.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s analyze.s mymath.s error.s
+gcc -o ../9cc charutil.s fileutil.s gen.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s analyze.s mymath.s il.s error.s

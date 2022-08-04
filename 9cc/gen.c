@@ -246,43 +246,6 @@ static void	cast(t_type *from, t_type *to)
 	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
-/* rax, rdi
-static void	create_add(bool is_add, t_type *l, t_type *r)
-{
-	int	size;
-
-	debug("    add(%d) %s(%d) + %s(%d)", is_add,
-			get_type_name(l), get_type_size(l),
-			get_type_name(r), get_type_size(r));
-
-	if (is_integer_type(l))
-	{
-		size = get_type_size(l);
-		if (size == 4)
-			printf("    movsxd rax, eax\n");
-		else if (size == 2)
-			printf("    movsx rax, ax\n");
-		else if (size == 1)
-			printf("    movsx rax, al\n");
-	}
-
-	if (is_integer_type(r))
-	{
-		size = get_type_size(r);
-		if (size == 4)
-			printf("    movsxd rdi, edi\n");
-		else if (size == 2)
-			printf("    movsx rdi, di\n");
-		else if (size == 1)
-			printf("    movsx rdi, dil\n");
-	}
-
-	if (is_add)
-		printf("    add rax, rdi\n");
-	else
-		printf("    sub rax, rdi\n");
-}*/
-
 static void	print_global_constant(t_node *node, t_type *type)
 {
 	t_node	*notmp;
@@ -335,6 +298,7 @@ static void gen_defglobal(t_defvar *node)
 
 static t_lvar	*g_funcnow_locals;
 static int		g_funcnow_offset;
+static int		aligned_stack_def_var_end;
 
 static void	gen_call_start(t_il *code)
 {
@@ -570,7 +534,7 @@ static void gen_func_prologue(t_il *code)
 	// 返り値がMEMORYなら、rdiからアドレスを取り出す
 	if (is_memory_type(code->deffunc_def->type_return))
 	{
-		printf("    mov [rbp - %d], %s\n", code->deffunc_def->locals->offset, RDI);
+		printf("    mov [rbp - %d], %s\n", code->deffunc_def->locals->offset, RDI); // 必ずoffsetが8なので、今のところおかしくならない....
 	}	
 }
 
@@ -581,6 +545,7 @@ static void	gen_func_epilogue(t_il *code)
 	// MEMORYなら、rdiのアドレスに格納
 	if (is_memory_type(code->type))
 	{
+		pop(RAX);
 		printf("    mov %s, [rbp - %d]\n", R10, code->deffunc_def->locals->offset);
 		store_ptr(get_type_size(code->type), false);
 
@@ -590,6 +555,7 @@ static void	gen_func_epilogue(t_il *code)
 	// STRUCTなら、rax, rdxに格納
 	else if (code->type->ty == TY_STRUCT)
 	{
+		pop(RAX);
 		size = align_to(get_type_size(code->type), 8);
 		if (size > 8)
 			printf("    mov %s, [%s  - 8]\n", RDX, RAX);
@@ -599,11 +565,22 @@ static void	gen_func_epilogue(t_il *code)
 	else if (code->type->ty != TY_VOID)
 		pop(RAX);
 
+	printf("    sub %s, %d\n", RSP, aligned_stack_def_var_end);
+	stack_count -= aligned_stack_def_var_end;
+
 	mov(RSP, RBP);
 	pop(RBP);
 	printf("    ret\n");
 
 	g_funcnow_locals = NULL;
+
+
+	if (stack_count != 0)
+	{
+		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
+		error("Error");
+	}
+
 
 	stack_count = 0;
 }
@@ -662,19 +639,24 @@ static void	gen_def_var_end(void)
 	to = align_to(stack_count, 16);
 	if (stack_count != to)
 		printf("    sub %s, %d\n", RSP, to - stack_count);
+	if (stack_count != 8)
+		aligned_stack_def_var_end = to - 8;
+	else
+		aligned_stack_def_var_end = to - stack_count;
 	stack_count = to;
 }
 
 static void	gen_il(t_il *code)
 {
-	printf("# kind %d\n", code->kind);
+	//printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
 		case IL_LABEL:
 		{
 			if (code->label_is_deffunc)
 			{
-				printf(".globl _%s\n", code->label_str);
+				if (!code->label_is_static_func)
+					printf(".globl _%s\n", code->label_str);
 				printf("_%s:\n", code->label_str);
 			}
 			else	
@@ -688,11 +670,13 @@ static void	gen_il(t_il *code)
 		}
 		case IL_JUMP_EQUAL:
 		{
+			pop(RAX);
 			printf("    je %s\n", code->label_str);
 			return ;
 		}
 		case IL_JUMP_NEQUAL:
 		{
+			pop(RAX);
 			printf("    jne %s\n", code->label_str);
 			return;
 		}
@@ -712,6 +696,7 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_AGAIN:
 		{
 			// TODO 型
+			debug("AGAIN");
 			push();
 			return ;
 		}
@@ -725,10 +710,10 @@ static void	gen_il(t_il *code)
 			mov(R10, RAX);
 
 			pop(RDI);
-			mov(RAX, RDI);
+			mov(RAX, R10);
 			push();
 
-			mov(RAX, R10);
+			mov(RAX, RDI);
 			push();
 			return ;
 		}
@@ -753,7 +738,9 @@ static void	gen_il(t_il *code)
 		case IL_MUL:
 			pop(RDI);
 			pop(RAX);
-			printf("    imul rax, rdi\n");	
+			printf("    movsxd %s, %s\n", RAX, EAX);
+			printf("    movsxd %s, %s\n", RDI, EDI);
+			printf("    imul %s, %s\n", RAX, RDI);	
 			push();
 			return ;
 		case IL_DIV:

@@ -11,9 +11,9 @@ t_test	*ptr;
 
 void	change(t_test **p)
 {
-	*p = malloc(sizeof(t_test));
-	(*p)->a = 1000;
-	(*p)->b = 2000;
+//	*p = malloc(sizeof(t_test));
+//	(*p)->a = 1000;
+//	(*p)->b = 2000;
 }
 
 int	main(void)

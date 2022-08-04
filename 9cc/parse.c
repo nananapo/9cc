@@ -17,7 +17,7 @@ t_node		*new_node_num(int val);
 bool		consume_enum_key(t_type **type, int *value);
 t_str_elem	*get_str_literal(char *str, int len);
 
-t_node	 	*cast(t_node *node, t_type *to);
+static t_node 	*cast(t_node *node, t_type *to);
 static t_node	*call(t_token *tok);
 static t_node	*read_suffix_increment(t_node *node);
 static t_node	*read_deref_index(t_node *node);
@@ -134,8 +134,7 @@ t_str_elem	*get_str_literal(char *str, int len)
 	return (elem);
 }
 
-// TODO analyze用と分けて、analyze版はanalyze_nodeをしてしまう
-t_node	*cast(t_node *node, t_type *to)
+static t_node	*cast(t_node *node, t_type *to)
 {
 	node = new_node(ND_CAST, node, NULL);
 	node->type = to;

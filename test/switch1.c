@@ -4,4 +4,9 @@ int main(void)
 	{
 		break;
 	}
+
+	switch(1)
+	{
+	//	break;
+	}
 }

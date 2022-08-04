@@ -189,6 +189,9 @@ static void	translate_return(t_node *node)
 
 	if (node->lhs != NULL)
 		translate_node(node->lhs);
+	else
+		append_il_pushnum(0);
+
 	code			= append_il(IL_JUMP);
 	code->label_str	= get_function_epi_label(node->funcdef->name, node->funcdef->name_len);
 }
@@ -212,6 +215,51 @@ static void	translate_block(t_node *node)
 		code		= append_il(IL_PUSH_AGAIN);
 		code->type	= last->type;
 	}
+	// 中身が空なら0をpush
+	else
+	{
+		append_il_pushnum(100);
+	}
+}
+
+// lhs ? rhs : els
+// ifのpopしない版
+static void	translate_conditional_op(t_node *node)
+{
+	t_il	*code;
+	int		lend;
+	int		lelse;
+
+	lend	= ++jumpLabelCount;
+	lelse	= ++jumpLabelCount;
+
+	translate_node(node->lhs);
+	append_il_pushnum(0);
+
+	code		= append_il(IL_EQUAL);
+	code->type	= node->lhs->type;
+
+	code			= append_il(IL_JUMP_EQUAL);
+	code->label_str	= get_label_str(lelse);
+
+	// trueなら実行してlendにジャンプ
+	translate_node(node->rhs);
+
+	code			= append_il(IL_JUMP);
+	code->label_str	= get_label_str(lend);
+
+	// スタックの調整用pop
+	append_il_pop(node->rhs->type);
+
+	// false
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lelse);
+
+	translate_node(node->els);
+
+	// end label
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lend);
 }
 
 static void	translate_if(t_node *node)
@@ -228,51 +276,39 @@ static void	translate_if(t_node *node)
 
 	code		= append_il(IL_EQUAL);
 	code->type	= node->lhs->type;
+
+	code			= append_il(IL_JUMP_EQUAL);
+	code->label_str	= get_label_str(lelse);
+
+	// trueなら実行してlendにジャンプ
+	translate_node(node->rhs);
+	append_il_pop(node->rhs->type);
+
+	code			= append_il(IL_JUMP);
+	code->label_str	= get_label_str(lend);
+
+	// false
+	code			= append_il(IL_LABEL);
+	code->label_str	= get_label_str(lelse);
+
+	// else, else ifを実行
+	// analyzeでelse ifを消したい
 	if (node->elsif != NULL)
 	{
-		// falseならelseに飛ぶ
-		code			= append_il(IL_JUMP_EQUAL);
-		code->label_str	= get_label_str(lelse);
-
-		translate_node(node->rhs);
-
-		code			= append_il(IL_JUMP);
-		code->label_str	= get_label_str(lend);
-
-		// else if
-		code			= append_il(IL_LABEL);
-		code->label_str	= get_label_str(lelse);
-
 		translate_node(node->elsif);
+		append_il_pop(node->elsif->type);
 	}
 	else if (node->els != NULL)
 	{
-		// falseならelseに飛ぶ
-		code			= append_il(IL_JUMP_EQUAL);
-		code->label_str	= get_label_str(lelse);
-
-		translate_node(node->rhs);
-
-		code			= append_il(IL_JUMP);
-		code->label_str	= get_label_str(lend);
-
-		code			= append_il(IL_LABEL);
-		code->label_str	= get_label_str(lelse);
-
 		translate_node(node->els);
-	}
-	else
-	{
-		// else if
-		code			= append_il(IL_JUMP_EQUAL);
-		code->label_str	= get_label_str(lend);
-
-		translate_node(node->rhs);
+		append_il_pop(node->els->type);
 	}
 
 	// end label
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_label_str(lend);
+
+	append_il_pushnum(40);
 }
 
 static void	translate_while(t_node *node)
@@ -317,7 +353,7 @@ static void	translate_while(t_node *node)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_label_str(lend);
 
-	append_il_pushnum(0);
+	append_il_pushnum(10);
 }
 
 static void	translate_dowhile(t_node *node)
@@ -364,7 +400,7 @@ static void	translate_dowhile(t_node *node)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_label_str(lend);
 
-	append_il_pushnum(0);
+	append_il_pushnum(20);
 }
 
 static void	translate_for(t_node *node)
@@ -431,7 +467,7 @@ static void	translate_for(t_node *node)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_label_str(lend);
 
-	append_il_pushnum(0);
+	append_il_pushnum(30);
 }
 
 static void	translate_switch(t_node *node)
@@ -453,13 +489,17 @@ static void	translate_switch(t_node *node)
 	for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
 		cases->label = ++jumpLabelCount;
 
+	// 保存先のアドレスをpush
+	code			= append_il(IL_VAR_LOCAL_ADDR);
+	code->var_local	= node->switch_save;
+
 	// switch (lhs)
 	translate_node(node->lhs);
 
-	// 結果を保存
+	// 結果を保存してpop
 	code			= append_il(IL_ASSIGN);
 	code->type		= node->lhs->type; // TODO これint?
-	code->var_local	= node->switch_save;
+	append_il_pop(node->lhs->type);
 
 	// if
 	for (cases = node->block_sbdata->cases; cases != NULL; cases = cases->next)
@@ -484,10 +524,13 @@ static void	translate_switch(t_node *node)
 		code->label_str	= get_label_str(lend);
 
 	translate_node(node->rhs);
+	append_il_pop(node->rhs->type);
 
 	//end
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_label_str(lend);
+
+	append_il_pushnum(50);
 }
 
 static void	translate_node(t_node *node)
@@ -581,9 +624,12 @@ static void	translate_node(t_node *node)
 
 			translate_node(node->rhs);
 
+/*
+	あれ～？ これが必要ないのは謎ですね?
 			code			= append_il(IL_STACK_SWAP);
 			code->stack_up	= node->rhs->type;
 			code->stack_down= node->lhs->type->ptr_to;
+*/
 
 			// op
 			if (node->kind == ND_COMP_ADD)
@@ -594,7 +640,7 @@ static void	translate_node(t_node *node)
 				code	= append_il(IL_MUL);
 			else if (node->kind == ND_COMP_DIV)
 				code	= append_il(IL_DIV);
-			else if (node->kind == ND_COMP_MOD)
+			else// if (node->kind == ND_COMP_MOD)
 				code	= append_il(IL_MOD);
 			code->type	= node->type;
 
@@ -736,6 +782,9 @@ static void	translate_node(t_node *node)
 			append_il_pushnum(0);
 			return;
 		}
+		case ND_COND_OP:
+			translate_conditional_op(node);
+			return ;
 		case ND_IF:
 			translate_if(node);
 			return ;
@@ -753,7 +802,6 @@ static void	translate_node(t_node *node)
 			return ;
 		case ND_NONE:
 			append_il_pushnum(0);
-			node->type = new_primitive_type(TY_INT);
 			return ;
 		case ND_SIZEOF:
 			fprintf(stderr, "sizeof not allowed\n"); // TODO genまで持っていく
@@ -773,9 +821,10 @@ static void	translate_func(t_deffunc *func)
 	t_il	*code;
 	t_lvar	*lvar;
 
-	code					= append_il(IL_LABEL);
-	code->label_str			= strndup(func->name, func->name_len);
-	code->label_is_deffunc	= true;
+	code						= append_il(IL_LABEL);
+	code->label_str				= strndup(func->name, func->name_len);
+	code->label_is_deffunc		= true;
+	code->label_is_static_func	= func->is_static;
 
 	code				= append_il(IL_FUNC_PROLOGUE);
 	code->deffunc_def	= func;
@@ -789,6 +838,11 @@ static void	translate_func(t_deffunc *func)
 	append_il(IL_DEF_VAR_END);
 
 	translate_node(func->stmt);
+
+	if (func->type_return->ty == TY_VOID)
+	{
+		append_il_pop(func->stmt->type);
+	}
 
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_function_epi_label(func->name, func->name_len);

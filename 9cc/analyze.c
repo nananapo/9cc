@@ -11,7 +11,7 @@ t_lvar		*copy_lvar(t_lvar *f);
 t_type		*type_cast_forarg(t_type *type);
 void		alloc_argument_simu(t_lvar *first, t_lvar *lvar);
 
-t_node		*cast(t_node *node, t_type *to);
+static t_node	*cast(t_node *node, t_type *to);
 
 static t_node	*analyze_var_def(t_node *node);
 static t_node	*analyze_var(t_node *node);
@@ -141,6 +141,16 @@ static t_switchcase	*add_switchcase(t_labelstack *sbdata, int number)
 
 	//TODO 被りチェック
 	return (tmp);
+}
+
+
+// parse.cからのコピー
+static t_node	*cast(t_node *node, t_type *to)
+{
+	node = new_node(ND_CAST, node, NULL);
+	node->type = to;
+	node->analyze_source = node->lhs->analyze_source;
+	return (node);
 }
 
 
@@ -478,8 +488,6 @@ static t_node	*analyze_add(t_node *node)
 {
 	t_type	*l;
 	t_type	*r;
-	t_type	*tmp;
-	t_node	*node_tmp;
 	int		size;
 
 	node->lhs = analyze_node(node->lhs);
@@ -506,21 +514,9 @@ static t_node	*analyze_add(t_node *node)
 			node		= analyze_node(node);
 		}
 	}
-	// 左辺をポインタにする
-	// 両辺がポインタなら入れ替えない
 	else
-	{	if ((node->kind == ND_ADD || node->kind == ND_SUB)
-			&& is_pointer_type(r) && !is_pointer_type(l))
-		{
-			tmp = l;
-			l = r;
-			r = tmp;
-
-			node_tmp = node->lhs;
-			node->lhs = node->rhs;
-			node->rhs = node_tmp;
-		}
-
+	{
+		// TODO int += ptr;
 		// ポインタと整数の演算
 		if (is_pointer_type(l) && is_integer_type(r))
 		{
@@ -530,7 +526,18 @@ static t_node	*analyze_add(t_node *node)
 			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to)));
 			node->rhs->type = new_primitive_type(TY_INT);
 			node->rhs->analyze_source = node->rhs->lhs->analyze_source;
-			analyze_node(node->rhs);
+			node->rhs = analyze_node(node->rhs);
+		}
+		// ポインタと整数の演算
+		else if (is_pointer_type(r) && is_integer_type(l))
+		{
+			node->type = r;
+
+			// 左辺を掛け算に置き換える
+			node->lhs = new_node(ND_MUL, node->lhs, new_node_num(get_type_size(r->ptr_to)));
+			node->lhs->type = new_primitive_type(TY_INT);
+			node->lhs->analyze_source = node->lhs->lhs->analyze_source;
+			node->lhs = analyze_node(node->lhs);
 		}
 		// 両方整数なら型の優先順位を考慮
 		else if (is_integer_type(l) || is_integer_type(r))
@@ -689,7 +696,6 @@ static t_node	*analyze_conditional_op(t_node *node)
 	if (!type_equal(node->rhs->type, node->els->type))
 		error_at(node->analyze_source, "条件演算子の型が一致しません");
 
-	node->kind = ND_IF;
 	node->type = node->rhs->type;
 
 	return (node);
@@ -899,14 +905,14 @@ static t_node	*analyze_node(t_node *node)
 			if (node->lhs != NULL)
 			{
 				node->lhs = analyze_node(node->lhs);
-
-				// 結果がND_NONEなら省略する
-				// popを行うために必要
-				if (node->lhs->kind == ND_NONE && node->rhs != NULL)
-					return (analyze_node(node->rhs));
+				node->type = node->lhs->type;
 			}
+			else
+				node->type = new_primitive_type(TY_INT); // lhsがNULLならとりあえず型をINTにする
+
 			if (node->rhs != NULL)
 				node->rhs = analyze_node(node->rhs);
+
 			return (node);
 		}
 		case ND_BITWISE_NOT:
@@ -1030,6 +1036,9 @@ static void	analyze_func(t_deffunc *func)
 	int		name_len;
 	t_type	*type;
 
+	t_node	*tmp_loop;
+	t_node	*tmp_ret;
+
 	g_func_now = func;
 
 	// 戻り値の型がMEMORY_CLASSならrdiを保存する用のスタックを用意する
@@ -1091,10 +1100,24 @@ static void	analyze_func(t_deffunc *func)
 	{
 		if (!func->is_prototype)
 		{
-			func->stmt = new_node(ND_BLOCK,
-								func->stmt,
-								new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL));
-			func->stmt = analyze_node(func->stmt);
+			if (func->stmt->kind == ND_BLOCK)
+			{
+				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL);
+				tmp_ret = analyze_node(tmp_ret);
+
+				for (tmp_loop = func->stmt; tmp_loop->rhs != NULL; tmp_loop = tmp_loop->rhs);
+
+				if (tmp_loop->lhs == NULL)
+					tmp_loop->lhs = tmp_ret;
+				else
+					tmp_loop->rhs = tmp_ret;
+			}
+			else
+			{
+				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL);
+				func->stmt = new_node(ND_BLOCK, func->stmt, tmp_ret);
+				func->stmt = analyze_node(func->stmt);
+			}
 		}	
 	}
 

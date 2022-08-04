@@ -27,7 +27,7 @@ unique() {
 }
 
 assert_async(){
-	uni="$2"
+	uni="$1"
 
 	input="$prefix`cat $testdir/$1`"
 	
@@ -39,12 +39,14 @@ assert_async(){
 
     echo "$input" | $prpr - | $ncc > $asmname
 	if [ "$?" != "0" ]; then
+		echo "9CC KO => $1"
 		echo "9CC KO => $1" >> tmp/err
 		exit 1
 	fi
 	
 	cc -o $targetname $asmname $module
 	if [ "$?" != "0" ]; then
+		echo "9CC COMPILE KO => $1"
 		echo "9CC COMPILE KO => $1" >> tmp/err
 		exit 1
 	fi
@@ -55,6 +57,7 @@ assert_async(){
 	echo "$input" > $cname
 	cc -w -o $targetname $cname $module
 	if [ "$?" != "0" ]; then
+		echo "GCC FAIL => $1"
 		echo "GCC FAIL => $1" >> tmp/err
 		exit 1
 	fi
@@ -63,6 +66,7 @@ assert_async(){
 	expected_status="${PIPESTATUS[0]}"
 
 	if [ "$actual_status" != "$expected_status" ]; then
+  	  echo "STATUS KO $1 > act:$actual_status exp:$expected_status"
   	  echo "STATUS KO $1 > act:$actual_status exp:$expected_status" >> tmp/err
   	  exit 1
 	fi
@@ -71,6 +75,7 @@ assert_async(){
 	  echo -n
  # 	  echo "$1 => OK"
   	else
+  	  echo "OUTPUT KO $1 > $actresname $expresname"
   	  echo "OUTPUT KO $1 > $actresname $expresname" >> tmp/err
   	  exit 1
   	fi
@@ -338,6 +343,9 @@ assert "increments8.c"
 assert "increments9.c"
 assert "increments10.c"
 assert "increments11.c"
+assert "increments12.c"
+assert "increments13.c"
+assert "increments14.c"
 
 assert "not.c"
 
@@ -406,7 +414,7 @@ wait
 if [ "`cat tmp/err | wc -l | tr -d ¥" ¥"`" != "0" ]; then
 	echo "--- report ---------------"
 	cat tmp/err | sort
-	echo "test failed"
+	echo "test failed : `wc -l tmp/err | tr -d " tmp/er"` errors"
 	exit 1
 fi
 

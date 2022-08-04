@@ -49,7 +49,7 @@ typedef enum	e_ilkind
 	IL_CALL_START,
 	IL_CALL_ADD_ARG, // どのcallと対応するかはスタック構造で確かめる?
 	IL_CALL_EXEC,
-	IL_MACRO_VASTART, // 何もpushしてはいけない
+	IL_MACRO_VASTART, // 何もpushしてはいけない...?
 
 	IL_CAST,
 	IL_LOAD
@@ -69,6 +69,7 @@ typedef struct	s_il
 
 	char		*label_str;
 	bool		label_is_deffunc;
+	bool		label_is_static_func;
 
 	int			number_int;
 

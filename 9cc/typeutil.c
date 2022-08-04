@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "mymath.h"
 
 // main
 extern t_token			*g_token;
@@ -16,13 +16,6 @@ extern t_defunion		*g_union_defs[1000];
 extern t_lvar			*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
-
-static int max(int a, int b)
-{
-	if (a > b)
-		return (a);
-	return (b);
-}
 
 bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value)
 {

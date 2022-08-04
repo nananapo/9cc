@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUG
+//#define DEBUG
 
 extern char	*g_user_input;
 
