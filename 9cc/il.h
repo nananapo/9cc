@@ -53,11 +53,6 @@ typedef enum	e_ilkind
 
 	IL_CAST,
 	IL_LOAD
-// TODO
-// 関数開始時の変数準備
-// 関数終了時のstructとかのリターン
-// pushpopで型
-// ラベルとリターン, 変数宣言とか以外は結果をpush
 }	t_ilkind;
 
 typedef struct	s_il

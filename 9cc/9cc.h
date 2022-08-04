@@ -389,8 +389,8 @@ void	error_at(char *loc, char *fmt, ...);
 
 t_token	*tokenize(char *p);
 
-t_node	*new_node(t_nodekind kind, t_node *lhs, t_node *rhs);
-t_node	*new_node_num(int val);
+t_node	*new_node(t_nodekind kind, t_node *lhs, t_node *rhs, char *source);
+t_node	*new_node_num(int val, char *source);
 
 // t_type
 t_type	*new_primitive_type(t_typekind pri);

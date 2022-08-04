@@ -5,7 +5,7 @@
 
 bool	consume(char *op);
 bool	consume_number(int *result);
-bool	consume_with_type(t_tokenkind kind);
+bool	consume_kind(t_tokenkind kind);
 t_token	*consume_ident(void);
 t_token	*consume_ident_str(char *p);
 t_token	*consume_str_literal(void);

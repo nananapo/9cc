@@ -13,9 +13,9 @@ extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals;
 extern t_defstruct		*g_struct_defs[1000];
-extern t_defenum			*g_enum_defs[1000];
-extern t_defunion			*g_union_defs[1000];
-extern t_lvar				*g_locals;
+extern t_defenum		*g_enum_defs[1000];
+extern t_defunion		*g_union_defs[1000];
+extern t_lvar			*g_locals;
 extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
@@ -38,7 +38,7 @@ bool consume_number(int *result)
 	return true;	
 }
 
-bool	consume_with_type(t_tokenkind kind)
+bool	consume_kind(t_tokenkind kind)
 {
 	if (g_token->kind != kind)
 		return false;
@@ -122,15 +122,15 @@ t_type	*consume_type_before(bool read_def)
 	t_token	*ident;
 
 	// type name
-	if (consume_with_type(TK_INT))
+	if (consume_kind(TK_INT))
 		type = new_primitive_type(TY_INT);
-	else if (consume_with_type(TK_CHAR))
+	else if (consume_kind(TK_CHAR))
 		type = new_primitive_type(TY_CHAR);
-	else if (consume_with_type(TK__BOOL))
+	else if (consume_kind(TK__BOOL))
 		type = new_primitive_type(TY_BOOL);
-	else if (consume_with_type(TK_VOID))
+	else if (consume_kind(TK_VOID))
 		type = new_primitive_type(TY_VOID);
-	else if (consume_with_type(TK_STRUCT))
+	else if (consume_kind(TK_STRUCT))
 	{
 		ident = consume_ident();
 		if (ident == NULL)
@@ -142,7 +142,7 @@ t_type	*consume_type_before(bool read_def)
 		if (type == NULL)
 			return (NULL);
 	}
-	else if (consume_with_type(TK_ENUM))
+	else if (consume_kind(TK_ENUM))
 	{
 		ident = consume_ident();
 		if (ident == NULL)
@@ -154,7 +154,7 @@ t_type	*consume_type_before(bool read_def)
 		if (type == NULL)
 			return (NULL);
 	}
-	else if (consume_with_type(TK_UNION))
+	else if (consume_kind(TK_UNION))
 	{
 		ident = consume_ident();
 		if (ident == NULL)
@@ -227,7 +227,7 @@ void	expect(char *op)
 	g_token = g_token->next;
 }
 
-int expect_number(void)
+int	expect_number(void)
 {
 	int val;
 

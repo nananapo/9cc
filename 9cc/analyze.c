@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-t_node		*new_node(t_nodekind kind, t_node *lhs, t_node *rhs);
-
 t_lvar		*create_lvar(t_deffunc *func, char *name, int name_len, t_type *type, bool is_arg);
 t_lvar		*copy_lvar(t_lvar *f);
 t_type		*type_cast_forarg(t_type *type);
@@ -147,9 +145,8 @@ static t_switchcase	*add_switchcase(t_labelstack *sbdata, int number)
 // parse.cからのコピー
 static t_node	*cast(t_node *node, t_type *to)
 {
-	node = new_node(ND_CAST, node, NULL);
+	node = new_node(ND_CAST, node, NULL, node->analyze_source);
 	node->type = to;
-	node->analyze_source = node->lhs->analyze_source;
 	return (node);
 }
 
@@ -160,7 +157,6 @@ static t_node	*cast(t_node *node, t_type *to)
 static t_node *analyze_var_def(t_node *node)
 {
 	t_lvar	*lvar;
-	char	*source;
 
 	if (!is_declarable_type(node->type))
 		error_at(node->analyze_source, "%s型の変数は宣言できません", get_type_name(node->type));
@@ -170,10 +166,8 @@ static t_node *analyze_var_def(t_node *node)
 
 	if (node->lvar_assign != NULL)
 	{
-		source = node->analyze_source;
 		node->kind = ND_VAR_LOCAL;
-		node = new_node(ND_ASSIGN, node, node->lvar_assign);
-		node->analyze_source = source;
+		node = new_node(ND_ASSIGN, node, node->lvar_assign, node->analyze_source);
 		node = analyze_node(node);
 	}
 	else
@@ -200,9 +194,7 @@ static t_node *analyze_var(t_node *node)
 
 		assign				= analyze_node(node->lvar_assign);
 		node->lvar_assign	= NULL;
-		node				= new_node(ND_ASSIGN, node, assign);
-		node->analyze_source= node->lhs->analyze_source;
-
+		node				= new_node(ND_ASSIGN, node, assign, node->analyze_source);
 		return (analyze_node(node));
 	}
 
@@ -509,7 +501,7 @@ static t_node	*analyze_add(t_node *node)
 			if (size == 0)
 				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
 
-			node		= new_node(ND_DIV, node, new_node_num(size));
+			node		= new_node(ND_DIV, node, new_node_num(size, node->analyze_source), node->analyze_source);
 			node->type	= new_primitive_type(TY_INT);
 			node		= analyze_node(node);
 		}
@@ -523,7 +515,7 @@ static t_node	*analyze_add(t_node *node)
 			node->type = l;
 
 			// 右辺を掛け算に置き換える
-			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to)));
+			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to), node->analyze_source), node->analyze_source);
 			node->rhs->type = new_primitive_type(TY_INT);
 			node->rhs->analyze_source = node->rhs->lhs->analyze_source;
 			node->rhs = analyze_node(node->rhs);
@@ -534,7 +526,7 @@ static t_node	*analyze_add(t_node *node)
 			node->type = r;
 
 			// 左辺を掛け算に置き換える
-			node->lhs = new_node(ND_MUL, node->lhs, new_node_num(get_type_size(r->ptr_to)));
+			node->lhs = new_node(ND_MUL, node->lhs, new_node_num(get_type_size(r->ptr_to), node->analyze_source), node->analyze_source);
 			node->lhs->type = new_primitive_type(TY_INT);
 			node->lhs->analyze_source = node->lhs->lhs->analyze_source;
 			node->lhs = analyze_node(node->lhs);
@@ -740,7 +732,7 @@ static t_node	*analyze_sizeof(t_node *node)
 	t_node	*result;
 
 	node->lhs = analyze_node(node->lhs);
-	result = new_node_num(get_type_size(node->lhs->type));
+	result = new_node_num(get_type_size(node->lhs->type), node->lhs->analyze_source);
 	return (analyze_node(result));
 }
 
@@ -929,7 +921,7 @@ static t_node	*analyze_node(t_node *node)
 			node = analyze_node(node->lhs);
 			if (!is_integer_type(node->type))
 				error_at(node->analyze_source, "%sに-を適用できません", get_type_name(node->type));
-			node = new_node(ND_SUB, new_node_num(0), node);
+			node = new_node(ND_SUB, new_node_num(0, node->analyze_source), node, node->analyze_source);
 			return (analyze_node(node));
 		}
 		case ND_ADD:
@@ -1102,7 +1094,7 @@ static void	analyze_func(t_deffunc *func)
 		{
 			if (func->stmt->kind == ND_BLOCK)
 			{
-				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL);
+				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0, func->name), NULL, func->name), NULL, func->name);
 				tmp_ret = analyze_node(tmp_ret);
 
 				for (tmp_loop = func->stmt; tmp_loop->rhs != NULL; tmp_loop = tmp_loop->rhs);
@@ -1114,8 +1106,8 @@ static void	analyze_func(t_deffunc *func)
 			}
 			else
 			{
-				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0), NULL), NULL);
-				func->stmt = new_node(ND_BLOCK, func->stmt, tmp_ret);
+				tmp_ret = new_node(ND_BLOCK, new_node(ND_RETURN, new_node_num(0, func->name), NULL, func->name), NULL, func->name);
+				func->stmt = new_node(ND_BLOCK, func->stmt, tmp_ret, func->name);
 				func->stmt = analyze_node(func->stmt);
 			}
 		}	
