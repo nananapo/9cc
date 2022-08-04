@@ -1,1 +1,1 @@
-int main(){(15 + 3) / 6;}
+int main(){return (15 + 3) / 6;}

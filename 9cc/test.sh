@@ -63,7 +63,7 @@ assert_async(){
 	expected_status="${PIPESTATUS[0]}"
 
 	if [ "$actual_status" != "$expected_status" ]; then
-  	  echo "STATUS KO $1 act:$actual_status exp:$expected_status" >> tmp/err
+  	  echo "STATUS KO $1 > act:$actual_status exp:$expected_status" >> tmp/err
   	  exit 1
 	fi
 
@@ -71,7 +71,7 @@ assert_async(){
 	  echo -n
  # 	  echo "$1 => OK"
   	else
-  	  echo "OUTPUT KO => $1" >> tmp/err
+  	  echo "OUTPUT KO $1 > $actresname $expresname" >> tmp/err
   	  exit 1
   	fi
 }

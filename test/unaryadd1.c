@@ -1,1 +1,1 @@
-int main(){+5;}
+int main(){return +5;}

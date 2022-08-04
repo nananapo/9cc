@@ -1,1 +1,1 @@
-int main(){11+12+19;}
+int main(){return 11+12+19;}

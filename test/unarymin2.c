@@ -1,1 +1,1 @@
-int main(){12 * -2 * -2;}
+int main(){return 12 * -2 * -2;}

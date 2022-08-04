@@ -18,4 +18,6 @@ int main()
 
 	result = test1(1,2,3,4,5,10,21);
 	dint(result);
+
+	return result;
 }

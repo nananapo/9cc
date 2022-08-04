@@ -253,7 +253,9 @@ static void	translate_if(t_node *node)
 
 		translate_node(node->rhs);
 
-		// else if
+		code			= append_il(IL_JUMP);
+		code->label_str	= get_label_str(lend);
+
 		code			= append_il(IL_LABEL);
 		code->label_str	= get_label_str(lelse);
 

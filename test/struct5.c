@@ -19,4 +19,5 @@ int main()
 	struct t2 b;
 
 	a.a[2].a = 65535;
+	return a.a[2].a % 99;
 }

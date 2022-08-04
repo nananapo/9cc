@@ -44,4 +44,5 @@ int main()
 	dint(add4(1, 2, 3, 4));
 	dint(add5(1, 2, 3, 4, 5));
 	dint(add6(1, 2, 3, 4, 5, 6));
+	return 0;
 }

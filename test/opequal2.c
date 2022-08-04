@@ -1,1 +1,1 @@
-int main(){3 + 4 == 8;}
+int main(){return 3 + 4 == 8;}

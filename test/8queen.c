@@ -94,7 +94,12 @@ int	rec(int x)
 
 int	main()
 {
+	int res;
+
 	N = 8;
-	pint(rec(0));
+	res = rec(0);
+	pint(res);
 	pline();
+
+	return res;
 }

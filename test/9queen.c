@@ -48,7 +48,11 @@ int rec(int i)
 
 int main()
 {
+	int res;
+
 	N = 9;
-	pint(rec(0));
+	res = rec(0);
+	pint(res);
 	pline();
+	return res;
 }
