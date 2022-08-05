@@ -886,15 +886,8 @@ static void	global_var(t_type *type, t_token *ident, bool is_extern, bool is_sta
 	defvar->is_extern	= is_extern;
 	defvar->is_static	= is_static;
 
-	// TODO チェックは違うパスでやりたい....
-	if (is_static && is_extern)
-		error_at(g_token->str, "staticとexternは併用できません");
-	if (!is_declarable_type(type))
-		error_at(g_token->str, "宣言できない型の変数です");
-
 	// 保存
-	i = -1;
-	while (g_global_vars[++i]);
+	for (i = 0; g_global_vars[i] != NULL; i++);
 	g_global_vars[i] = defvar;
 
 	// 代入
@@ -913,16 +906,15 @@ t_type	*read_struct_block(t_token *ident)
 {
 	t_type		*type;
 	t_defstruct	*def;
-	t_member	*tmp;
-	int			typesize;
-	int			maxsize;
+	t_member	*elem;
+	t_member	**tmp_elem;
 	int			i;
 
-	def = calloc(1, sizeof(t_defstruct));
-	def->name = ident->str;
-	def->name_len = ident->len;
-	def->mem_size = -1;
-	def->members = NULL;
+	def				= calloc(1, sizeof(t_defstruct));
+	def->name		= ident->str;
+	def->name_len	= ident->len;
+	def->is_declared= false;
+	tmp_elem		= &def->members;
 
 	// 保存
 	for (i = 0; g_struct_defs[i]; i++) ;
@@ -931,7 +923,7 @@ t_type	*read_struct_block(t_token *ident)
 	while (1)
 	{
 		if (consume("}"))
-			break;
+			break ;
 
 		type = consume_type_before(true);
 		if (type == NULL)
@@ -944,61 +936,22 @@ t_type	*read_struct_block(t_token *ident)
 
 		expect_semicolon();
 
-		tmp = calloc(1, sizeof(t_member));
-		tmp->name = ident->str;
-		tmp->name_len = ident->len;
-		tmp->type = type;
-		tmp->next = def->members;
+		elem			= calloc(1, sizeof(t_member));
+		elem->name		= ident->str;
+		elem->name_len	= ident->len;
+		elem->type		= type;
+		elem->is_struct	= true;
+		elem->strct		= def;
+		*tmp_elem	= elem;
+		tmp_elem	= &elem->next;
 
-		// 型のサイズを取得
-		typesize = get_type_size(type);
-		if (typesize == -1)
+		if ((type->ty == TY_STRUCT && !type->strct->is_declared)
+		|| (type->ty == TY_UNION && !type->unon->is_declared))
 			error_at(ident->str, "型のサイズが確定していません");
-
-		maxsize = max_type_size(type);
-
-		// offsetをoffset + typesizeに設定
-		if (def->members ==  NULL)
-			tmp->offset = typesize;
-		else
-		{
-			i = def->members->offset;
-			if (maxsize < 4)
-			{
-				if (i % 4 + typesize > 4)
-					tmp->offset = ((i + 4) / 4 * 4) + typesize;
-				else
-					tmp->offset = i + typesize;
-			}
-			else if (maxsize == 4)
-				tmp->offset = ((i + 3) / 4) * 4 + typesize;
-			else
-				tmp->offset = ((i + 7) / 8) * 8 + typesize;
-		}
-
-		debug("  OFFSET OF %s : %d", strndup(ident->str, ident->len), tmp->offset);
-		def->members = tmp;
 	}
 
+	def->is_declared = true;
 	type = new_struct_type(def->name, def->name_len);
-
-	// メモリサイズを決定
-	if (def->members == NULL)
-		def->mem_size = 0;
-	else
-	{
-		maxsize = max_type_size(type);
-		debug("  MAX_SIZE = %d", maxsize);
-		def->mem_size = align_to(def->members->offset, maxsize);
-	}
-	debug("  MEMSIZE = %d", def->mem_size);
-
-	// offsetを修正
-	for (tmp = def->members; tmp != NULL; tmp = tmp->next)
-	{
-		tmp->offset -= get_type_size(tmp->type);
-	}
-
 	return (type);
 }
 
@@ -1045,20 +998,18 @@ t_type	*read_enum_block(t_token *ident)
 t_type	*read_union_block(t_token *ident)
 {
 	t_defunion	*def;
-	t_member	*tmp;
+	t_member	*elem;
 	t_type		*type;
 	int			i;
-	int			typesize;
 
 	def				= calloc(1, sizeof(t_defunion));
 	def->name		= ident->str;
 	def->name_len	= ident->len;
+	def->is_declared= false;
 
 	// 保存
 	for (i = 0; g_union_defs[i]; i++) ;
 	g_union_defs[i] = def;
-
-	debug(" READ UNION %s", strndup(ident->str, ident->len));
 
 	// 要素を追加 & 最大のサイズを取得
 	while (1)
@@ -1077,24 +1028,21 @@ t_type	*read_union_block(t_token *ident)
 		expect_type_after(&type);
 		expect_semicolon();
 
-		tmp = calloc(1, sizeof(t_member));
-		tmp->name = ident->str;
-		tmp->name_len = ident->len;
-		tmp->type = type;
-		tmp->next = def->members;
-		tmp->offset = 0;
+		elem			= calloc(1, sizeof(t_member));
+		elem->name		= ident->str;
+		elem->name_len	= ident->len;
+		elem->type		= type;
+		elem->next		= def->members;
+		elem->is_struct	= false;
+		elem->unon		= def;
+		def->members = elem;
 
-		// 型のサイズを取得
-		typesize = get_type_size(type);
-		if (typesize == -1)
+		if ((type->ty == TY_STRUCT && !type->strct->is_declared)
+		|| (type->ty == TY_UNION && !type->unon->is_declared))
 			error_at(ident->str, "型のサイズが確定していません");
-		def->mem_size = max(def->mem_size, typesize);
-
-		def->members = tmp;
 	}
 
-	debug("  MEMSIZE = %d", def->mem_size);
-
+	def->is_declared = true;
 	type = new_union_type(def->name, def->name_len);
 	return (type);
 }

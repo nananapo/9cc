@@ -20,14 +20,142 @@ static void	load(t_type *type);
 static void	cast(t_type *from, t_type *to);
 static void	print_global_constant(t_node *node, t_type *type);
 
-static char				*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-static int				stack_count = 0;
+static char		*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+static int		stack_count = 0;
+static t_lvar	*g_funcnow_locals;
+static int		g_funcnow_offset;
+static int		aligned_stack_def_var_end;
 
 // main
 extern t_deffunc		*g_func_defs[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
 extern t_il				*g_il;
+
+
+
+static int	max_align_size(t_type *type)
+{
+	t_member	*tmp;
+	int			size;
+
+	if (type->ty == TY_STRUCT)
+	{
+		size = 0;
+		for (tmp = type->strct->members; tmp; tmp = tmp->next)
+		{
+			size = max(size, max_align_size(tmp->type));
+		}
+		return (size);
+	}
+	else if (type->ty == TY_ARRAY)
+		return (max_align_size(type->ptr_to));
+	return (get_type_size(type));
+}
+
+static int	get_member_offset(t_member *mem)
+{
+	t_member	*tmp;
+	t_member	*last;
+	int			offset;
+	int			typesize;
+	int			maxsize;
+
+	if (!mem->is_struct)
+		return (0);
+
+	offset	= 0;
+	last	= NULL;
+	for (tmp = mem->strct->members; last != mem && tmp != NULL; tmp = tmp->next)
+	{
+		typesize = get_type_size(tmp->type);
+		if (offset == 0)
+		{
+			offset = typesize;
+		}	
+		else
+		{
+			maxsize = max_align_size(tmp->type);
+			if (maxsize < 4)
+			{
+				if (offset % 4 + typesize > 4)
+					offset = ((offset + 4) / 4 * 4) + typesize;
+				else
+					offset = offset + typesize;
+			}
+			else if (maxsize == 4)
+				offset = ((offset + 3) / 4) * 4 + typesize;
+			else
+				offset = ((offset + 7) / 8) * 8 + typesize;
+		}
+		last = tmp;
+	}
+
+	offset -= get_type_size(mem->type);
+	return (offset);
+}
+
+// TODO voidのarray
+// TODO arrayの掛け算
+
+static int	get_struct_size(t_type *type)
+{
+	t_defstruct	*def;
+	t_member	*mem;
+
+	def			= type->strct;
+	if (def->members == NULL)
+		return (0);
+
+	for (mem = def->members; mem->next != NULL; mem = mem->next) ;
+	return (align_to(get_member_offset(mem) + get_type_size(mem->type), max_align_size(type)));
+}
+
+static int	get_union_size(t_defunion *def)
+{
+	int			tmp_size;
+	t_member	*mem;
+
+	tmp_size = 0;
+	for (mem = def->members; mem != NULL; mem = mem->next)
+		tmp_size = max(tmp_size, get_type_size(mem->type));
+	return (tmp_size);
+}
+
+// 型のサイズを取得する
+int	get_type_size(t_type *type)
+{
+	switch (type->ty)
+	{
+		case TY_INT:
+			return (4);
+		case TY_CHAR:
+			return (1);
+		case TY_BOOL:
+			return (1);
+		case TY_PTR:
+			return (8);
+		case TY_ARRAY:
+			return (get_type_size(type->ptr_to) * type->array_size);
+		case TY_VOID:
+			return (1);
+		case TY_ENUM:
+			return  (4);
+		case TY_STRUCT:
+			return (get_struct_size(type));
+		case TY_UNION:
+			return (get_union_size(type->unon));
+		default:
+			error("size of unknown type %d", type->ty);
+	}
+	return (-1);
+}
+
+
+
+
+
+
 
 static void	push()
 {
@@ -295,10 +423,6 @@ static void gen_defglobal(t_defvar *node)
 		print_global_constant(node->assign, node->type);
 	}
 }
-
-static t_lvar	*g_funcnow_locals;
-static int		g_funcnow_offset;
-static int		aligned_stack_def_var_end;
 
 static void	gen_call_start(t_il *code)
 {
@@ -883,14 +1007,14 @@ static void	gen_il(t_il *code)
 		case IL_MEMBER:
 		case IL_MEMBER_PTR:
 			pop(RAX);
-			printf("    add %s, %d\n", RAX, code->member->offset);
+			printf("    add %s, %d\n", RAX, get_member_offset(code->member));
 			load(code->member->type);
 			push();
 			return ;
 		case IL_MEMBER_ADDR:
 		case IL_MEMBER_PTR_ADDR:
 			pop(RAX);
-			printf("    add %s, %d\n", RAX, code->member->offset);
+			printf("    add %s, %d\n", RAX, get_member_offset(code->member));
 			push();
 			return ;
 		case IL_STR_LIT:

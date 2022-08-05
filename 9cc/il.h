@@ -1,23 +1,22 @@
 #ifndef IL_H
 # define IL_H
+# include "9cc.h"
 
-typedef enum	e_ilkind
+// va_startでは何もpushしない
+typedef enum e_ilkind
 {
 	IL_LABEL,
 	IL_JUMP,
 	IL_JUMP_EQUAL,
 	IL_JUMP_NEQUAL,
-
 	IL_FUNC_PROLOGUE,
 	IL_FUNC_EPILOGUE,
 	IL_DEF_VAR_LOCAL,
 	IL_DEF_VAR_END,
-
 	IL_PUSH_AGAIN,
 	IL_PUSH_NUM,
 	IL_STACK_SWAP,
 	IL_POP,
-
 	IL_ADD,
 	IL_SUB,
 	IL_MUL,
@@ -33,29 +32,25 @@ typedef enum	e_ilkind
 	IL_BITWISE_NOT,
 	IL_SHIFT_LEFT,
 	IL_SHIFT_RIGHT,
-
 	IL_ASSIGN,
 	IL_VAR_LOCAL,
 	IL_VAR_LOCAL_ADDR,
 	IL_VAR_GLOBAL,
 	IL_VAR_GLOBAL_ADDR,
-
 	IL_MEMBER,
 	IL_MEMBER_ADDR,
 	IL_MEMBER_PTR,
 	IL_MEMBER_PTR_ADDR,
 	IL_STR_LIT,
-
 	IL_CALL_START,
-	IL_CALL_ADD_ARG, // どのcallと対応するかはスタック構造で確かめる?
+	IL_CALL_ADD_ARG,
 	IL_CALL_EXEC,
-	IL_MACRO_VASTART, // 何もpushしてはいけない...?
-
+	IL_MACRO_VASTART,
 	IL_CAST,
 	IL_LOAD
 }	t_ilkind;
 
-typedef struct	s_il
+typedef struct s_il
 {
 	t_ilkind	kind;
 	struct s_il	*next;
@@ -76,14 +71,12 @@ typedef struct	s_il
 
 	t_str_elem	*def_str;
 
-	// call start/exec
 	t_deffunc	*funccall_callee;
 	t_deffunc	*funccall_caller;
 	t_lvar		**funccall_argdefs;
 	int			funccall_argcount;
 	t_lvar		*funccall_save_pos;
 
-	// add arg
 	int			funccall_arg_index;
 	t_lvar		*funccall_arg_def;
 
@@ -96,7 +89,6 @@ typedef struct	s_il
 	t_member	*member;
 }	t_il;
 
-#include "9cc.h"
 void	translate_il(void);
 
 #endif

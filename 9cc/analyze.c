@@ -40,6 +40,8 @@ static t_node	*analyze_break(t_node *node);
 static t_node	*analyze_continue(t_node *node);
 static t_node	*analyze_default(t_node *node);
 static t_node	*analyze_node(t_node *node);
+static void		analyze_func(t_deffunc *func);
+static void		analyze_global_var(t_defvar *def);
 
 
 // main
@@ -498,7 +500,7 @@ static t_node	*analyze_add(t_node *node)
 		if (size == 0 || size > 1)
 		{
 			if (size == 0)
-				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です");
+				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です\n");
 
 			node		= new_node(ND_DIV, node, new_node_num(size, node->analyze_source), node->analyze_source);
 			node->type	= new_primitive_type(TY_INT);
@@ -1032,6 +1034,7 @@ static void	analyze_func(t_deffunc *func)
 
 	g_func_now = func;
 
+	// TODO genに移動
 	// 戻り値の型がMEMORY_CLASSならrdiを保存する用のスタックを用意する
 	if (is_memory_type(func->type_return))
 	{
@@ -1081,7 +1084,6 @@ static void	analyze_func(t_deffunc *func)
 	}
 
 	// TODO 関数名の被りチェック
-	
 	if (!func->is_prototype)
 		func->stmt = analyze_node(func->stmt);
 
@@ -1115,6 +1117,36 @@ static void	analyze_func(t_deffunc *func)
 	g_func_now = NULL;
 }
 
+static void analyze_global_var(t_defvar *def)
+{
+	if (def->is_static && def->is_extern)
+		error_at(def->name, "staticとexternは併用できません");
+	if (!is_declarable_type(def->type))
+		error_at(def->name, "宣言できない型の変数です");
+}
+
+static void	analyze_struct(t_defstruct *def)
+{
+	t_member	*mem;
+
+	for (mem = def->members; mem != NULL; mem = mem->next)
+	{
+		if (!is_declarable_type(mem->type))
+			error_at(mem->name, "宣言できない型です");
+	}
+}
+
+static void	analyze_union(t_defunion *def)
+{
+	t_member	*mem;
+
+	for (mem = def->members; mem != NULL; mem = mem->next)
+	{
+		if (!is_declarable_type(mem->type))
+			error_at(mem->name, "宣言できない型です");
+	}
+}
+
 void	analyze(void)
 {
 	int	i;
@@ -1123,4 +1155,10 @@ void	analyze(void)
 		analyze_func(g_func_protos[i]);
 	for (i = 0; g_func_defs[i] != NULL; i++)
 		analyze_func(g_func_defs[i]);
+	for (i = 0; g_global_vars[i] != NULL; i++)
+		analyze_global_var(g_global_vars[i]);
+	for (i = 0; g_struct_defs[i] != NULL; i++)
+		analyze_struct(g_struct_defs[i]);
+	for (i = 0; g_union_defs[i] != NULL; i++)
+		analyze_union(g_union_defs[i]);
 }

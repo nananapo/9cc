@@ -131,8 +131,8 @@ bool	type_equal(t_type *t1, t_type *t2)
 	{
 		if ((t1->ty == TY_PTR && t2->ty == TY_ARRAY)
 			|| (t1->ty == TY_ARRAY && t2->ty == TY_PTR))
-			return type_equal(t1->ptr_to, t2->ptr_to);
-		return false;
+			return (type_equal(t1->ptr_to, t2->ptr_to));
+		return (false);
 	}
 	if (t1->ty == TY_PTR)
 		return type_equal(t1->ptr_to, t2->ptr_to);
@@ -144,31 +144,7 @@ bool	type_equal(t_type *t1, t_type *t2)
 		return (t1->unon == t2->unon);
 	if (t1->ty == TY_ENUM)
 		return (t1->enm == t2->enm);
-	return true;
-}
-
-// typeのサイズを取得する
-int	get_type_size(t_type *type)
-{
-	if (type->ty == TY_INT)
-		return (4);
-	if (type->ty == TY_CHAR)
-		return (1);
-	if (type->ty == TY_BOOL)
-		return (1);
-	if (type->ty == TY_PTR)
-		return (8);
-	if (type->ty == TY_ARRAY)
-		return (get_type_size(type->ptr_to) * type->array_size);
-	if (type->ty == TY_STRUCT)
-		return (type->strct->mem_size);
-	if (type->ty == TY_ENUM)
-		return (4);
-	if (type->ty == TY_UNION)
-		return (type->unon->mem_size);
-	if (type->ty == TY_VOID)
-		return (1);
-	return -1;
+	return (true);
 }
 
 // 整数型かどうか判定する
@@ -259,27 +235,6 @@ t_member	*get_member_by_name(t_type *type, char *name, int len)
 	return (NULL);
 }
 
-int	max_type_size(t_type *type)
-{
-	t_member	*tmp;
-	int			size;
-
-	if (type->ty == TY_STRUCT)
-	{
-		size = 0;
-		for (tmp = type->strct->members; tmp; tmp = tmp->next)
-		{
-			size = max(size, max_type_size(tmp->type));
-		}
-		return (size);
-	}
-	else if (type->ty == TY_ARRAY)
-	{
-		return (max_type_size(type->ptr_to));
-	}
-	return get_type_size(type);
-}
-
 static void	typename_loop(t_type *type, char *str)
 {
 	if (type->ty == TY_INT)
@@ -291,11 +246,23 @@ static void	typename_loop(t_type *type, char *str)
 	else if (type->ty == TY_VOID)
 		strcat(str, "void");
 	else if (type->ty == TY_STRUCT)
-		strcat(str, "struct"); // TODO struct name
+	{
+		strcat(str, "struct[");
+		strncat(str, type->strct->name, type->strct->name_len);
+		strcat(str, "]");
+	}
 	else if (type->ty == TY_ENUM)
+	{
 		strcat(str, "enum");
+		strncat(str, type->enm->name, type->enm->name_len);
+		strcat(str, "]");
+	}
 	else if (type->ty == TY_UNION)
+	{
 		strcat(str, "union");
+		strncat(str, type->unon->name, type->unon->name_len);
+		strcat(str, "]");
+	}
 	else if (type->ty == TY_ARRAY)
 	{
 		typename_loop(type->ptr_to, str);

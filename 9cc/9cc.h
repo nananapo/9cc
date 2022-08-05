@@ -207,26 +207,27 @@ typedef struct s_type
 	{
 		char				*name;
 		int					name_len;
-		int					mem_size; // -1ならまだ定義されていない
+		int					is_declared;
 		struct s_member
 		{
-			struct s_type	*type;
-			char			*name;
-			int				name_len;
-			int				offset;
-			struct s_member	*next;
+			struct s_type		*type;
+			char				*name;
+			int					name_len;
+			struct s_member		*next;
+
+			bool				is_struct;
+			struct s_defstruct	*strct;
+			struct s_defunion
+			{
+				char			*name;
+				int				name_len;
+				int				is_declared;
+				struct s_member	*members;
+			}					*unon;
 		} *members;
 	}	*strct;
-
 	t_defenum			*enm;
-
-	struct s_defunion
-	{
-		char			*name;
-		int				name_len;
-		int				mem_size;
-		struct s_member	*members;
-	}	*unon;
+	struct s_defunion *unon;
 } t_type;
 
 typedef struct s_defstruct	t_defstruct;
@@ -406,7 +407,6 @@ bool	is_declarable_type(t_type *type);
 bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
 bool	type_equal(t_type *t1, t_type *t2);
 t_member	*get_member_by_name(t_type *type, char *name, int len);
-int		max_type_size(t_type *type);
 char	*get_type_name(t_type *type);
 bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
 t_type	*type_array_to_ptr(t_type *type);
