@@ -57,7 +57,6 @@ extern t_defstruct		*g_struct_defs[1000];
 extern t_defenum		*g_enum_defs[1000];
 extern t_defunion		*g_union_defs[1000];
 extern t_lvar			*g_locals;
-extern t_deffunc		*g_func_now;
 extern t_linked_list	*g_type_alias;
 
 t_deffunc	*get_function_by_name(char *name, int len)
@@ -926,11 +925,8 @@ t_type	*read_struct_block(t_token *ident)
 	def->members = NULL;
 
 	// 保存
-	for (i = 0; g_struct_defs[i]; i++)
-		continue ;
+	for (i = 0; g_struct_defs[i]; i++) ;
 	g_struct_defs[i] = def;
-
-	debug(" READ STRUCT %s", strndup(ident->str, ident->len));
 
 	while (1)
 	{
@@ -940,6 +936,7 @@ t_type	*read_struct_block(t_token *ident)
 		type = consume_type_before(true);
 		if (type == NULL)
 			error_at(g_token->str, "型宣言が必要です\n (read_struct_block)");
+
 		ident = consume_ident();
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が必要です\n (read_struct_block)");
@@ -1012,33 +1009,32 @@ t_type	*read_enum_block(t_token *ident)
 	t_defenum	*def;
 	t_type		*type;
 
-	def = calloc(1, sizeof(t_defenum));
-	def->name = ident->str;
-	def->name_len = ident->len;
-	def->kind_len = 0;
+	def				= calloc(1, sizeof(t_defenum));
+	def->name		= ident->str;
+	def->name_len	= ident->len;
+	def->kind_len	= 0;
 
 	// 保存
-	for (i = 0; g_enum_defs[i]; i++)
-		continue ;
+	for (i = 0; g_enum_defs[i]; i++) ;
 	g_enum_defs[i] = def;
-
-	debug(" READ ENUM %s", strndup(ident->str, ident->len));
 
 	while (1)
 	{
 		if (consume("}"))
 			break ;
+
 		ident = consume_ident();
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が見つかりません");
+
 		def->kinds[def->kind_len++] = strndup(ident->str, ident->len);
+
 		if (!consume(","))
 		{
 			if (!consume("}"))
 				error_at(g_token->str, "}が見つかりません");
 			break ;
 		}
-		debug(" ENUM %s", def->kinds[def->kind_len - 1]);
 	}
 
 	type = new_enum_type(def->name, def->name_len);
@@ -1054,15 +1050,12 @@ t_type	*read_union_block(t_token *ident)
 	int			i;
 	int			typesize;
 
-	def = calloc(1, sizeof(t_defunion));
-	def->name = ident->str;
-	def->name_len = ident->len;
-	def->mem_size = 0;
-	def->members = NULL;
+	def				= calloc(1, sizeof(t_defunion));
+	def->name		= ident->str;
+	def->name_len	= ident->len;
 
 	// 保存
-	for (i = 0; g_union_defs[i]; i++)
-		continue ;
+	for (i = 0; g_union_defs[i]; i++) ;
 	g_union_defs[i] = def;
 
 	debug(" READ UNION %s", strndup(ident->str, ident->len));
@@ -1076,11 +1069,12 @@ t_type	*read_union_block(t_token *ident)
 		type = consume_type_before(true);
 		if (type == NULL)
 			error_at(g_token->str, "型宣言が必要です\n (read_union_block)");
+
 		ident = consume_ident();
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が必要です\n (read_union_block)");
-		expect_type_after(&type);
 
+		expect_type_after(&type);
 		expect_semicolon();
 
 		tmp = calloc(1, sizeof(t_member));
@@ -1105,9 +1099,6 @@ t_type	*read_union_block(t_token *ident)
 	return (type);
 }
 
-
-// TODO ブロックを抜けたらlocalsを戻す
-// TODO 変数名の被りチェックは別のパスで行う
 // (まで読んだところから読む
 static void	funcdef(t_type *type, t_token *ident, bool is_static)
 {
@@ -1121,7 +1112,6 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 	def->type_return			= type;
 	def->argcount				= 0;
 	def->is_static				= is_static;
-	g_func_now = def;
 
 	// args
 	if (!consume(")"))
@@ -1165,9 +1155,9 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 			expect_type_after(&type);
 
 			// save
-			def->argument_names[def->argcount] = arg->str;
-			def->argument_name_lens[def->argcount] = arg->len;
-			def->type_arguments[def->argcount] = type;
+			def->argument_names[def->argcount]		= arg->str;
+			def->argument_name_lens[def->argcount]	= arg->len;
+			def->type_arguments[def->argcount]		= type;
 			def->argcount += 1;
 
 			// )か,
@@ -1192,16 +1182,14 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 		g_func_defs[i] = def;
 		def->stmt = stmt();
 	}
-
-	g_func_now = NULL;
 	
-	debug(" CREATED FUNC %s", strndup(def->name, def->name_len));
+	debug(" func %s created", strndup(def->name, def->name_len));
 }
 
 static void	read_typedef(void)
 {
-	t_type		*type;
-	t_token		*token;
+	t_type			*type;
+	t_token			*token;
 	t_typedefpair	*pair;
 
 	// 型を読む
@@ -1216,10 +1204,11 @@ static void	read_typedef(void)
 		error_at(g_token->str, "識別子が必要です");
 
 	// ペアを追加
-	pair = malloc(sizeof(t_typedefpair));
-	pair->name = token->str;
-	pair->name_len = token->len;
-	pair->type = type;
+	pair			= malloc(sizeof(t_typedefpair));
+	pair->name		= token->str;
+	pair->name_len	= token->len;
+	pair->type		= type;
+
 	linked_list_insert(g_type_alias, pair);
 
 	expect_semicolon();

@@ -43,7 +43,6 @@ static t_node	*analyze_node(t_node *node);
 
 
 // main
-//extern Token			*g_token;
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
 extern t_defvar			*g_global_vars[1000];
