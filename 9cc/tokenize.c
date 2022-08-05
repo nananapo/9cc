@@ -121,6 +121,8 @@ static bool	match_strlit(char **str, t_token **last)
 		}
 		else if (**str == '"')
 			break;
+		else if (**str == '\0')
+			error_at(*str, "文字列が終了しませんでした");
 		(*last)->len++;
 		(*last)->strlen_actual++;
 		(*str)++;
