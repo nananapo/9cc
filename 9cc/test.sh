@@ -86,6 +86,8 @@ assert() {
 	assert_async "$1" "$1"_"$COUNTER"_"$(unique)" &
 }
 
+start_time=`date +%s`
+
 assert "expr1.c"
 assert "expr2.c"
 
@@ -410,6 +412,10 @@ assert "ret_struct1.c"
 assert "ret_struct2.c"
 
 wait
+
+end_time=`date +%s`
+
+echo time : $((end_time - start_time)) sec
 
 if [ "`cat tmp/err | wc -l | tr -d ¥" ¥"`" != "0" ]; then
 	echo "--- report ---------------"
