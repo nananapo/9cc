@@ -1270,7 +1270,11 @@ static void	filescope(void)
 		if (consume("("))
 			funcdef(type, ident, is_static);
 		else
+		{
+			if (is_inline)
+				error_at(ident->str, "グローバル変数にinlineは使えません");
 			global_var(type, ident, false, is_static);
+		}
 		return ;
 	}
 
