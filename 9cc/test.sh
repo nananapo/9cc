@@ -22,10 +22,6 @@ touch tmp/err
 
 COUNTER=0
 
-unique() {
-  echo "`echo $RANDOM | md5 | head -c 10`"
-}
-
 assert_async(){
 	uni="$1"
 
@@ -83,7 +79,7 @@ assert_async(){
 
 assert() {
 	COUNTER=$((++COUNTER))
-	assert_async "$1" "$1"_"$COUNTER"_"$(unique)" &
+	assert_async "$1" "$1"_"$COUNTER"" &
 }
 
 start_time=`date +%s`
