@@ -1181,7 +1181,7 @@ static void	gen_il(t_il *code)
 			pop(T0);
         	printf("sext.w  %s, %s\n", T0, T0);
         	printf("sext.w  %s, %s\n", T1, T1);
-         	printf("slt     %s, %s\n", T0, T0);
+         	printf("slt     %s, %s, %s\n", T0, T0, T1);
          	printf("andi    %s, %s, 0xff\n", T0, T0);
         	printf("sext.w  %s, %s\n", T0, T0);
 			push();
