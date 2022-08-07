@@ -8,6 +8,7 @@ struct t1
 
 int test(int d, struct t1 a, int e, struct t1 b, int f, struct t1 c, int g)
 {
+
 	dint(*a.a);
 	dint(a.b);
 
@@ -72,7 +73,7 @@ int main()
 	v3.a = &c;
 	v3.b = 777;
 
-	dint(*v1.a);
+ 	dint(*v1.a);
 	dint(v1.b);
 
 	dint(*v2.a);

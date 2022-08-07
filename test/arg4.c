@@ -8,6 +8,12 @@ struct t1
 
 int test(int b, int c, int d, int e, struct t1 a)
 {
+
+	dint(b);
+	dint(c);
+	dint(d);
+	dint(e);
+
 	dint(*a.a);
 	dint(a.b);
 
@@ -22,6 +28,7 @@ int test(int b, int c, int d, int e, struct t1 a)
 	dint(d);
 	dint(e);
 	return 1;
+
 }
 
 int main()

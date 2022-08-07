@@ -316,6 +316,8 @@ assert "arg6.c"
 assert "arg7.c"
 assert "arg8.c"
 assert "arg9.c"
+assert "arg10.c"
+assert "arg11.c"
 
 assert "varg.c"
 assert "varg2.c"
@@ -408,8 +410,12 @@ assert "bitwise_xor.c"
 
 assert "shift.c"
 
+assert "ret_struct0.c"
 assert "ret_struct1.c"
 assert "ret_struct2.c"
+assert "ret_struct3.c"
+assert "ret_struct4.c"
+assert "ret_struct5.c"
 
 wait
 

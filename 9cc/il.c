@@ -5,15 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// main
-extern t_deffunc		*g_func_defs[1000];
-extern t_il				*g_il;
-
-static t_il	*g_il_last;
-static int	jumpLabelCount;
-
-
-
 static void	translate_condtional_and(t_node *node);
 static void	translate_condtional_or(t_node *node);
 static void	translate_call(t_node *node);
@@ -28,6 +19,12 @@ static void	translate_node(t_node *node);
 static void	translate_func(t_deffunc *func);
 void		translate_il(void);
 
+static t_il	*g_il_last;
+static int	jumpLabelCount;
+
+// main
+extern t_deffunc		*g_func_defs[1000];
+extern t_il				*g_il;
 
 static char	*get_function_epi_label(char *name, int len)
 {
@@ -157,30 +154,21 @@ static void	translate_call(t_node *node)
 	int		i;
 	t_il	*code;
 
+	for (i = node->funccall_argcount - 1; i >= 0; i--)
+		translate_node(node->funccall_args[i]);
+
 	code					= append_il(IL_CALL_START);
-	code->funccall_caller	= node->funccall_caller;
 	code->funccall_callee	= node->funcdef;
-	code->funccall_argcount	= node->funccall_argcount;
-	code->funccall_argdefs	= node->funccall_argdefs;
-	code->funccall_save_pos	= node->call_mem_stack;
 
 	for (i = 0;	i < node->funccall_argcount; i++)
 	{
-		translate_node(node->funccall_args[i]);
-		code						= append_il(IL_CALL_ADD_ARG);
-		code->funccall_caller		= node->funccall_caller;
-		code->funccall_callee		= node->funcdef;
-		code->funccall_arg_index	= i;
-		code->funccall_arg_def		= node->funccall_argdefs[i];
-		code->type					= type_array_to_ptr(node->funccall_args[i]->type); //TODO これanalyzeにやらせたい
+		code					= append_il(IL_CALL_ADD_ARG);
+		code->funccall_callee	= node->funcdef;
+		code->type				= node->funccall_args[i]->type;
 	}
 
 	code					= append_il(IL_CALL_EXEC);
-	code->funccall_caller	= node->funccall_caller;
 	code->funccall_callee	= node->funcdef;
-	code->funccall_argcount	= node->funccall_argcount;
-	code->funccall_argdefs	= node->funccall_argdefs;
-	code->funccall_save_pos	= node->call_mem_stack;
 }
 
 static void	translate_return(t_node *node)
@@ -614,7 +602,7 @@ static void	translate_node(t_node *node)
 		case ND_COMP_DIV:
 		case ND_COMP_MOD:
 		{
-			// 左辺を二回push -> load -> 右辺をpush -> swap -> op -> assign
+			// 左辺を二回push -> load -> 右辺をpush -> op -> assign
 			translate_node(node->lhs);
 			code		= append_il(IL_PUSH_AGAIN);
 			code->type	= node->lhs->type;
@@ -623,13 +611,6 @@ static void	translate_node(t_node *node)
 			code->type	= node->lhs->type->ptr_to;
 
 			translate_node(node->rhs);
-
-/*
-	あれ～？ これが必要ないのは謎ですね?
-			code			= append_il(IL_STACK_SWAP);
-			code->stack_up	= node->rhs->type;
-			code->stack_down= node->lhs->type->ptr_to;
-*/
 
 			// op
 			if (node->kind == ND_COMP_ADD)
@@ -738,7 +719,7 @@ static void	translate_node(t_node *node)
 		{
 			translate_node(node->funccall_args[0]);
 			code					= append_il(IL_MACRO_VASTART);
-			code->funccall_caller	= node->funccall_caller;
+			//code->funccall_caller	= node->funccall_caller;
 			append_il_pushnum(0);
 			return ;
 		}
@@ -831,7 +812,6 @@ static void	translate_func(t_deffunc *func)
 
 	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
 	{
-		// TODO register
 		code = append_il(IL_DEF_VAR_LOCAL);
 		code->var_local = lvar;
 	}

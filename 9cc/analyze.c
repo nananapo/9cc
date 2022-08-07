@@ -4,10 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-t_lvar		*create_lvar(t_deffunc *func, char *name, int name_len, t_type *type, bool is_arg);
-t_lvar		*copy_lvar(t_lvar *f);
-t_type		*type_cast_forarg(t_type *type);
-void		alloc_argument_simu(t_lvar *first, t_lvar *lvar);
+t_lvar		*append_lvar(t_deffunc *func, char *name, int name_len, t_type *type, bool is_arg);
+t_lvar		*append_dummy_lvar(t_deffunc *func, t_type *type);
 
 static t_node	*cast(t_node *node, t_type *to);
 
@@ -162,7 +160,7 @@ static t_node *analyze_var_def(t_node *node)
 	if (!is_declarable_type(node->type))
 		error_at(node->analyze_source, "%s型の変数は宣言できません", get_type_name(node->type));
 
-	lvar = create_lvar(g_func_now, node->analyze_var_name, node->analyze_var_name_len, node->type, false);
+	lvar = append_lvar(g_func_now, node->analyze_var_name, node->analyze_var_name_len, node->type, false);
 	node->lvar = lvar;
 
 	if (node->lvar_assign != NULL)
@@ -276,11 +274,8 @@ static t_node	*analyze_member_value(t_node *node)
 
 static t_node	*analyze_call(t_node *node)
 {
-	t_lvar	*def;
-	t_lvar	*lastdef;
-	t_lvar	*firstdef;
-	t_lvar	*lvtmp;
 	int		i;
+	t_node	*argnode;
 
 	// set caller
 	node->funccall_caller = g_func_now;
@@ -304,8 +299,7 @@ static t_node	*analyze_call(t_node *node)
 
 	// function exist?
 	if (node->funcdef == NULL)
-		error_at(node->analyze_source, "関数%sがみつかりません",
-					strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
+		error_at(node->analyze_source, "関数%sがみつかりません", strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
 
 	// set type
 	node->type = node->funcdef->type_return;
@@ -319,8 +313,8 @@ static t_node	*analyze_call(t_node *node)
 	// 引数の数を比較する
 	if (node->funcdef->is_zero_argument && node->funccall_argcount != 0)
 		error_at(node->analyze_source, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-			strndup(node->funcdef->name, node->funcdef->name_len),
-			node->funcdef->argcount, node->funccall_argcount);
+				strndup(node->funcdef->name, node->funcdef->name_len),
+				node->funcdef->argcount, node->funccall_argcount);
 	else
 	{
 		if (!node->funcdef->is_variable_argument && node->funccall_argcount != node->funcdef->argcount)
@@ -333,97 +327,28 @@ static t_node	*analyze_call(t_node *node)
 						node->funcdef->argcount, node->funccall_argcount);
 	}
 
-	// 返り値がMEMORYかstructなら、それを保存する用の場所を確保する
-	if (is_memory_type(node->funcdef->type_return)
-		|| node->funcdef->type_return->ty == TY_STRUCT)
-	{
-		node->call_mem_stack = create_lvar(g_func_now, "", 0, node->funcdef->type_return, false);
-		node->call_mem_stack->is_dummy = true;
-	}
-
-	// 引数を定義と比較
-	if (node->funcdef->locals != NULL)
-	{
-		// 返り値がMEMORYなら二個進める
-		if (is_memory_type(node->funcdef->type_return))
-		{
-			def = node->funcdef->locals->next->next;
-			if (def != NULL)
-				def = copy_lvar(def);
-		}
-		else
-			def = copy_lvar(node->funcdef->locals);
-	}
-	else
-		def = NULL;
-	firstdef = def;
-	lastdef = NULL;
-
-	t_node	*args;
+	// 型の確認
 	for (i = 0; i < node->funccall_argcount; i++)
 	{
-		debug("  READ ARG(%d) START", i);
+		argnode			= node->funccall_args[i];
+		argnode->type	= type_array_to_ptr(argnode->type);
 
-		args = node->funccall_args[i];
-
-		if (def != NULL && def->is_arg)
-		{	
-			debug("  is ARG");
-
-			def->type = type_array_to_ptr(def->type);
-
-			// 型の確認
-			if (!type_equal(def->type, args->type))
+		if (i < node->funcdef->argcount)
+		{
+			if (!type_equal(node->funcdef->argument_types[i], argnode->type))
 			{
 				// 暗黙的なキャストの確認
-				if (!type_can_cast(args->type, def->type, false))
-					error_at(args->analyze_source, "関数%sの引数(%s)の型が一致しません\n %s と %s",
+				if (!type_can_cast(argnode->type, node->funcdef->argument_types[i], false))
+					error_at(argnode->analyze_source, "関数%sの引数(%s)の型が一致しません\n %s と %s",
 							strndup(node->funcdef->name, node->funcdef->name_len),
-							strndup(def->name, def->name_len),
-							get_type_name(def->type),
-							get_type_name(args->type));
-
-				args = analyze_node(cast(args, def->type));
-				node->funccall_args[i] = args;
+							strndup(node->funcdef->argument_names[i], node->funcdef->argument_name_lens[i]),
+							get_type_name(node->funcdef->argument_types[i]),
+							get_type_name(argnode->type));
+				node->funccall_args[i] = analyze_node(cast(argnode, node->funcdef->argument_types[i]));
 			}
 		}
-		else
-		{
-			// defがNULL -> 可変長引数
-			debug("  is VA");
-
-			// create_local_varからのコピペ
-			def = calloc(1, sizeof(t_lvar));
-			def->name = "VA";
-			def->name_len = 2;
-			def->type = type_cast_forarg(args->type);
-			def->is_arg = true;
-			def->arg_regindex = -1;
-			def->next = NULL;
-			def->is_dummy = false;
-
-			alloc_argument_simu(firstdef, def); 
-
-			debug("ASSIGNED %d", def->arg_regindex);
-
-			lastdef->next = def;
-		}
-
-		node->funccall_argdefs[i] = def;
-
-		// 進める
-		lastdef = def;
-		if (def->next != NULL)
-		{
-			lvtmp = copy_lvar(def->next);
-			def->next = lvtmp;
-			def = lvtmp;
-		}
-		else
-			def = NULL;
-
-		debug("  READ ARG(%d) END", i);
 	}
+
 	return (node);
 }
 
@@ -441,7 +366,7 @@ static t_node *analyze_bitwise_not(t_node *node)
 // kindとtypeを変える副作用があるので、関数の最後で実行する
 static void	analyze_replace_lval(t_node *node)
 {
-	// TODO 文字列も
+	// TODO 文字列も?
 	if (node->kind == ND_VAR_LOCAL)
 		node->kind = ND_VAR_LOCAL_ADDR;
 	else if (node->kind == ND_VAR_GLOBAL)
@@ -516,7 +441,7 @@ static t_node	*analyze_add(t_node *node)
 			node->type = l;
 
 			// 右辺を掛け算に置き換える
-			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_type_size(l->ptr_to), node->analyze_source), node->analyze_source);
+			node->rhs = new_node(ND_MUL, node->rhs, new_node_num(get_array_align_size(l->ptr_to), node->analyze_source), node->analyze_source);
 			node->rhs->type = new_primitive_type(TY_INT);
 			node->rhs->analyze_source = node->rhs->lhs->analyze_source;
 			node->rhs = analyze_node(node->rhs);
@@ -527,7 +452,7 @@ static t_node	*analyze_add(t_node *node)
 			node->type = r;
 
 			// 左辺を掛け算に置き換える
-			node->lhs = new_node(ND_MUL, node->lhs, new_node_num(get_type_size(r->ptr_to), node->analyze_source), node->analyze_source);
+			node->lhs = new_node(ND_MUL, node->lhs, new_node_num(get_array_align_size(r->ptr_to), node->analyze_source), node->analyze_source);
 			node->lhs->type = new_primitive_type(TY_INT);
 			node->lhs->analyze_source = node->lhs->lhs->analyze_source;
 			node->lhs = analyze_node(node->lhs);
@@ -822,8 +747,7 @@ static t_node	*analyze_switch(t_node *node)
 	node->switch_has_default = data->defaultLabel != -1;
 
 	// lhsの保存用
-	node->switch_save = create_lvar(g_func_now, "", 0, node->lhs->type, false);
-	node->switch_save->is_dummy = true;
+	node->switch_save = append_dummy_lvar(g_func_now, node->lhs->type);
 	return (node);
 }
 
@@ -1024,7 +948,6 @@ static t_node	*analyze_node(t_node *node)
 static void	analyze_func(t_deffunc *func)
 {
 	int		i;
-	t_lvar	*lvar;
 	char	*name;
 	int		name_len;
 	t_type	*type;
@@ -1034,53 +957,22 @@ static void	analyze_func(t_deffunc *func)
 
 	g_func_now = func;
 
-	// TODO genに移動
-	// 戻り値の型がMEMORY_CLASSならrdiを保存する用のスタックを用意する
-	if (is_memory_type(func->type_return))
-	{
-		// for save rdi
-		lvar				= calloc(1, sizeof(t_lvar));
-		lvar->name			= "";
-		lvar->name_len 		= 0;
-		lvar->type			= new_type_ptr_to(new_primitive_type(TY_VOID));
-		lvar->is_arg 		= true;
-		lvar->arg_regindex	= 0;
-		lvar->is_dummy		= true;
-		lvar->offset		= 8;
-		lvar->next			= NULL;
-		func->locals		= lvar;
-
-		// padding
-		lvar				= calloc(1, sizeof(t_lvar));
-		lvar->name			= "";
-		lvar->name_len		= 0;
-		lvar->type			= func->type_return;
-		lvar->is_arg		= false;
-		lvar->arg_regindex	= -1;
-		lvar->is_dummy		= true;
-		lvar->offset		= 8 + align_to(get_type_size(func->type_return), 16) * 2;
-		lvar->next			= NULL;
-		func->locals->next	= lvar;
-	}
-
-	// check argument types
+	// TODO 引数の名前の被りチェック
+	// check argument
 	for (i = 0; i < func->argcount; i++)
 	{
 		name		= func->argument_names[i];
 		name_len	= func->argument_name_lens[i];
-		type		= func->type_arguments[i];
+		type		= func->argument_types[i];
 
 		// if array type, change type to ptr
-		type = type_array_to_ptr(type);
-		func->type_arguments[i] = type;
+		func->argument_types[i] = type_array_to_ptr(type);
 
 		if (!is_declarable_type(type))
 			error_at(name, "宣言できない型の変数です");
 
-		// t_lvarを作成
-		create_lvar(func, name, name_len, type, true);
-
-		// TODO 引数の名前の被りチェック
+		// 引数を格納する変数を作成
+		append_lvar(func, name, name_len, type, true);
 	}
 
 	// TODO 関数名の被りチェック

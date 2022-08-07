@@ -153,8 +153,6 @@ static t_node	*call(t_token *tok)
 
 		node->funccall_args[node->funccall_argcount++] = expr();
 	}
-
-	debug(" CALL END");
 	return (node);
 }
 
@@ -1069,7 +1067,7 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 			// variable argument
 			if (consume("..."))
 			{
-				if (def->type_arguments[0] == NULL)
+				if (def->argument_types[0] == NULL)
 					error_at(g_token->str, "可変長引数の宣言をするには、少なくとも一つの引数が必要です");
 				if (!consume(")"))
 					error_at(g_token->str, ")が必要です");
@@ -1089,7 +1087,7 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 				// voidなら引数0個
 				if (type->ty == TY_VOID)
 				{
-					if (def->type_arguments[0] != NULL)
+					if (def->argument_types[0] != NULL)
 						error_at(g_token->str, "既に引数が宣言されています");
 					if (!consume(")"))
 						error_at(g_token->str, ")が見つかりませんでした。");
@@ -1105,7 +1103,7 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 			// save
 			def->argument_names[def->argcount]		= arg->str;
 			def->argument_name_lens[def->argcount]	= arg->len;
-			def->type_arguments[def->argcount]		= type;
+			def->argument_types[def->argcount]		= type;
 			def->argcount += 1;
 
 			// )か,

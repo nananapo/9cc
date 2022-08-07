@@ -319,14 +319,6 @@ bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
 	return (true);
 }
 
-t_type	*type_cast_forarg(t_type *type)
-{
-	if (type->ty == TY_PTR)
-		return (new_type_ptr_to(type->ptr_to));
-	else
-		return (type);
-}
-
 char	*get_type_name(t_type *type)
 {
 	char	*ret;

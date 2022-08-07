@@ -255,17 +255,13 @@ typedef struct s_labelstack
 
 typedef struct s_lvar
 {
+	t_type			*type;
+	char			*name;
+	int				name_len;
+	bool			is_dummy;
+	bool			is_argument;
+
 	struct s_lvar	*next;
-
-	char		*name;
-	int			name_len;
-	int			offset;
-
-	bool		is_arg;
-	int			arg_regindex;
-	bool		is_dummy;
-
-	t_type		*type;
 } t_lvar;
 
 typedef struct s_str_literal_elem
@@ -323,7 +319,7 @@ struct s_deffunc
 
 	char		*argument_names[20];
 	int			argument_name_lens[20];
-	t_type		*type_arguments[20];
+	t_type		*argument_types[20];
 
 	bool		is_static;
 	bool		is_prototype;
@@ -335,11 +331,7 @@ struct s_deffunc
 }	*funcdef;
 	int				funccall_argcount;
 	struct s_node	*funccall_args[20];
-	t_lvar			*funccall_argdefs[20];
 	struct s_deffunc*funccall_caller;
-
-	// 返り値がMEMORYかstructな関数を呼んだ時に結果を入れる場所
-	t_lvar			*call_mem_stack;
 
 	t_member		*elem;
 
@@ -380,13 +372,10 @@ typedef struct s_typedefpair
 
 
 void	debug(char *fmt, ...);
-
-char	*read_file(char	*name);
-
-int		align_to(int a, int to);
-
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);
+
+char	*read_file(char	*name);
 
 t_token	*tokenize(char *p);
 
@@ -395,31 +384,37 @@ t_node	*new_node_num(int val, char *source);
 
 // t_type
 t_type	*new_primitive_type(t_typekind pri);
-int		get_type_size(t_type *type);
 t_type	*new_type_ptr_to(t_type *ptr_to);
 t_type	*new_type_array(t_type *ptr_to);
 t_type	*new_struct_type(char *name, int len);
 t_type	*new_enum_type(char *name, int len);
 t_type	*new_union_type(char *name, int len);
+t_type	*type_array_to_ptr(t_type *type);
+
 bool	is_integer_type(t_type *type);
 bool	is_pointer_type(t_type *type);
 bool	is_declarable_type(t_type *type);
-bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
 bool	type_equal(t_type *t1, t_type *t2);
-t_member	*get_member_by_name(t_type *type, char *name, int len);
-char	*get_type_name(t_type *type);
-bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
-t_type	*type_array_to_ptr(t_type *type);
-bool	can_use_arrow(t_type *type);
-bool	can_use_dot(t_type *type);
 bool	is_memory_type(t_type *type);
 
-bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value);
-t_lvar	*find_lvar(t_deffunc *func, char *str, int len);
+bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
+bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
+bool	can_use_arrow(t_type *type);
+bool	can_use_dot(t_type *type);
+t_member	*get_member_by_name(t_type *type, char *name, int len);
+
+char	*get_type_name(t_type *type);
+
+bool		find_enum(char *str, int len, t_defenum **res_def, int *res_value);
+t_lvar		*find_lvar(t_deffunc *func, char *str, int len);
 t_defvar	*find_global(char *str, int len);
 
 void	parse(void);
 void	analyze();
+
+// gen.c
 void	codegen(void);
+int		get_type_size(t_type *type);
+int		get_array_align_size(t_type *type);
 
 #endif

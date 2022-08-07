@@ -16,6 +16,7 @@ int test(struct t1 a)
 
 	dint(*a.a);
 	dint(a.b);
+
 	return 1;
 }
 

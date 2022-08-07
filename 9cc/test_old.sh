@@ -536,6 +536,8 @@ assert_gcc "arg6.c"
 assert_gcc "arg7.c"
 assert_gcc "arg8.c"
 assert_gcc "arg9.c"
+assert_gcc "arg10.c"
+assert_gcc "arg11.c"
 
 assert_gcc "varg.c"
 assert_gcc "varg2.c"
@@ -728,8 +730,12 @@ assert_gcc "bitwise_xor.c"
 
 assert_gcc "shift.c"
 
+assert_gcc "ret_struct0.c"
 assert_gcc "ret_struct1.c"
 assert_gcc "ret_struct2.c"
+assert_gcc "ret_struct3.c"
+assert_gcc "ret_struct4.c"
+assert_gcc "ret_struct5.c"
 
 echo OK
 

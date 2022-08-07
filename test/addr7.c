@@ -1,3 +1,5 @@
+int dint(int x);
+
 int swap(int *x, int *y)
 {
 	int tmp;
@@ -13,9 +15,10 @@ int main()
 	int y;
 	x = 24;
 	y = 42;
+	dint(x);
+	dint(y);
 	swap(&x, &y);
-	pint(x);
-	pspace(1);
-	pint(y);
+	dint(x);
+	dint(y);
 	return 0;
 }

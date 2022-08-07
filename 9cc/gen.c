@@ -22,9 +22,23 @@ static void	print_global_constant(t_node *node, t_type *type);
 
 static char		*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int		stack_count = 0;
-static t_lvar	*g_funcnow_locals;
-static int		g_funcnow_offset;
 static int		aligned_stack_def_var_end;
+static int		locals_stack_add = 0;
+
+static int		g_locals_count;
+static t_lvar	*g_locals[1000];
+static int		g_locals_offset[1000];
+static int		g_locals_regindex[1000];
+
+static int		g_call_locals_count;
+static t_lvar	*g_call_locals[1000];
+static int		g_call_locals_offset[1000];
+static int		g_call_locals_regindex[1000];
+
+static int		g_call_memory_count;
+static t_il		*g_call_memory_codes[1000];
+static t_lvar	*g_call_memory_lvars[1000];
+
 
 // main
 extern t_deffunc		*g_func_defs[1000];
@@ -96,7 +110,6 @@ static int	get_member_offset(t_member *mem)
 }
 
 // TODO voidのarray
-// TODO arrayの掛け算
 
 static int	get_struct_size(t_type *type)
 {
@@ -120,6 +133,11 @@ static int	get_union_size(t_defunion *def)
 	for (mem = def->members; mem != NULL; mem = mem->next)
 		tmp_size = max(tmp_size, get_type_size(mem->type));
 	return (tmp_size);
+}
+
+int	get_array_align_size(t_type *type)
+{
+	return (get_type_size(type));
 }
 
 // 型のサイズを取得する
@@ -151,32 +169,223 @@ int	get_type_size(t_type *type)
 	return (-1);
 }
 
+static int	alloc_argument(t_lvar *lvar)
+{
+	int		i;
+	int		size;
+	int		regindex_max;
+	int		offset_min;
+	int		offset_max;
+	t_lvar	*var_loop;
+	int		offset_loop;
+	int		reg_loop;
 
+	// rbpをプッシュした分を考慮する
+	offset_min = -16;
+	offset_max = 0;
+	regindex_max = -1;
 
+	for (i = 0; i < g_locals_count; i++)
+	{
+		var_loop	= g_locals[i];
+		offset_loop	= g_locals_offset[i];
+		reg_loop	= g_locals_regindex[i];
+		if (var_loop->is_argument)
+		{
+			regindex_max = max(regindex_max, reg_loop);
+			if (reg_loop == -1)
+			{
+				offset_min = min(offset_min, offset_loop -
+								align_to(get_type_size(var_loop->type), 8));
+			}
+			offset_max = max(offset_max, max(0, offset_loop));
+		}
+	}
 
+	size = get_type_size(type_array_to_ptr(lvar->type));
+
+	// レジスタに入れる
+	if (regindex_max < ARGREG_SIZE - 1
+	&& (ARGREG_SIZE - regindex_max - 1) * 8 >= size)
+	{
+		g_locals[g_locals_count]			= lvar;
+		g_locals_regindex[g_locals_count]	= regindex_max + align_to(size, 8) / 8;
+		g_locals_offset[g_locals_count]		= (offset_max + size + 7) / 8 * 8;
+	}
+	// スタックに入れる
+	else
+	{
+		g_locals[g_locals_count]			= lvar;
+		g_locals_regindex[g_locals_count]	= -1;
+		g_locals_offset[g_locals_count]		= offset_min;
+	}
+
+	g_locals_count += 1;
+
+	return (g_locals_count - 1);
+}
+
+static void	append_local(t_lvar *def)
+{
+	int	i;
+	int	size;
+	int	regindex;
+	int	offset;
+	int	old;
+
+	size = get_type_size(def->type);
+
+	if (def->is_argument)
+	{
+		i = alloc_argument(def);
+
+		size	= align_to(size, 8); // 8byte
+		regindex= g_locals_regindex[i];
+		offset	= g_locals_offset[i];
+
+		if (regindex == -1)
+			return ;
+		
+		// スタックに領域確保
+		printf("    sub rsp, %d # %d\n", size, locals_stack_add);
+		stack_count			+= size;
+		locals_stack_add	+= size;
+
+		mov(R10, RBP);
+		printf("    sub %s, %d\n", R10, offset);
+
+		while (size >= 8)
+		{
+			mov(RAX, arg_regs[regindex--]);
+			store_value(8);
+			size -= 8;
+			if (size != 0)
+				printf("    add %s, 8\n", R10);
+		}
+		return ;
+	}
+
+	offset = 0;
+	for (i = 0; i < g_locals_count; i++)
+	{
+		offset = max(g_locals_offset[i], offset);
+	}
+
+	g_locals[g_locals_count]			= def;
+	g_locals_offset[g_locals_count]		= align_to(offset + size, 8);
+	g_locals_regindex[g_locals_count]	= -1;
+
+	g_locals_count += 1;
+
+	printf("    sub %s, %d\n", RSP, align_to(offset + size, 8) - offset);
+
+	old				= stack_count;
+	stack_count		+= align_to(offset + size, 8) - offset;
+	locals_stack_add+= stack_count - old;
+}
+
+static int	append_argument_call(t_lvar *lvar)
+{
+	int		i;
+	int		size;
+	int		regindex_max;
+	int		offset_min;
+	int		offset_max;
+	t_lvar	*var_loop;
+	int		offset_loop;
+	int		reg_loop;
+
+	// rbpをプッシュした分を考慮する
+	offset_min = -16;
+	offset_max = 0;
+	regindex_max = -1;
+
+	for (i = 0; i < g_call_locals_count; i++)
+	{
+		var_loop	= g_call_locals[i];
+		offset_loop	= g_call_locals_offset[i];
+		reg_loop	= g_call_locals_regindex[i];
+		if (var_loop->is_argument)
+		{
+			regindex_max = max(regindex_max, reg_loop);
+			if (reg_loop == -1)
+			{
+				offset_min = min(offset_min, offset_loop -
+								align_to(get_type_size(var_loop->type), 8));
+			}
+			offset_max = max(offset_max, max(0, offset_loop));
+		}
+	}
+
+	size = get_type_size(type_array_to_ptr(lvar->type));
+
+	// レジスタに入れる
+	if (regindex_max < ARGREG_SIZE - 1
+	&& (ARGREG_SIZE - regindex_max - 1) * 8 >= size)
+	{
+		g_call_locals[g_call_locals_count]			= lvar;
+		g_call_locals_regindex[g_call_locals_count]	= regindex_max + align_to(size, 8) / 8;
+		g_call_locals_offset[g_call_locals_count]	= (offset_max + size + 7) / 8 * 8;
+	}
+	// スタックに入れる
+	else
+	{
+		g_call_locals[g_call_locals_count]			= lvar;
+		g_call_locals_regindex[g_call_locals_count]	= -1;
+		g_call_locals_offset[g_call_locals_count]	= offset_min;
+	}
+
+	g_call_locals_count += 1;
+
+	return (g_call_locals_count - 1);
+}
+
+static void	set_call_memory(t_il *code, t_lvar *lvar)
+{
+	g_call_memory_codes[g_call_memory_count]	= code;
+	g_call_memory_lvars[g_call_memory_count]	= lvar;
+	g_call_memory_count += 1;
+}
+
+// 返り値がmemoryな関数を読んだ時の保存場所を返す
+static int	get_call_memory(t_il *code)
+{
+	int	i;
+	int	j;
+
+	for (i = 0; i < g_call_memory_count; i++)
+	{
+		if (g_call_memory_codes[i] == code)
+		{
+			for (j = 0; j < g_locals_count; j++)
+			{
+				if (g_call_memory_lvars[i] == g_locals[j])
+					return (g_locals_offset[j]);
+			}
+			return (-1);
+		}
+	}
+	return (-1);
+}
 
 
 
 static void	push()
 {
 	stack_count += 8;
-	
-	debug("stack= %d -> %d", stack_count - 8, stack_count);
-	printf("    %s %s\n", ASM_PUSH, RAX);
+	printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
 }
 
 static void	pushi(int num)
 {
 	stack_count += 8;
-	debug("stack= %d -> %d", stack_count - 8, stack_count);
-	printf("    %s %d\n", ASM_PUSH, num);
+	printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
 }
 
 static void	pop(char *reg)
 {
 	stack_count -= 8;
-	debug("stack= %d -> %d", stack_count + 8, stack_count);
-	printf("    pop %s\n", reg);
+	printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
 }
 
 static void	mov(char *dst, char *from)
@@ -426,43 +635,34 @@ static void gen_defglobal(t_defvar *node)
 
 static void	gen_call_start(t_il *code)
 {
-	debug("start %s", strndup(code->funccall_callee->name, code->funccall_callee->name_len));
+	t_lvar	*lvar;
+
+	debug("start call %s", strndup(code->funccall_callee->name, code->funccall_callee->name_len));
+
+	g_call_locals_count = 0;
+
+	if (is_memory_type(code->funccall_callee->type_return))
+	{
+		lvar				= calloc(1, sizeof(t_lvar));
+		lvar->name			= "";
+		lvar->name_len		= 0;
+		lvar->type			= new_primitive_type(TY_INT);
+		lvar->is_argument	= true;
+		lvar->is_dummy		= true;
+		append_argument_call(lvar);
+	}
 }
 
 static void	gen_call_add_arg(t_il *code)
 {
-	int		i;
-	int		size;
-	t_lvar	*def;
+	t_lvar	*lvar;
 
-	size	= get_type_size(code->type);
-	def		= code->funccall_arg_def;
-
-	debug("PUSH ARG %s(%d)", strndup(def->name, def->name_len), size);
-
-	// popする TODO floatとかは?
-	pop(RAX);
-
-	if (def->arg_regindex != -1)
-	{
-		if (size <= 8)
-		{
-			push();
-			return ;
-		}
-		// size > 8はstructなので、スタックに積む
-		mov(RDI, RAX);
-		for (i = 0; i < size; i += 8)
-		{
-			if (i == 0)
-				printf("    %s %s, [%s]\n", ASM_MOV, RAX, RDI);
-			else
-				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RDI, i);
-			push();
-		}
-	}
-	else
-		push();
+	lvar				= calloc(1, sizeof(t_lvar));
+	lvar->name			= get_type_name(code->type);
+	lvar->name_len		= strlen(lvar->name);
+	lvar->type			= code->type;
+	lvar->is_argument	= true;
+	append_argument_call(lvar);
 }
 
 static void	gen_call_exec(t_il *code)
@@ -471,124 +671,130 @@ static void	gen_call_exec(t_il *code)
 	int			j;
 	int			pop_count;
 	int 		rbp_offset;
-	bool		is_aligned;
 	int			size;
 	t_deffunc	*deffunc;
 	t_lvar		*defarg;
+
+	int			tmp_regindex;
+	int			tmp_offset;
 
 	deffunc = code->funccall_callee;
 
 	// 16 byteアラインチェック
 	rbp_offset = 0;
-	for (i = 0; i < code->funccall_argcount; i++)
+	for (i = 0; i < g_call_locals_count; i++)
 	{
-		defarg = code->funccall_argdefs[i];
-		if (defarg->arg_regindex != -1)
+		defarg		= g_call_locals[i];
+		tmp_regindex= g_call_locals_regindex[i];
+		tmp_offset	= g_call_locals_offset[i];
+
+		if (!defarg->is_argument || tmp_regindex != -1)
 			continue ;
-		rbp_offset = min(rbp_offset, defarg->offset - align_to(get_type_size(defarg->type), 8) + 8);
+
+		rbp_offset = min(rbp_offset, tmp_offset - align_to(get_type_size(defarg->type), 8) + 8);
 	}
 
 	// マイナスなのでプラスにする
 	rbp_offset = - rbp_offset;
-
-	is_aligned = (stack_count + rbp_offset + 8) % 16 == 0;
-	if (!is_aligned)
+	if ((stack_count + rbp_offset) % 16 == 0)
 		rbp_offset += 8;
 
-	debug("RBP_OFFSET %d (is_aligned : %d)", rbp_offset, is_aligned);
-	
+	debug("rbp_offset : %d", rbp_offset);
+
 	pop_count = 0;
 	// 後ろから格納していく
-	for (i = code->funccall_argcount - 1; i >= 0; i--)
+	for (i = 0; i < g_call_locals_count; i++)
 	{
-		defarg			= code->funccall_argdefs[i];
+		defarg			= g_call_locals[i];
 		defarg->type	= type_array_to_ptr(defarg->type);
 		size			= get_type_size(defarg->type);
+		tmp_regindex	= g_call_locals_regindex[i];
+		tmp_offset		= g_call_locals_offset[i];
 
-		debug("POP %s", strndup(defarg->name, defarg->name_len));
+		// スタックに積む
+		size = align_to(size, 8);
+
+		if (defarg->is_dummy)
+			continue ;
 
 		// レジスタに入れる
-		if (defarg->arg_regindex != -1)
+		if (tmp_regindex != -1)
 		{
 			if (size <= 8)
 			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
-				mov(arg_regs[defarg->arg_regindex], RAX);
+				printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count * 8);
+				mov(arg_regs[tmp_regindex], RAX);
+				pop_count += 1;
 				continue ;
 			}
+
+			printf("    %s %s, [%s + %d]\n", ASM_MOV, R10, RSP, pop_count * 8);
+			pop_count += 1;
+
 			for (j = size - 8; j >= 0; j -= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV,
-					arg_regs[defarg->arg_regindex - j / 8],
-					 RSP, pop_count++ * 8);
+						arg_regs[tmp_regindex - j / 8],
+						R10, j);
 			}
 			continue ;
 		}
 
-		debug("OFFSET %d", defarg->offset);
+		debug("offset : %d (%s)", tmp_offset, strndup(defarg->name, defarg->name_len));
 
-		// スタックに積む
-		// 必ず8byteアラインなので楽々実装
-		size = align_to(size, 8);
-
-		printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count++ * 8);
-		mov(R10, RSP);
-
-		printf("    sub %s, %d\n", R10,
-				(defarg->offset + 16) + rbp_offset);
-
-		// STRUCTならptr先を渡す
 		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
+		{
+			printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count * 8);
+			mov(R10, RSP);
+			printf("    sub %s, %d\n", R10, (tmp_offset + 16) + rbp_offset);
 			store_ptr(size, false);
+		}
 		else
+		{
+			printf("    %s %s, [%s + %d]\n", ASM_MOV, RAX, RSP, pop_count * 8);
+			mov(R10, RSP);
+			printf("    sub %s, %d\n", R10, (tmp_offset + 16) + rbp_offset);
 			store_value(size);
+		}
+		pop_count += 1; // doubleなら2とかになる？
 	}
 
-	// rspを移動する
-	if (rbp_offset != 0)
-	{
-		if (!is_aligned)
-			debug("aligned + 8");
-		debug("rbp_offset");
-		printf("    sub %s, %d\n", RSP, rbp_offset);
-	}
+	debug("ready");
+
+	// rsp += rbp_offsetする
+	printf("    sub %s, %d\n", RSP, rbp_offset);
 
 	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
 	if (is_memory_type(deffunc->type_return))
 	{
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, code->funccall_save_pos->offset);
+		printf("    lea %s, [%s - %d]\n", RDI, RBP, get_call_memory(code));
 	}
 
 	// call
-	debug("CALL RBP_OFFSET: %d", rbp_offset);
 	if (deffunc->is_variable_argument)
+	{
 		movi(AL, 0);
+	}
 	printf("    call _%s\n", strndup(deffunc->name, deffunc->name_len));
 
 	// rspを元に戻す
-	if (rbp_offset != 0)
-	{
-		debug("rbp_offset");
-		printf("    add %s, %d\n", RSP, rbp_offset);
-	}
+	printf("    add %s, %d\n", RSP, rbp_offset);
 
 	// stack_countをあわせる
-	debug("pop_count");
 	printf("    add %s, %d\n", RSP, pop_count * 8);
-	debug("POP ALL %d -> %d", stack_count, stack_count - pop_count * 8);
 	stack_count -= pop_count * 8;
 
 	// 返り値がMEMORYなら、raxにアドレスを入れる
 	if (is_memory_type(deffunc->type_return))
 	{
-		printf("    lea %s, [%s - %d]\n", RAX, RBP, code->funccall_save_pos->offset);
+		printf("    lea %s, [%s - %d]\n", RAX, RBP, get_call_memory(code));
 		push();
 	}
 	// 返り値がstructなら、rax, rdxを移動する
 	else if (deffunc->type_return->ty == TY_STRUCT)
 	{
 		size = align_to(get_type_size(deffunc->type_return), 8);
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, code->funccall_save_pos->offset);
+		printf("    lea %s, [%s - %d]\n", RDI, RBP, get_call_memory(code));
 		if (size > 0)
 			printf("    mov [%s], %s\n", RDI, RAX);
 		if (size > 8)
@@ -603,11 +809,11 @@ static void	gen_call_exec(t_il *code)
 	}
 }
 
-static void	gen_macro_va_start(t_il *code)
+static void	gen_macro_va_start()
 {
 	int		min_offset;
 	int		max_argregindex;
-	t_lvar	*def;
+	int		i;
 
 	pop(RAX);
 
@@ -623,11 +829,10 @@ static void	gen_macro_va_start(t_il *code)
 	min_offset = 0;
 	max_argregindex = -1;
 
-	for (def = code->funccall_caller->locals; def; def = def->next)
+	for (i = 0; i < g_locals_count; i++)
 	{
-		min_offset = min(def->offset, min_offset);
-		max_argregindex = max(max_argregindex, def->arg_regindex);
-		debug(" # LOOP %d\n", def->arg_regindex);
+		min_offset = min(g_locals_offset[i], min_offset);
+		max_argregindex = max(max_argregindex, g_locals_regindex[i]);
 	}
 
 	mov(RDI, RAX);
@@ -640,26 +845,76 @@ static void	gen_macro_va_start(t_il *code)
 	printf("    mov [rdi + 8], rax\n"); // overflow arg area
 	printf("    mov [rdi + 16], rsp\n\n"); // reg save area
 
-	debug("    VA_START");
 	debug("    gp_offset : %d", (1 + max_argregindex) * 8);
 	debug("    fp_offset : %d", 0 * 8);
 }
 
-static void gen_func_prologue(t_il *code)
+static void	gen_save_rdi(t_il *code)
 {
-	stack_count = 0;
-
-	mov(RAX, RBP);
-	push();
-	mov(RBP, RSP);
-	g_funcnow_locals = NULL;
-	g_funcnow_offset = 0;
+	t_lvar	*lvar;
 
 	// 返り値がMEMORYなら、rdiからアドレスを取り出す
 	if (is_memory_type(code->deffunc_def->type_return))
 	{
-		printf("    mov [rbp - %d], %s\n", code->deffunc_def->locals->offset, RDI); // 必ずoffsetが8なので、今のところおかしくならない....
-	}	
+		// for save rdi
+		lvar				= calloc(1, sizeof(t_lvar));
+		lvar->name			= "";
+		lvar->name_len		= 0;
+		lvar->type			= new_type_ptr_to(new_primitive_type(TY_VOID));
+		lvar->is_argument	= true;
+		lvar->is_dummy		= true;
+		append_local(lvar);
+
+		lvar			= calloc(1, sizeof(t_lvar));
+		lvar->name		= "";
+		lvar->name_len	= 0;
+		lvar->type		= code->deffunc_def->type_return;
+		lvar->is_dummy	= true;
+		append_local(lvar);
+	}
+}
+
+// 関数呼び出しを先読みして、返り値の型がMEMORYなら保存用の場所を確保する
+static void gen_call_memory(t_il *code)
+{
+	t_type	*type_return;
+	t_lvar	*lvar;
+
+	for (; code != NULL && code->kind != IL_FUNC_EPILOGUE; code = code->next)
+	{
+		if (code->kind != IL_CALL_EXEC)
+			continue ;
+		type_return = code->funccall_callee->type_return;
+		// 返り値がMEMORYなら、それを保存する用の場所を確保する
+		if (is_memory_type(type_return) || type_return->ty == TY_STRUCT)
+		{
+			lvar				= calloc(1, sizeof(t_lvar));
+			lvar->name			= "";
+			lvar->name_len		= 0;
+			lvar->type			= type_return;
+			lvar->is_argument	= false;
+			lvar->is_dummy		= true;
+			append_local(lvar);
+			set_call_memory(code, lvar);
+		}
+	}
+}
+
+static void gen_func_prologue(t_il *code)
+{
+	g_locals_count			= 0;
+	g_call_memory_count 	= 0;
+
+	stack_count				= 0;
+	locals_stack_add		= 0;
+	aligned_stack_def_var_end	= 0;
+
+	mov(RAX, RBP);
+	push();
+	mov(RBP, RSP);
+
+	gen_save_rdi(code);
+	gen_call_memory(code);
 }
 
 static void	gen_func_epilogue(t_il *code)
@@ -670,11 +925,11 @@ static void	gen_func_epilogue(t_il *code)
 	if (is_memory_type(code->type))
 	{
 		pop(RAX);
-		printf("    mov %s, [rbp - %d]\n", R10, code->deffunc_def->locals->offset);
+		printf("    mov %s, [rbp - %d]\n", R10, g_locals_offset[0]);
 		store_ptr(get_type_size(code->type), false);
 
 		// RDIを復元する
-		printf("    mov %s, [rbp - %d]\n", RDI, code->deffunc_def->locals->offset);
+		printf("    mov %s, [rbp - %d]\n", RDI, g_locals_offset[0]);
 	}
 	// STRUCTなら、rax, rdxに格納
 	else if (code->type->ty == TY_STRUCT)
@@ -689,15 +944,16 @@ static void	gen_func_epilogue(t_il *code)
 	else if (code->type->ty != TY_VOID)
 		pop(RAX);
 
-	printf("    sub %s, %d\n", RSP, aligned_stack_def_var_end);
+	printf("    add %s, %d # %d\n", RSP, aligned_stack_def_var_end, stack_count);
 	stack_count -= aligned_stack_def_var_end;
+	printf("    add %s, %d # %d\n", RSP, locals_stack_add, stack_count);
+	stack_count -= locals_stack_add;
 
 	mov(RSP, RBP);
 	pop(RBP);
 	printf("    ret\n");
 
-	g_funcnow_locals = NULL;
-
+	g_locals_count = 0;
 
 	if (stack_count != 0)
 	{
@@ -705,69 +961,46 @@ static void	gen_func_epilogue(t_il *code)
 		error("Error");
 	}
 
-
 	stack_count = 0;
 }
 
 static void	gen_def_var_local(t_il *code)
 {
-	t_lvar	*def;
-	int		size;
-	int		index;
-	int		offset_before;
-
-	// TODO 引数の配列型
-	def		= code->var_local;
-	size	= get_type_size(def->type);
-
-	// offsetを設定する
-	if (!def->is_arg || def->arg_regindex != -1)
-	{
-		offset_before	= g_funcnow_offset;
-		g_funcnow_offset= align_to(g_funcnow_offset + size, 8);
-		def->offset		= g_funcnow_offset;
-
-		printf("    sub %s, %d\n", RSP, g_funcnow_offset - offset_before);
-		stack_count += g_funcnow_offset - offset_before;
-	}
-
-	if (def->is_arg)
-	{
-		debug("ARG %s", strndup(def->name, def->name_len));
-		if (def->arg_regindex != -1)
-		{
-			index = def->arg_regindex;
-			size = align_to(get_type_size(def->type), 8);
-	
-			mov(R10, RBP);
-			printf("    sub %s, %d\n", R10, def->offset);
-	
-			// とりあえず、かならず8byte境界になっている
-			// ↑ は？
-			while (size >= 8)
-			{
-				mov(RAX, arg_regs[index--]);
-				store_value(8);
-				size -= 8;
-				if (size != 0)
-				printf("    add %s, 8\n", R10);
-			}
-		}
-	}
+	append_local(code->var_local);
 }
 
 static void	gen_def_var_end(void)
 {
-	int	to;
+	int	old;
 
-	to = align_to(stack_count, 16);
-	if (stack_count != to)
-		printf("    sub %s, %d\n", RSP, to - stack_count);
-	if (stack_count != 8)
-		aligned_stack_def_var_end = to - 8;
+	old			= stack_count;
+	stack_count	= align_to(stack_count, 16);
+
+	printf("    sub %s, %d\n", RSP, stack_count - old);
+	aligned_stack_def_var_end = stack_count - old;
+}
+
+static void	gen_var_local_addr(t_il *code)
+{
+	int	i;
+	int	offset;
+
+	offset = 0;
+	for (i = 0; i < g_locals_count; i++)
+	{
+		if (g_locals[i] == code->var_local)
+		{
+			offset = g_locals_offset[i];
+			break ;
+		}
+	}
+
+	mov(RAX, RBP);
+	if (offset >= 0)
+		printf("    sub %s, %d\n", RAX, offset);
 	else
-		aligned_stack_def_var_end = to - stack_count;
-	stack_count = to;
+		printf("    add %s, %d\n", RAX, -offset);
+	push();
 }
 
 static void	gen_il(t_il *code)
@@ -983,12 +1216,7 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_VAR_LOCAL_ADDR:
-			mov(RAX, RBP);
-			if (code->var_local->offset > 0)
-				printf("    sub %s, %d\n", RAX, code->var_local->offset);
-			else if (code->var_local->offset < 0)
-				printf("    add %s, %d\n", RAX, -code->var_local->offset);
-			push();
+			gen_var_local_addr(code);
 			return ;
 		case IL_VAR_GLOBAL:
 			code->kind = IL_VAR_GLOBAL_ADDR;
@@ -1032,7 +1260,7 @@ static void	gen_il(t_il *code)
 			gen_call_exec(code);
 			return ;
 		case IL_MACRO_VASTART:
-			gen_macro_va_start(code);
+			gen_macro_va_start();
 			return ;
 
 		case IL_CAST:
