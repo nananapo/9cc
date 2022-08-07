@@ -28,7 +28,7 @@ extern t_il				*g_il;
 
 static char	*get_function_epi_label(char *name, int len)
 {
-	return (my_strcat("Lepi_", strndup(name, len)));
+	return (my_strcat("Lepi_", my_strndup(name, len)));
 }
 
 static char	*get_label_str(int i)
@@ -803,7 +803,7 @@ static void	translate_func(t_deffunc *func)
 	t_lvar	*lvar;
 
 	code						= append_il(IL_LABEL);
-	code->label_str				= strndup(func->name, func->name_len);
+	code->label_str				= my_strndup(func->name, func->name_len);
 	code->label_is_deffunc		= true;
 	code->label_is_static_func	= func->is_static;
 

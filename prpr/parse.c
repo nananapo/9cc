@@ -173,7 +173,7 @@ static Node	*parse_include(ParseEnv *env)
 	if (lit == NULL)
 		error_at(env->token->str, "ファイル名が必要です(%p %d)", env->token, env->token->kind);
 	node->is_std_include = !lit->is_dq;
-	node->file_name = strndup(lit->str, lit->len);
+	node->file_name = my_strndup(lit->str, lit->len);
 	expect_eod(env);
 	return (node);
 }
@@ -191,7 +191,7 @@ static Node	*parse_define(ParseEnv *env)
 	tmp = consume_name(env, true);
 	if (tmp == NULL)
 		error_at(env->token->str, "名前が見つかりません");
-	node->macro_name = strndup(tmp->str, tmp->len);
+	node->macro_name = my_strndup(tmp->str, tmp->len);
 
 	// 引数の処理
 	tmp = consume_keyword(env, "(", true);
@@ -204,7 +204,7 @@ static Node	*parse_define(ParseEnv *env)
 				tmp = consume_name(env, true);
 				if (tmp == NULL)
 					error_at(env->token->str, "引数が見つかりません");
-				add_str_elem(&node->params, strndup(tmp->str, tmp->len));
+				add_str_elem(&node->params, my_strndup(tmp->str, tmp->len));
 				if (consume_keyword(env, ",", true) == NULL)
 				{
 					if (consume_keyword(env, ")", true) == NULL)
@@ -239,7 +239,7 @@ static Node	*parse_undef(ParseEnv *env)
 	tmp = consume_name(env, true);
 	if (tmp == NULL)
 		error_at(env->token->str, "名前が見つかりません");
-	node->macro_name = strndup(tmp->str, tmp->len);
+	node->macro_name = my_strndup(tmp->str, tmp->len);
 
 	expect_eod(env);
 	return (node);
@@ -299,7 +299,7 @@ static Node	*parse_ifdef(ParseEnv *env, int nest)
 	tmp = consume_name(env, true);
 	if (tmp == NULL)
 		error_at(env->token->str, "識別子が必要です");
-	node->macro_name = strndup(tmp->str, tmp->len);
+	node->macro_name = my_strndup(tmp->str, tmp->len);
 	expect_eod(env);
 
 	// endif
@@ -366,7 +366,7 @@ Node	*parse(Token **tok, int nest_if)
 				*tok = (*tok)->next;
 			if (nest_if == 0)
 				error_at(env.token->str, "不正なディレクティブです");
-			//printf("DETECT ENDDIR %s \n", strndup(env.token->str, env.token->len));
+			//printf("DETECT ENDDIR %s \n", my_strndup(env.token->str, env.token->len));
 			return (env.node);
 		}
 		error_at(env.token->str, "構文解析に失敗しました(parse) (%p:%d)", env.token, env.token->kind);

@@ -3,6 +3,7 @@
 #include "il.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 char			*g_user_input;
 
@@ -19,9 +20,18 @@ t_linked_list	*g_type_alias;
 t_il			*g_il;
 t_arch			g_arch;
 
+char	*my_strndup(char *source, int len)
+{
+	char	*dst;
+
+	dst = calloc(len + 1, sizeof(char));
+	strncat(dst, source, len);
+	return (dst);
+}
+
+
 int main(int argc, char **argv)
 {
-
 	g_arch = ARCH_X8664;
 
 	if (argc == 1)
@@ -30,7 +40,7 @@ int main(int argc, char **argv)
 	{
 		if (strcmp("--arch", argv[1]) == 0)
 		{
-			if (argc < 4)
+			if (argc < 3)
 			{
 				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
 				return (1);
@@ -46,7 +56,10 @@ int main(int argc, char **argv)
 				return (1);
 			}
 
-			g_user_input = read_file(argv[3]);
+			if (argc < 4)
+				g_user_input = read_file("-");
+			else
+				g_user_input = read_file(argv[3]);
 		}
 		else
 			g_user_input = read_file(argv[1]);

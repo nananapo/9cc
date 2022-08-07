@@ -1,3 +1,4 @@
+#include "9cc.h"
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -64,7 +65,7 @@ void	error_at(char *loc, char *fmt, ...)
 	if (ret == NULL)
 		fprintf(stderr, "%s\n", mystart);
 	else
-		fprintf(stderr, "%s\n", strndup(mystart, ret - mystart));
+		fprintf(stderr, "%s\n", my_strndup(mystart, ret - mystart));
 
 	fprintf(stderr, "%*s", pos, " ");
 	fprintf(stderr, "^ ");

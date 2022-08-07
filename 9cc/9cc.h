@@ -376,6 +376,8 @@ typedef enum s_arch
 	ARCH_RISCV
 }	t_arch;
 
+char	*my_strndup(char *s, int len);
+
 void	debug(char *fmt, ...);
 void	error(char *fmt, ...);
 void	error_at(char *loc, char *fmt, ...);

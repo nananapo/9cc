@@ -61,7 +61,7 @@ char	*read_ident(char *str)
 // TODO 小数点とか
 char	*read_number(char *str)
 {
-	while (*str && isnumber(*str))
+	while (*str && isdigit(*str))
 		str++;
 	return (str);
 }

@@ -616,7 +616,7 @@ static void gen_defglobal(t_defvar *node)
 
 	if (node->is_extern)
 		return ;
-	name = strndup(node->name, node->name_len);
+	name = my_strndup(node->name, node->name_len);
 	if (!node->is_static)
 		printf(".globl _%s\n", name);
 	if (node->assign == NULL)
@@ -635,7 +635,7 @@ static void	gen_call_start(t_il *code)
 {
 	t_lvar	*lvar;
 
-	debug("start call %s", strndup(code->funccall_callee->name, code->funccall_callee->name_len));
+	debug("start call %s", my_strndup(code->funccall_callee->name, code->funccall_callee->name_len));
 
 	g_call_locals_count = 0;
 
@@ -738,7 +738,7 @@ static void	gen_call_exec(t_il *code)
 			continue ;
 		}
 
-		debug("offset : %d (%s)", tmp_offset, strndup(defarg->name, defarg->name_len));
+		debug("offset : %d (%s)", tmp_offset, my_strndup(defarg->name, defarg->name_len));
 
 		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
 		{
@@ -773,7 +773,7 @@ static void	gen_call_exec(t_il *code)
 	{
 		movi(AL, 0);
 	}
-	printf("    call _%s\n", strndup(deffunc->name, deffunc->name_len));
+	printf("    call _%s\n", my_strndup(deffunc->name, deffunc->name_len));
 
 	// rspを元に戻す
 	printf("    add %s, %d\n", RSP, rbp_offset);
@@ -1226,7 +1226,7 @@ static void	gen_il(t_il *code)
 			return ;
 		case IL_VAR_GLOBAL_ADDR:
 			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
-					strndup(code->var_global->name, code->var_global->name_len));
+					my_strndup(code->var_global->name, code->var_global->name_len));
 			push();
 			return ;
 		// TODO genでoffsetの解決 , analyzeで宣言のチェック

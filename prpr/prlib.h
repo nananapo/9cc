@@ -103,6 +103,8 @@ typedef struct s_gen_env
 	char	*stddir;
 }	GenEnv;
 
+char	*my_strndup(char *s, int len);
+
 void	debug(char *fmt, ...);
 
 char	*read_file(char *name);

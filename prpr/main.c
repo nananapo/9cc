@@ -1,6 +1,16 @@
 #include "prlib.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
+char	*my_strndup(char *source, int len)
+{
+	char	*dst;
+
+	dst = calloc(len + 1, sizeof(char));
+	strncat(dst, source, len);
+	return (dst);
+}
 
 int	main(int argc, char **argv)
 {
@@ -30,7 +40,7 @@ int	main(int argc, char **argv)
 
 	filename = argv[findex];
 	len = strlen(filename);
-	str = read_file(strndup(filename, len));
+	str = read_file(my_strndup(filename, len));
 
 	if (str == NULL)
 		return (0);
