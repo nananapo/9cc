@@ -79,7 +79,7 @@ assert_async(){
 
 assert() {
 	COUNTER=$((++COUNTER))
-	assert_async "$1" "$1"_"$COUNTER"" &
+	assert_async "$1" "$1"_"$COUNTER" &
 }
 
 start_time=`date +%s`
