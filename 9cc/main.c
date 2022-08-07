@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+char			*g_filename;
 char			*g_user_input;
 
 t_token			*g_token;
@@ -32,7 +33,8 @@ char	*my_strndup(char *source, int len)
 
 int main(int argc, char **argv)
 {
-	g_arch = ARCH_X8664;
+	g_arch		= ARCH_X8664;
+	g_filename	= "-";
 
 	if (argc == 1)
 		g_user_input = read_file("-");
@@ -59,10 +61,16 @@ int main(int argc, char **argv)
 			if (argc < 4)
 				g_user_input = read_file("-");
 			else
-				g_user_input = read_file(argv[3]);
+			{
+				g_user_input	= read_file(argv[3]);
+				g_filename		= argv[3];
+			}
 		}
 		else
-			g_user_input = read_file(argv[1]);
+		{
+			g_user_input	= read_file(argv[1]);
+			g_filename		= argv[1];
+		}
 	}
 
 	g_type_alias = linked_list_new();

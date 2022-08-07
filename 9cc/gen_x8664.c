@@ -7,6 +7,40 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#define ASM_MOV "mov"
+#define ASM_PUSH "push"
+#define ASM_LEA "lea"
+
+#define RAX "rax"
+#define RDI "rdi"
+#define RSI "rsi"
+#define RBP "rbp"
+#define RSP "rsp"
+#define R10 "r10"
+#define R11 "r11"
+#define RDX "rdx"
+
+#define EAX "eax"
+#define EDI "edi"
+#define ESI "esi"
+#define R11D "r11d"
+
+#define AX "ax"
+#define SI "si"
+#define R11W "r11w"
+
+#define AL "al"
+#define DIL "dil"
+#define SIL "sil"
+#define CL "cl"
+#define R11B "r11b"
+
+#define BYTE_PTR "byte ptr"
+#define WORD_PTR "word ptr"
+#define DWORD_PTR "dword ptr"
+
+#define ARGREG_SIZE 6
+
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
