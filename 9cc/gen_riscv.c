@@ -1153,21 +1153,21 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_MUL:
-			pop(T0);
+			pop(T1);
 			pop(T0);
 			printf("    mulw %s, %s, %s\n", T0, T0, T1);
 			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_DIV:
-			pop(T0);
+			pop(T1);
 			pop(T0);
 			printf("    divw %s, %s, %s\n", T0, T0, T1);
 			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_MOD:
-			pop(T0);
+			pop(T1);
 			pop(T0);
 			printf("    remw %s, %s, %s\n", T0, T0, T1);
 			printf("    sext.w %s, %s\n", T0, T0);
