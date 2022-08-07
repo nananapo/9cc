@@ -1,5 +1,10 @@
 #!/bin/bash
 
+TARGET="$1"
+if [ "$TARGET" = "" ]; then
+	TARGET="x8664"
+fi
+
 prefix="
 int pint(int i);
 int dint(int i);
@@ -12,7 +17,7 @@ int *my_malloc_int(int n);
 "
 
 testdir="../test/"
-ncc="./9cc"
+ncc="./9cc --arch $TARGET"
 prpr="../prpr/prpr --stddir ../std/"
 module="$testdir/sub/print.c"
 

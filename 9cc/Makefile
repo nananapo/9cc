@@ -1,6 +1,4 @@
 NAME=9cc
-TEST_SCRIPT=test.sh
-TEST_SCRIPT_OLD=test_old.sh
 
 CC=gcc
 # -fsanitize=address -fno-omit-frame-pointer
@@ -13,10 +11,10 @@ $(NAME): $(OBJS)
 	$(CC) -g -o $(NAME) $(OBJS) $(LDFLAGS)
 
 test: $(NAME)
-	env LC_ALL="C" ./$(TEST_SCRIPT)
+	sh test.sh $(arch)
 
 testo: $(NAME)
-	env LC_ALL="C" ./$(TEST_SCRIPT_OLD)
+	sh test_old.sh $(arch)
 
 clean:
 	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3

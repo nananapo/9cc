@@ -1,4 +1,25 @@
-#!/bin/bash
+TARGET="$1"
+if [ "$TARGET" = "" ]; then
+	TARGET="x8664"
+fi
+
+testdir="../test/"
+ncc="./9cc --arch $TARGET "
+prpr="../prpr/prpr --stddir ../std/"
+module="$testdir/sub/print.c"
+
+echo target : $TARGET
+echo testdir: $testdir
+echo 9cc    : $ncc
+echo prpr   : $prpr
+
+rm -rf tmp
+mkdir tmp
+touch tmp/err
+
+echo test start
+sleep 1
+
 
 prefix="
 int pint(int i);
@@ -11,29 +32,21 @@ int my_print(char *s);
 int *my_malloc_int(int n);
 "
 
-testdir="../test/"
-ncc="./9cc"
-prpr="../prpr/prpr --stddir ../std/"
-module="$testdir/sub/print.c"
-
-rm -rf tmp
-mkdir tmp
-touch tmp/err
-
 COUNTER=0
 
 assert_async(){
 	uni="$1"
 
-	input="$prefix`cat $testdir/$1`"
-	
 	asmname="./tmp/asm_$uni.s"
 	cname="./tmp/c_$uni.c"
 	targetname="./tmp/exe_$uni"
 	actresname="./tmp/act_$uni.txt"
 	expresname="./tmp/exp_$uni.txt"
 
-    echo "$input" | $prpr - | $ncc > $asmname
+	echo "$prefix" > $cname
+	cat "$testdir/$1" >> $cname
+
+    $prpr "$cname" | $ncc > $asmname
 	if [ "$?" != "0" ]; then
 		echo "9CC KO => $1"
 		echo "9CC KO => $1" >> tmp/err
@@ -42,6 +55,7 @@ assert_async(){
 	
 	cc -o $targetname $asmname $module
 	if [ "$?" != "0" ]; then
+		echo "$input" > hey
 		echo "9CC COMPILE KO => $1"
 		echo "9CC COMPILE KO => $1" >> tmp/err
 		exit 1
@@ -50,7 +64,6 @@ assert_async(){
 	./$targetname &> $actresname
 	actual_status="${PIPESTATUS[0]}"
 
-	echo "$input" > $cname
 	cc -w -o $targetname $cname $module
 	if [ "$?" != "0" ]; then
 		echo "GCC FAIL => $1"
@@ -67,10 +80,7 @@ assert_async(){
   	  exit 1
 	fi
 
-  	if [ "`diff $actresname $expresname`" = "" ]; then
-	  echo -n
- # 	  echo "$1 => OK"
-  	else
+  	if [ "`diff $actresname $expresname`" != "" ]; then
   	  echo "OUTPUT KO $1 > $actresname $expresname"
   	  echo "OUTPUT KO $1 > $actresname $expresname" >> tmp/err
   	  exit 1
