@@ -16,13 +16,12 @@
 #define FP "fp"
 #define SP "sp"
 #define T0 "t0"
+#define T1 "t1"
 #define A0 "a0"
 
 #define RA "ra"
 
 
-
-#define RDI "rdi"
 #define RSI "rsi"
 #define RBP "rbp"
 #define R10 "r10"
@@ -464,7 +463,7 @@ static void	cmps(char *dst, char *from)
 static void	cmp(t_type *dst)
 {
 	if (dst->ty == TY_PTR || dst->ty == TY_ARRAY)
-		cmps(T0, RDI);
+		cmps(T0, T1);
 	else if (dst->ty == TY_CHAR || dst->ty == TY_BOOL)
 		cmps(AL, DIL);
 	else if (dst->ty == TY_INT || dst->ty == TY_ENUM)
@@ -820,10 +819,10 @@ static void	gen_call_exec(t_il *code)
 	// rsp += rbp_offsetする
 	printf("    sub %s, %d\n", RSP, rbp_offset);
 
-	// 返り値がMEMORYなら、返り値の格納先のアドレスをRDIに設定する
+	// 返り値がMEMORYなら、返り値の格納先のアドレスをT1に設定する
 	if (is_memory_type(deffunc->type_return))
 	{
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, get_call_memory(code));
+		printf("    lea %s, [%s - %d]\n", T1, RBP, get_call_memory(code));
 	}
 
 	// call
@@ -850,12 +849,12 @@ static void	gen_call_exec(t_il *code)
 	else if (deffunc->type_return->ty == TY_STRUCT)
 	{
 		size = align_to(get_type_size(deffunc->type_return), 8);
-		printf("    lea %s, [%s - %d]\n", RDI, RBP, get_call_memory(code));
+		printf("    lea %s, [%s - %d]\n", T1, RBP, get_call_memory(code));
 		if (size > 0)
-			printf("    mov [%s], %s\n", RDI, T0);
+			printf("    mov [%s], %s\n", T1, T0);
 		if (size > 8)
-			printf("    mov [%s + 8], %s\n", RDI, RDX);
-		mov(T0, RDI);
+			printf("    mov [%s + 8], %s\n", T1, RDX);
+		mov(T0, T1);
 		push();
 	}
 	// それ以外(int, char, ptrとか)ならraxをpushする
@@ -891,7 +890,7 @@ static void	gen_macro_va_start()
 		max_argregindex = max(max_argregindex, g_locals_regindex[i]);
 	}
 
-	mov(RDI, T0);
+	mov(T1, T0);
 
 	printf("    mov dword ptr [rdi], %d\n", (1 + max_argregindex) * 8); // gp offset
 	printf("    mov dword ptr [rdi + 4], 0\n\n"); // fp_offset
@@ -985,8 +984,8 @@ static void	gen_func_epilogue(t_il *code)
 		printf("    mov %s, [rbp - %d]\n", R10, g_locals_offset[0]);
 		store_ptr(get_type_size(code->type), false);
 
-		// RDIを復元する
-		printf("    mov %s, [rbp - %d]\n", RDI, g_locals_offset[0]);
+		// T1を復元する
+		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
 	}
 	// STRUCTなら、rax, rdxに格納
 	else if (code->type->ty == TY_STRUCT)
@@ -1125,11 +1124,11 @@ static void	gen_il(t_il *code)
 			pop(T0);
 			mov(R10, T0);
 
-			pop(RDI);
+			pop(T1);
 			mov(T0, R10);
 			push();
 
-			mov(T0, RDI);
+			mov(T0, T1);
 			push();
 			return ;
 		}
@@ -1140,43 +1139,41 @@ static void	gen_il(t_il *code)
 
 		// TODO 型を考慮
 		case IL_ADD:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
-			printf("    add %s, %s\n", T0, RDI);
+			printf("    add %s, %s, %s\n", T0, T0, T1);
 			push();
 			return ;
 		case IL_SUB:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
-			printf("    sub %s, %s\n", T0, RDI);
+			printf("    sub %s, %s\n", T0, T0, T1);
 			push();
 			return ;
 		case IL_MUL:
-			pop(RDI);
 			pop(T0);
-			printf("    movsxd %s, %s\n", T0, EAX);
-			printf("    movsxd %s, %s\n", RDI, EDI);
-			printf("    imul %s, %s\n", T0, RDI);	
+			pop(T0);
+			printf("    mulw %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_DIV:
-			pop(RDI);
 			pop(T0);
-			printf("    cdq\n");
-			printf("    idiv edi\n");
+			pop(T0);
+			printf("    divw %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_MOD:
-			pop(RDI);
 			pop(T0);
-			printf("    cdq\n"); // d -> q -> o
-			printf("    idiv edi\n");
-			mov(T0, RDX);
+			pop(T0);
+			printf("    remw %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 
 		case IL_EQUAL:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
 			cmp(code->type);
 			printf("    sete al\n");
@@ -1184,7 +1181,7 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_NEQUAL:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
 			cmp(code->type);
 			printf("    setne al\n");
@@ -1192,7 +1189,7 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_LESS:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
 			cmp(code->type);
 			printf("    setl al\n");
@@ -1200,7 +1197,7 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_LESSEQ:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
 			cmp(code->type);
 			printf("    setle al\n");
@@ -1209,39 +1206,43 @@ static void	gen_il(t_il *code)
 			return ;
 		case IL_BITWISE_AND:
 			pop(T0);
-			pop(RDI);
-			printf("   and %s, %s\n", T0, RDI);
+			pop(T1);
+			printf("   and %s, %s, %s\n", T0, T0, T1);
+			printf("   sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_BITWISE_XOR:
 			pop(T0);
-			pop(RDI);
-			printf("   xor %s, %s\n", T0, RDI);
+			pop(T1);
+			printf("   xor %s, %s, %s\n", T0, T0, T1);
+			printf("   sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_BITWISE_OR:
 			pop(T0);
-			pop(RDI);
-			printf("    or %s, %s\n", T0, RDI);
+			pop(T1);
+			printf("    or %s, %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_BITWISE_NOT:
 			pop(T0);
-			printf("    xor %s, -1\n", T0);
+			printf("    not %s, %s\n", T0, T0);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return;
 		case IL_SHIFT_RIGHT:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
-			mov(CL, DIL);
-			printf("    shr %s, %s\n", T0, CL);
+			printf("    srl %s, %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return;
 		case IL_SHIFT_LEFT:
-			pop(RDI);
+			pop(T1);
 			pop(T0);
-			mov(CL, DIL);
-			printf("    shl %s, %s\n", T0, CL);
+			printf("    sll %s, %s, %s\n", T0, T0, T1);
+			printf("    sext.w %s, %s\n", T0, T0);
 			push();
 			return;
 
