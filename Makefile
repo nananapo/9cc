@@ -5,24 +5,24 @@ prpr:
 	cd 9cc && make
 
 prpr1: 9cc prpr
-	./prtest1.sh
+	sh prtest.sh test1
 
 prpr3: 9cc prpr
-	./prtest1.sh
-	./prtest2.sh
-	./prtest3.sh
+	sh prtest.sh test1
+	sh prtest.sh test2
+	sh prtest.sh test3
 	cd 9cc && make test
-	./diffprpr.sh
+	sh diff3.sh prpr
 
 9cc1: 9cc prpr
-	./cctest1.sh
+	sh cctest.sh test1
 
 9cc3: 9cc prpr
-	./cctest1.sh
-	./cctest2.sh
-	./cctest3.sh
+	sh cctest.sh test1
+	sh cctest.sh test2
+	sh cctest.sh test3
 	cd 9cc && make test
-	./diffcc.sh
+	sh diff3.sh 9cc
 
 re:
 	cd prpr && make re

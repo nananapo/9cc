@@ -1,7 +1,8 @@
 NAME=prpr
 TEST_SCRIPT=test.sh
 
-CC=gcc -fsanitize=address -fno-omit-frame-pointer
+CC=gcc 
+#-fsanitize=address -fno-omit-frame-pointer
 CFLAGS=-std=c11 -g -static -Wall -Werror -Wextra
 
 SRCS=${wildcard *.c}
@@ -11,7 +12,7 @@ ${NAME}: ${OBJS}
 	$(CC) -g -o $(NAME) $(OBJS) $(LDFLAGS)
 
 clean:
-	rm -rf ${OBJS} *~ tmp* *dSYM a.out
+	rm -rf ${OBJS} *~ tmp* *dSYM a.out test1/ test2/ test3/
 
 fclean: clean
 	rm -rf ${NAME}

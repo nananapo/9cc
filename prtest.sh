@@ -1,10 +1,11 @@
+DIR="$1/"
+
 cd prpr
 echo "`pwd`"
 
 NCC="../9cc/9cc"
 PRPR="./prpr --stddir ../std/"
 
-DIR="test2/"
 rm -rf $DIR
 mkdir $DIR
 
