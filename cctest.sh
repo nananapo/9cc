@@ -1,9 +1,18 @@
-DIR="$1/"
+TARGET="$1"
+DIR="$2/"
+
+if [ "$TARGET" = "" ]; then
+	TARGET="x8664"
+fi
+if [ "$DIR" = "/" ]; then
+	echo "Usage: sh test.sh [x8664/riscv] [dir]"
+	exit 1
+fi
 
 cd 9cc
 echo "`pwd`"
 
-NCC="../9cc/9cc"
+NCC="../9cc/9cc --arch $TARGET "
 PRPR="../prpr/prpr --stddir ../std/"
 
 rm -rf $DIR

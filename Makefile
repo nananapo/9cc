@@ -4,24 +4,18 @@ prpr:
 9cc:
 	cd 9cc && make
 
-prpr1: 9cc prpr
-	sh prtest.sh test1
-
 prpr3: 9cc prpr
-	sh prtest.sh test1
-	sh prtest.sh test2
-	sh prtest.sh test3
-	cd 9cc && make test
+	sh prtest.sh ${arch} test1
+	sh prtest.sh ${arch} test2
+	sh prtest.sh ${arch} test3
+	cd 9cc && make test arch=${arch}
 	sh diff3.sh prpr
 
-9cc1: 9cc prpr
-	sh cctest.sh test1
-
 9cc3: 9cc prpr
-	sh cctest.sh test1
-	sh cctest.sh test2
-	sh cctest.sh test3
-	cd 9cc && make test
+	sh cctest.sh ${arch} test1
+	sh cctest.sh ${arch} test2
+	sh cctest.sh ${arch} test3
+	cd 9cc && make test arch=${arch}
 	sh diff3.sh 9cc
 
 re:
