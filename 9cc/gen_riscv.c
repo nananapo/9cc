@@ -60,8 +60,6 @@ static void	pushi(int data);
 static void	pop(char *reg);
 static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
-static void	cmps(char *dst, char *from);
-static void	cmp(t_type *type);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(t_type *type);
@@ -451,24 +449,6 @@ static void	mov(char *dst, char *from)
 static void	movi(char *dst, int i)
 {
 	printf("    li %s, %d\n", dst, i);
-}
-
-static void	cmps(char *dst, char *from)
-{
-	printf("    cmp %s, %s\n", dst, from);
-}
-
-// TODO 構造体の比較
-// rax, rdi
-static void	cmp(t_type *dst)
-{
-	if (dst->ty == TY_PTR || dst->ty == TY_ARRAY)
-		cmps(T0, T1);
-	else if (dst->ty == TY_CHAR || dst->ty == TY_BOOL)
-		cmps(AL, DIL);
-	else if (dst->ty == TY_INT || dst->ty == TY_ENUM)
-		cmps(EAX, EDI);
-	return ;
 }
 
 // T0からR10(アドレス)に値をストアする
@@ -1177,33 +1157,44 @@ static void	gen_il(t_il *code)
 		case IL_EQUAL:
 			pop(T1);
 			pop(T0);
-			cmp(code->type);
-			printf("    sete al\n");
-			printf("    movzx rax, al\n");
+        	printf("sext.w  %s, %s\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T1, T1);
+         	printf("sub     %s, %s ,%s\n", T0, T0, T1);
+         	printf("seqz    %s, %s\n", T0, T0);
+         	printf("andi    %s, %s, 0xff\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_NEQUAL:
 			pop(T1);
 			pop(T0);
-			cmp(code->type);
-			printf("    setne al\n");
-			printf("    movzx rax, al\n");
+        	printf("sext.w  %s, %s\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T1, T1);
+         	printf("sub     %s, %s ,%s\n", T0, T0, T1);
+         	printf("snez    %s, %s\n", T0, T0);
+         	printf("andi    %s, %s, 0xff\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_LESS:
 			pop(T1);
 			pop(T0);
-			cmp(code->type);
-			printf("    setl al\n");
-			printf("    movzx rax, al\n");
+        	printf("sext.w  %s, %s\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T1, T1);
+         	printf("slt     %s, %s\n", T0, T0);
+         	printf("andi    %s, %s, 0xff\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_LESSEQ:
 			pop(T1);
 			pop(T0);
-			cmp(code->type);
-			printf("    setle al\n");
-			printf("    movzx rax, al\n");
+        	printf("sext.w  %s, %s\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T1, T1);
+       		printf("sgt     %s, %s, %s\n", T0, T0, T1);
+        	printf("xori    %s, %s, 1\n", T0, T0);
+         	printf("andi    %s, %s, 0xff\n", T0, T0);
+        	printf("sext.w  %s, %s\n", T0, T0);
 			push();
 			return ;
 		case IL_BITWISE_AND:
