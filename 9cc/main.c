@@ -17,17 +17,39 @@ t_defunion		*g_union_defs[1000];
 t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
 t_il			*g_il;
+t_arch			g_arch;
 
 int main(int argc, char **argv)
 {
+
+	g_arch = ARCH_X8664;
+
 	if (argc == 1)
 		g_user_input = read_file("-");
-	else if (argc == 2)
-		g_user_input = read_file(argv[1]);
 	else
 	{
-		fprintf(stderr, "引数の個数が正しくありません");
-		return (1);
+		if (strcmp("--arch", argv[1]) == 0)
+		{
+			if (argc < 4)
+			{
+				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
+				return (1);
+			}
+
+			if (strcmp("x8664", argv[2]) == 0)
+				g_arch = ARCH_X8664;
+			else if (strcmp("riscv", argv[2]) == 0)
+				g_arch = ARCH_RISCV;
+			else
+			{
+				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
+				return (1);
+			}
+
+			g_user_input = read_file(argv[3]);
+		}
+		else
+			g_user_input = read_file(argv[1]);
 	}
 
 	g_type_alias = linked_list_new();
@@ -40,13 +62,10 @@ int main(int argc, char **argv)
 	parse();
 	debug("parse end");
 
-	// analyze
 	analyze();
 
 	translate_il();
 
-	// codegen
 	codegen();
-
 	return (0);
 }

@@ -110,7 +110,6 @@ static int	get_member_offset(t_member *mem)
 }
 
 // TODO voidのarray
-
 static int	get_struct_size(t_type *type)
 {
 	t_defstruct	*def;
@@ -135,13 +134,12 @@ static int	get_union_size(t_defunion *def)
 	return (tmp_size);
 }
 
-int	get_array_align_size(t_type *type)
+int	get_array_align_size_x8664(t_type *type)
 {
 	return (get_type_size(type));
 }
 
-// 型のサイズを取得する
-int	get_type_size(t_type *type)
+int	get_type_size_x8664(t_type *type)
 {
 	switch (type->ty)
 	{
@@ -1288,7 +1286,7 @@ static void	gen_il(t_il *code)
 	}
 }
 
-void	codegen(void)
+void	codegen_x8664(void)
 {
 	int		i;
 	t_il	*code;

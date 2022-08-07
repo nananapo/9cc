@@ -370,6 +370,11 @@ typedef struct s_typedefpair
 	t_type	*type;
 }	t_typedefpair;
 
+typedef enum s_arch
+{
+	ARCH_X8664,
+	ARCH_RISCV
+}	t_arch;
 
 void	debug(char *fmt, ...);
 void	error(char *fmt, ...);
@@ -412,7 +417,6 @@ t_defvar	*find_global(char *str, int len);
 void	parse(void);
 void	analyze();
 
-// gen.c
 void	codegen(void);
 int		get_type_size(t_type *type);
 int		get_array_align_size(t_type *type);

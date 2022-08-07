@@ -23,6 +23,7 @@ char	*read_file(char	*name)
 		if (fd == -1)
 		{
 			perror("error");
+			exit(1);
 			return (NULL);
 		}
 	}
