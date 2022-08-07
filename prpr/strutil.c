@@ -68,25 +68,35 @@ char	*strlit_to_str(char *str, int len)
 				case '"':
 				case '\'':
 					c = str[i];
+					break ;
 				case 'a':
 					c = '\a';
+					break ;
 				case 'b':
 					c = '\b';
+					break ;
 				case 'f':
 					c =  '\f';
+					break ;
 				case 'n':
 					c =  '\n';
+					break ;
 				case 'r':
 					c = '\r';
+					break ;
 				case 'v':
 					c = '\v';
+					break ;
 				case '0':
 					c = '\0';
+					break ;
 				case '\\':
 					c = '\\';
+					break ;
 				default:
 					error("不明なエスケープシーケンスです %c", str[i]);
 					c = 0;
+					break ;
 			}
 		}
 		else
