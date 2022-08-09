@@ -1041,7 +1041,7 @@ static void	gen_il(t_il *code)
 			printf("    jal %s, %s\n", ZERO, code->label_str);
 			return ;
 		}
-		case IL_JUMP_EQUAL:
+		case IL_JUMP_TRUE:
 		{
 			pop(T1);
 			pushi(0);
@@ -1049,7 +1049,7 @@ static void	gen_il(t_il *code)
 			printf("    bne %s, %s, %s\n", T0, T1, code->label_str);
 			return ;
 		}
-		case IL_JUMP_NEQUAL:
+		case IL_JUMP_FALSE:
 		{
 			pop(T1);
 			pushi(0);

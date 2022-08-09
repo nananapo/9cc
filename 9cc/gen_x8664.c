@@ -1057,16 +1057,20 @@ static void	gen_il(t_il *code)
 			printf("    jmp %s\n", code->label_str);
 			return ;
 		}
-		case IL_JUMP_EQUAL:
+		case IL_JUMP_TRUE:
 		{
 			pop(RAX);
+			printf("    mov %s, %d\n", RDI, 1);
+			printf("    cmp %s, %s\n", RAX, RDI);
 			printf("    je %s\n", code->label_str);
 			return ;
 		}
-		case IL_JUMP_NEQUAL:
+		case IL_JUMP_FALSE:
 		{
 			pop(RAX);
-			printf("    jne %s\n", code->label_str);
+			printf("    mov %s, %d\n", RDI, 0);
+			printf("    cmp %s, %s\n", RAX, RDI);
+			printf("    je %s\n", code->label_str);
 			return;
 		}
 		case IL_FUNC_PROLOGUE:
