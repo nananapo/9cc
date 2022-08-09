@@ -814,7 +814,10 @@ static t_node	*analyze_node(t_node *node)
 			return (node);
 		case ND_STR_LITERAL:
 		{
-			node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
+			node->type = new_type_array(new_primitive_type(TY_CHAR));
+			node->type->array_size = node->def_str->len;
+			// TODO 実際のサイズではない
+			//fprintf(stderr, "array : %d\n", node->def_str->len);
 			return (node);
 		}
 		case ND_BLOCK:

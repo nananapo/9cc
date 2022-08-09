@@ -744,5 +744,7 @@ assert_gcc "ret_struct3.c"
 assert_gcc "ret_struct4.c"
 assert_gcc "ret_struct5.c"
 
+assert "quine.c"
+
 echo OK
 

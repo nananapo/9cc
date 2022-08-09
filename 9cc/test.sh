@@ -427,6 +427,8 @@ assert "ret_struct3.c"
 assert "ret_struct4.c"
 assert "ret_struct5.c"
 
+assert "quine.c"
+
 wait
 
 end_time=`date +%s`
