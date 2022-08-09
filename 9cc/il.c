@@ -177,11 +177,13 @@ static void	translate_return(t_node *node)
 
 	if (node->lhs != NULL)
 		translate_node(node->lhs);
-	else
-		append_il_pushnum(0);
 
 	code			= append_il(IL_JUMP);
 	code->label_str	= get_function_epi_label(node->funcdef->name, node->funcdef->name_len);
+
+	// push数を合わせるためのpushnum
+	if (node->lhs == NULL)
+		append_il_pushnum(0);
 }
 
 static void	translate_block(t_node *node)
