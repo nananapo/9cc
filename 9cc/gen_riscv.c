@@ -1306,11 +1306,12 @@ void	codegen_riscv(void)
 		printf("\"\n");
 	}
 
-	// グローバル変数を生成
-	for (i = 0; g_global_vars[i] != NULL; i++)
-		gen_defglobal(g_global_vars[i]);
-
 	printf("    .align 1\n");
 	for (code = g_il; code != NULL; code = code->next)
 		gen_il(code);
+
+	// グローバル変数を生成
+	printf(".section  .sdata, \"aw\", @progbits\n");
+	for (i = 0; g_global_vars[i] != NULL; i++)
+		gen_defglobal(g_global_vars[i]);
 }
