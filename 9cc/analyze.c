@@ -389,10 +389,10 @@ static t_node	*analyze_mul(t_node *node)
 	node->rhs = analyze_node(node->rhs);
 
 	if (!is_integer_type(node->lhs->type))
-		error_at(node->analyze_source, "%sに演算子を適用できません(L*/%)", get_type_name(node->lhs->type));
+		error_at(node->analyze_source, "* か / か %% の左辺が整数ではありません", get_type_name(node->lhs->type));
 
 	if (!is_integer_type(node->rhs->type))
-		error_at(node->analyze_source, "%sに演算子を適用できません(R*/%)", get_type_name(node->rhs->type));
+		error_at(node->analyze_source, "* か / か %% の右辺が整数ではありません", get_type_name(node->rhs->type));
 
 	node->type = new_primitive_type(TY_INT);
 

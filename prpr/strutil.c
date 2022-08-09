@@ -24,11 +24,6 @@ char	*skip_space(char *p)
 	return (p);
 }
 
-bool	is_symbol(char str)
-{
-	return (str == '_');
-}
-
 void	add_str_elem(StrElem **list, char *str)
 {
 	StrElem	*elem;

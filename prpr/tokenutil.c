@@ -43,7 +43,7 @@ bool	is_ident_prefix(char str)
 		return (true);
 	if ('A' <= str && str <= 'Z')
 		return (true);
-	if (is_symbol(str))
+	if (str == '_')
 		return (true);
 	return (false);
 }
@@ -53,7 +53,7 @@ char	*read_ident(char *str)
 	if (!is_ident_prefix(*str))
 		return (str);
 	str++;
-	while (*str && (isalnum(*str) || is_symbol(*str)))
+	while (*str && (isalnum(*str) || *str == '_'))
 		str++;
 	return (str);
 }
