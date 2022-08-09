@@ -1239,14 +1239,14 @@ static void	gen_il(t_il *code)
 		case IL_MEMBER:
 		case IL_MEMBER_PTR:
 			pop(T0);
-			printf("    add %s, %d\n", T0, get_member_offset(code->member));
+			printf("    addi %s, %s, %d\n", T0, T0, get_member_offset(code->member));
 			load(code->member->type);
 			push();
 			return ;
 		case IL_MEMBER_ADDR:
 		case IL_MEMBER_PTR_ADDR:
 			pop(T0);
-			printf("    add %s, %d\n", T0, get_member_offset(code->member));
+			printf("    addi %s, %s, %d\n", T0, T0, get_member_offset(code->member));
 			push();
 			return ;
 		case IL_STR_LIT:
