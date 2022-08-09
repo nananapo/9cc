@@ -276,7 +276,7 @@ static void	append_local(t_lvar *def)
 			store_value(8);
 			size -= 8;
 			if (size != 0)
-				printf("    addi %s, %s, 8\n", T1, T1);
+				addi(T1, T1, 8);
 		}
 		return ;
 	}
@@ -411,8 +411,15 @@ static void	pop(char *reg)
 // T2を一時的に使用している
 static void	addi(char *dst, char *a, int b)
 {
-	printf("    li %s, %d\n", T2, b);
-	printf("    add %s, %s, %s\n", dst, a, T2);
+	if (b < -2000 || b > 2000)
+	{
+		printf("    li %s, %d\n", T2, b);
+		printf("    add %s, %s, %s\n", dst, a, T2);
+	}
+	else
+	{
+		printf("    addi %s, %s, %d\n", dst, a, b);
+	}
 }
 
 static void	mov(char *dst, char *from)
