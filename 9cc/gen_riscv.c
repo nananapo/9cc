@@ -564,7 +564,7 @@ static void	cast(t_type *from, t_type *to)
 			if (size1 == 1)
 			{
 				printf("    sb %s, -8(%s)\n", T0, SP);
-				printf("    lb %s, -8(%s)\n", T0, SP);
+				printf("    lbu %s, -8(%s)\n", T0, SP);
 			}
 			else if (size1 == 4)
 				printf("    sext.w %s, %s\n", T0, T0);

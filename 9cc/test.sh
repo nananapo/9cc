@@ -338,6 +338,7 @@ assert "cast0.c"
 assert "cast1.c"
 assert "cast2.c"
 assert "cast3.c"
+assert "cast4.c"
 
 assert "implicit_cast0.c"
 
