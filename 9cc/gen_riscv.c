@@ -33,7 +33,7 @@ static void	pop(char *reg);
 static void	addi(char *dst, char *a, int b);
 static void	mov(char *dst, char *from);
 static void	store_value(int size);
-static void	store_ptr(int size, bool minus_step);
+static void	store_ptr(int size);
 static void	load(t_type *type);
 static void	cast(t_type *from, t_type *to);
 static void	print_global_constant(t_node *node, t_type *type);
@@ -436,58 +436,43 @@ static void	store_value(int size)
 }
 
 // アドレス(T0)の先の値をT1(アドレス)にストアする
-static void store_ptr(int size, bool minus_step)
+// T2を一時的に使用する
+static void store_ptr(int size)
 {
-	debug("%d %d", size, minus_step);
-/*
-	int		delta;
-	char	*dest;
-	char	*from;
-	char	*op;
-	int		i;
+	int	delta;
+	int	i;
 
-	op = "+";
-	if (minus_step)
-		op = "-";
-
-	dest = T1;
-	
 	for (i = 0; i < size; i += 8)
 	{
 		delta = size - i;
 		if (delta >= 8)
 		{
-			from = T2;
-			printf("    %s %s, [%s + %d]\n", ASM_MOV, from, T0, i);
-			printf("    %s [%s %s %d], %s\n", ASM_MOV, dest, op, i, from);
+			printf("    ld %s, %d(%s)\n", T2, i, T0);
+			printf("    sd %s, %d(%s)\n", T2, i, T1);
 			continue ;
 		}
 		if (delta >= 4)
 		{
-			//from = T2D;
-			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, DWORD_PTR, T0, i);
-			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, DWORD_PTR, dest, op,  i, from);
+			printf("    lw %s, %d(%s)\n", T2, i, T0);
+			printf("    sw %s, %d(%s)\n", T2, i, T1);
 			i += 4;
 			delta -= 4;
 		}
 		if (delta >= 2)
 		{
-			//from = T2W;
-			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, WORD_PTR, T0, i);
-			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, WORD_PTR, dest, op, i, from);
+			printf("    lh %s, %d(%s)\n", T2, i, T0);
+			printf("    sh %s, %d(%s)\n", T2, i, T1);
 			i += 2;
 			delta -= 2;
 		}
 		if (delta >= 1)
 		{
-			//from = T2B;
-			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, BYTE_PTR, T0, i);
-			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, BYTE_PTR, dest, op, i, from);
+			printf("    lb %s, %d(%s)\n", T2, i, T0);
+			printf("    sb %s, %d(%s)\n", T2, i, T1);
 			i += 1;
 			delta -= 1;
 		}
 	}
-*/
 }
 
 // raxをraxに読み込む
@@ -735,7 +720,7 @@ static void	gen_call_exec(t_il *code)
 			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
 			mov(T1, SP);
 			printf("    sub %s, %d\n", T1, (tmp_offset + 16) + rbp_offset);
-			store_ptr(size, false);
+			store_ptr(size);
 		}
 		{
 			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
@@ -916,7 +901,7 @@ static void	gen_func_epilogue(t_il *code)
 	{
 		pop(T0);
 		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
-		store_ptr(get_type_size(code->type), false);
+		store_ptr(get_type_size(code->type));
 
 		// T1を復元する
 		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
@@ -1203,7 +1188,7 @@ static void	gen_il(t_il *code)
 			}
 			else if(code->type->ty == TY_STRUCT || code->type->ty == TY_UNION)
 			{
-				store_ptr(get_type_size(code->type), false);
+				store_ptr(get_type_size(code->type));
 				push(); // TODO これOK?
 			}
 			else
