@@ -337,6 +337,7 @@ assert "void2.c"
 assert "cast0.c"
 assert "cast1.c"
 assert "cast2.c"
+assert "cast3.c"
 
 assert "implicit_cast0.c"
 

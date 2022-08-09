@@ -542,49 +542,32 @@ static void	cast(t_type *from, t_type *to)
 	debug("cast %s -> %s", name1, name2);
 
 	// ポインタからポインタのキャストは何もしない
-	if (is_pointer_type(from)
-	&& is_pointer_type(to))
+	if (is_pointer_type(from) && is_pointer_type(to))
 		return ;
 	
 	size1 = get_type_size(from);
 	size2 = get_type_size(to);
 
-	// ポインタから整数へのキャストは情報を落とす
-	if (is_pointer_type(from)
-	&& is_integer_type(to))
+	if (is_pointer_type(from) && is_integer_type(to))
+		return ;
+
+	if (is_integer_type(from) && is_pointer_type(to))
 	{
-		pushi(0);
-		mov(R10, SP);
-		store_value(size2);
-		pop(T0);
+		printf("    sext.w %s, %s\n", T0, T0);
 		return ;
 	}
 
-	// 整数からポインタは0埋めで拡張
-	// (ポインタはunsinged long long intなので)
-	if (is_integer_type(from)
-	&& is_pointer_type(to))
+	if (is_integer_type(from) && is_integer_type(to))
 	{
-		pushi(0);
-		mov(R10, SP);
-		store_value(size1);
-		pop(T0);
-		return ;
-	}
-
-	// 整数から整数は符号を考えながらキャスト
-	if (is_integer_type(from)
-	&& is_integer_type(to))
-	{
-		// TODO unsigned
-		// 符号拡張する
 		if (size1 < size2)
 		{
-			debug("cast %d -> %d", size1, size2);
 			if (size1 == 1)
-				printf("    movsx %s, %s\n", T0, T0);//AL);
+			{
+				printf("    sb %s, -8(%s)\n", T0, SP);
+				printf("    lb %s, -8(%s)\n", T0, SP);
+			}
 			else if (size1 == 4)
-				printf("    movsx %s, %s\n", T0, EAX);
+				printf("    sext.w %s, %s\n", T0, T0);
 			else
 				error("8byte -> 8byteのキャストは無い");
 		}
@@ -631,7 +614,10 @@ static void gen_defglobal(t_defvar *node)
 
 	if (node->is_extern)
 		return ;
+
 	name = my_strndup(node->name, node->name_len);
+	if (!node->is_static)
+		printf("    .globl %s\n", name);
 	if (node->assign == NULL)
 	{
 		printf("    .comm %s,%d,4\n",
@@ -639,10 +625,9 @@ static void gen_defglobal(t_defvar *node)
 	}
 	else
 	{
-		printf("    .align 3\n");
+		printf("    .align %d\n", mylog2(max_align_size(node->type)));
 		printf("    .type %s, @object\n", name);
-		if (!node->is_static)
-			printf(".globl %s\n", name);
+		printf("    .size %s, %d\n", name, get_type_size(node->type));
 		printf("%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}

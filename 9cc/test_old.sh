@@ -640,6 +640,7 @@ assert_gcc "void2.c"
 assert_gcc "cast0.c"
 assert_gcc "cast1.c"
 assert_gcc "cast2.c"
+assert_gcc "cast3.c"
 
 assert_gcc "implicit_cast0.c"
 
