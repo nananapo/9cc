@@ -524,6 +524,7 @@ assert_gcc "structsize2.c"
 assert_gcc "structsize3.c"
 assert_gcc "structsize4.c"
 assert_gcc "structsize5.c"
+assert_gcc "structsize6.c"
 
 assert_gcc "struct2.c"
 assert_gcc "struct3.c"

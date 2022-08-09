@@ -298,6 +298,7 @@ assert "structsize2.c"
 assert "structsize3.c"
 assert "structsize4.c"
 assert "structsize5.c"
+assert "structsize6.c"
 
 assert "struct1.c"
 assert "struct2.c"

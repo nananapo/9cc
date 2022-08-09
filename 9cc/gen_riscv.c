@@ -30,6 +30,7 @@
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
+static void	addi(char *dst, char *a, int b);
 static void	mov(char *dst, char *from);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
@@ -264,11 +265,10 @@ static void	append_local(t_lvar *def)
 			return ;
 		
 		// スタックに領域確保
-		printf("    addi %s, %s, -%d # %d\n", SP, SP, size, locals_stack_add);
+		addi(SP, SP, -size);
 		stack_count			+= size;
 		locals_stack_add	+= size;
-
-		printf("    addi %s, %s, -%d\n", T1, FP, offset);
+		addi(T1, FP, -offset);
 
 		while (size >= 8)
 		{
@@ -293,7 +293,7 @@ static void	append_local(t_lvar *def)
 
 	g_locals_count += 1;
 
-	printf("    addi %s, %s, -%d\n", SP, SP, align_to(offset + size, 8) - offset);
+	addi(SP, SP, offset - align_to(offset + size , 8));
 
 	old				= stack_count;
 	stack_count		+= align_to(offset + size, 8) - offset;
@@ -407,9 +407,12 @@ static void	pop(char *reg)
 	printf("    addi %s, %s, 8 # %d -> %d\n", SP, SP, stack_count + 8, stack_count);
 }
 
+// addiする
+// T2を一時的に使用している
 static void	addi(char *dst, char *a, int b)
 {
-	printf("    %s %s,%s,%d\n", ASM_ADDI, dst, a, b);
+	printf("    li %s, %d\n", T2, b);
+	printf("    add %s, %s, %s\n", dst, a, T2);
 }
 
 static void	mov(char *dst, char *from)
@@ -746,7 +749,7 @@ static void	gen_call_exec(t_il *code)
 	debug("ready");
 
 	// rsp += rbp_offsetする
-	printf("    addi %s, %s, %d\n", SP, SP, -rbp_offset);
+	addi(SP, SP, -rbp_offset);
 
 	// 返り値がMEMORYなら、返り値の格納先のアドレスをT1に設定する
 	if (is_memory_type(deffunc->type_return))
@@ -761,10 +764,10 @@ static void	gen_call_exec(t_il *code)
 	printf("    call %s\n", my_strndup(deffunc->name, deffunc->name_len));
 
 	// rspを元に戻す
-	printf("    addi %s, %s, %d\n", SP, SP, rbp_offset);
+	addi(SP, SP, rbp_offset);
 
 	// stack_countをあわせる
-	printf("    addi %s, %s, %d\n", SP, SP, pop_count * 8);
+	addi(SP, SP, pop_count * 8);
 	stack_count -= pop_count * 8;
 
 	// 返り値がMEMORYなら、raxにアドレスを入れる
@@ -983,7 +986,7 @@ static void	gen_var_local_addr(t_il *code)
 	}
 
 	mov(T0, FP);
-	printf("    addi %s, %s, %d\n", T0, T0, -offset);
+	addi(T0, T0, -offset);
 	push();
 }
 
@@ -1239,14 +1242,14 @@ static void	gen_il(t_il *code)
 		case IL_MEMBER:
 		case IL_MEMBER_PTR:
 			pop(T0);
-			printf("    addi %s, %s, %d\n", T0, T0, get_member_offset(code->member));
+			addi(T0, T0, get_member_offset(code->member));
 			load(code->member->type);
 			push();
 			return ;
 		case IL_MEMBER_ADDR:
 		case IL_MEMBER_PTR_ADDR:
 			pop(T0);
-			printf("    addi %s, %s, %d\n", T0, T0, get_member_offset(code->member));
+			addi(T0, T0, get_member_offset(code->member));
 			push();
 			return ;
 		case IL_STR_LIT:
