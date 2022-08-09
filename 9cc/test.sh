@@ -288,7 +288,7 @@ assert "str4.c"
 assert "str5.c"
 assert "str6.c"
 
-assert "8queen.c"
+#assert "8queen.c"
 assert "9queen.c"
 
 assert "structsize1.c"
@@ -371,6 +371,7 @@ assert "continue3.c"
 assert "break1.c"
 assert "break2.c"
 assert "break3.c"
+assert "break4.c"
 
 assert "nostmt1.c"
 

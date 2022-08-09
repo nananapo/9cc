@@ -381,7 +381,7 @@ static void	translate_dowhile(t_node *node)
 	code		= append_il(IL_NEQUAL);
 	code->type	= node->rhs->type;
 
-	code			= append_il(IL_JUMP_NEQUAL);
+	code			= append_il(IL_JUMP_EQUAL);
 	code->label_str	= get_label_str(lbegin);
 
 	// end

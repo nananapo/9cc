@@ -516,7 +516,7 @@ assert "222" "int main(){
 	return i;
 }"
 
-assert_gcc "8queen.c"
+#assert_gcc "8queen.c"
 assert_gcc "9queen.c"
 
 assert_gcc "structsize1.c"
@@ -676,6 +676,7 @@ assert_gcc "continue3.c"
 assert_gcc "break1.c"
 assert_gcc "break2.c"
 assert_gcc "break3.c"
+assert_gcc "break4.c"
 
 assert_gcc "nostmt1.c"
 

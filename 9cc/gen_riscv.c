@@ -605,7 +605,7 @@ static void	print_global_constant(t_node *node, t_type *type)
 
 	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
-		printf("    .long %d\n", node->val);
+		printf("    .word %d\n", node->val);
 	}
 	else if (type_equal(type, new_primitive_type(TY_CHAR)))
 	{
@@ -614,13 +614,10 @@ static void	print_global_constant(t_node *node, t_type *type)
  	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& node->def_str != NULL)
 	{
-		// TODO arrayのchar
-		printf("    .quad L_STR_%d\n", node->def_str->index);
+		printf("    .dword .L_STR_%d\n", node->def_str->index);
 	}
 	else if (is_pointer_type(type))
 	{
-		// TODO 数のチェックはしてない
-		// array array
 		for (notmp = node; notmp; notmp = notmp->global_assign_next)
 			print_global_constant(notmp, type->ptr_to);
 	}
@@ -635,16 +632,18 @@ static void gen_defglobal(t_defvar *node)
 	if (node->is_extern)
 		return ;
 	name = my_strndup(node->name, node->name_len);
-	if (!node->is_static)
-		printf(".globl _%s\n", name);
 	if (node->assign == NULL)
 	{
-		printf("    .comm _%s,%d,2\n",
+		printf("    .comm %s,%d,4\n",
 				name, get_type_size(node->type));
 	}
 	else
 	{
-		printf("_%s:\n", name);
+		printf("    .align 3\n");
+		printf("    .type %s, @object\n", name);
+		if (!node->is_static)
+			printf(".globl %s\n", name);
+		printf("%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}
 }
@@ -1019,7 +1018,7 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
-	printf("# kind %d\n", code->kind);
+	//printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
 		case IL_LABEL:
@@ -1260,11 +1259,12 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_VAR_GLOBAL_ADDR:
-			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
+			printf("    lui %s,%%hi(%s)\n", T0,
+					my_strndup(code->var_global->name, code->var_global->name_len));
+			printf("    addi %s, %s, %%lo(%s)\n", T0, T0,
 					my_strndup(code->var_global->name, code->var_global->name_len));
 			push();
 			return ;
-		// TODO genでoffsetの解決 , analyzeで宣言のチェック
 		case IL_MEMBER:
 		case IL_MEMBER_PTR:
 			pop(T0);
@@ -1279,7 +1279,8 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_STR_LIT:
-			printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, T0, code->def_str->index);
+			printf("    lui %s, %%hi(.L_STR_%d)\n", T0, code->def_str->index);
+			printf("    addi %s, %s, %%lo(.L_STR_%d)\n", T0, T0, code->def_str->index);
 			push();
 			return;
 
@@ -1327,10 +1328,13 @@ void	codegen_riscv(void)
 
 	printf("    .file \"%s\"\n", g_filename);
 
+	printf("    .text\n");
+	printf("    .section .rodata\n");
+	printf("    .align 3\n");
 	// 文字列リテラル生成
 	for (i = 0; g_str_literals[i] != NULL; i++)
 	{
-		printf("L_STR_%d:\n", g_str_literals[i]->index);
+		printf(".L_STR_%d:\n", g_str_literals[i]->index);
 		printf("    .string \"");
 		put_str_literal(g_str_literals[i]->str, g_str_literals[i]->len);
 		printf("\"\n");
