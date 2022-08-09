@@ -7,7 +7,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define ASM_MOV "mv"
 #define ASM_ADDI "addi"
 
 #define ZERO "zero"
@@ -424,7 +423,7 @@ static void	addi(char *dst, char *a, int b)
 
 static void	mov(char *dst, char *from)
 {
-	printf("    %s %s, %s\n", ASM_MOV, dst, from);
+	printf("    mv %s, %s\n", dst, from);
 }
 
 // T0からT1(アドレス)に値をストアする
@@ -708,14 +707,12 @@ static void	gen_call_exec(t_il *code)
 				continue ;
 			}
 
-			printf("    %s %s, [%s + %d]\n", ASM_MOV, T1, SP, pop_count * 8);
+			printf("    ld %s, %d(%s)\n", T1, pop_count * 8, SP);
 			pop_count += 1;
 
 			for (j = size - 8; j >= 0; j -= 8)
 			{
-				printf("    %s %s, [%s + %d]\n", ASM_MOV,
-						arg_regs[tmp_regindex - j / 8],
-						T1, j);
+				printf("    ld %s, %d(%s)\n", arg_regs[tmp_regindex - j / 8],j, T1);
 			}
 			continue ;
 		}
@@ -724,18 +721,19 @@ static void	gen_call_exec(t_il *code)
 
 		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
 		{
-			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
+			printf("    ld %s, %d(%s)\n", T0, pop_count * 8, SP);
 			mov(T1, SP);
-			printf("    sub %s, %d\n", T1, (tmp_offset + 16) + rbp_offset);
+			addi(T1, T1, -((tmp_offset + 16) + rbp_offset));
 			store_ptr(size);
 		}
+		else
 		{
-			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
+			printf("    ld %s, %d(%s)\n", T0, pop_count * 8, SP);
 			mov(T1, SP);
-			printf("    sub %s, %d\n", T1, (tmp_offset + 16) + rbp_offset);
+			addi(T1, T1, -((tmp_offset + 16) + rbp_offset));
 			store_value(size);
 		}
-		pop_count += 1; // doubleなら2とかになる？
+		pop_count += 1;
 	}
 
 	debug("ready");
@@ -743,15 +741,16 @@ static void	gen_call_exec(t_il *code)
 	// rsp += rbp_offsetする
 	addi(SP, SP, -rbp_offset);
 
-	// 返り値がMEMORYなら、返り値の格納先のアドレスをT1に設定する
+	// 返り値がMEMORYなら、返り値の格納先のアドレスをA0に設定する
 	if (is_memory_type(deffunc->type_return))
 	{
-		printf("    lea %s, [%s - %d]\n", T1, FP, get_call_memory(code));
+		addi(A0, FP, get_call_memory(code));
 	}
 
 	// call
 	if (deffunc->is_variable_argument)
 	{
+		// TODO
 	}
 	printf("    call %s\n", my_strndup(deffunc->name, deffunc->name_len));
 
@@ -762,21 +761,21 @@ static void	gen_call_exec(t_il *code)
 	addi(SP, SP, pop_count * 8);
 	stack_count -= pop_count * 8;
 
-	// 返り値がMEMORYなら、raxにアドレスを入れる
+	// 返り値がMEMORYなら、T0にアドレスを入れる
 	if (is_memory_type(deffunc->type_return))
 	{
-		printf("    lea %s, [%s - %d]\n", T0, FP, get_call_memory(code));
+		addi(T0, FP, get_call_memory(code));
 		push();
 	}
-	// 返り値がstructなら、rax, rdxを移動する
+	// 返り値がstructなら、A0とA1を移動する
 	else if (deffunc->type_return->ty == TY_STRUCT)
 	{
 		size = align_to(get_type_size(deffunc->type_return), 8);
-		printf("    lea %s, [%s - %d]\n", T1, FP, get_call_memory(code));
+		addi(T1, FP, get_call_memory(code));
 		if (size > 0)
-			printf("    mov [%s], %s\n", T1, T0);
+			printf("    sd %s , 0(%s)\n", A0, T1);
 		if (size > 8)
-			printf("    mov [%s + 8], %s\n", T1, A1);
+			printf("    sd %s , 8(%s)\n", A1, T1);
 		mov(T0, T1);
 		push();
 	}
@@ -903,25 +902,25 @@ static void	gen_func_epilogue(t_il *code)
 {
 	int	size;
 
-	// MEMORYなら、rdiのアドレスに格納
+	// MEMORYなら、A0のアドレスに格納
 	if (is_memory_type(code->type))
 	{
 		pop(T0);
-		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
+		printf("    ld %s, %d(%s)\n", T1, g_locals_offset[0], FP);
 		store_ptr(get_type_size(code->type));
 
 		// T1を復元する
-		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
+		printf("    ld %s, %d(%s)\n", T1, g_locals_offset[0], FP);
 	}
-	// STRUCTなら、rax, rdxに格納
+	// STRUCTなら、A0, A1に格納
 	else if (code->type->ty == TY_STRUCT)
 	{
 		pop(T0);
 		size = align_to(get_type_size(code->type), 8);
 		if (size > 8)
-			printf("    mov %s, [%s  - 8]\n", A1, T0);
+			printf("    ld %s, -8(%s)\n", A1, T0);
 		if (size > 0)
-			printf("    mov %s, [%s]\n", T0, T0);
+			printf("    ld %s, 0(%s)\n", A0, T0);
 	}
 	else if (code->type->ty != TY_VOID)
 		pop(A0);
