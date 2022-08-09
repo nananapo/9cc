@@ -9,34 +9,17 @@
 
 #define ASM_MOV "mv"
 #define ASM_ADDI "addi"
-#define ASM_LEA "lea"
-
 
 #define ZERO "zero"
 #define FP "fp"
 #define SP "sp"
 #define T0 "t0"
 #define T1 "t1"
+#define T2 "t2"
 #define A0 "a0"
-
+#define A1 "a1"
 #define RA "ra"
 
-
-#define RSI "rsi"
-#define R10 "r10"
-#define R11 "r11"
-#define RDX "rdx"
-
-#define SP "sp"
-
-#define EAX "eax"
-#define EDI "edi"
-#define ESI "esi"
-#define R11D "r11d"
-
-#define BYTE_PTR "byte ptr"
-#define WORD_PTR "word ptr"
-#define DWORD_PTR "dword ptr"
 
 #define ARGREG_SIZE 8
 
@@ -449,9 +432,11 @@ static void	store_value(int size)
 		error("store_valueに不正なサイズ(%d)の値を渡しています", size);
 }
 
-// アドレス(T0)の先の値をR10(アドレス)にストアする
+// アドレス(T0)の先の値をT1(アドレス)にストアする
 static void store_ptr(int size, bool minus_step)
 {
+	debug("%d %d", size, minus_step);
+/*
 	int		delta;
 	char	*dest;
 	char	*from;
@@ -462,21 +447,21 @@ static void store_ptr(int size, bool minus_step)
 	if (minus_step)
 		op = "-";
 
-	dest = R10;
+	dest = T1;
 	
 	for (i = 0; i < size; i += 8)
 	{
 		delta = size - i;
 		if (delta >= 8)
 		{
-			from = R11;
+			from = T2;
 			printf("    %s %s, [%s + %d]\n", ASM_MOV, from, T0, i);
 			printf("    %s [%s %s %d], %s\n", ASM_MOV, dest, op, i, from);
 			continue ;
 		}
 		if (delta >= 4)
 		{
-			//from = R11D;
+			//from = T2D;
 			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, DWORD_PTR, T0, i);
 			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, DWORD_PTR, dest, op,  i, from);
 			i += 4;
@@ -484,7 +469,7 @@ static void store_ptr(int size, bool minus_step)
 		}
 		if (delta >= 2)
 		{
-			//from = R11W;
+			//from = T2W;
 			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, WORD_PTR, T0, i);
 			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, WORD_PTR, dest, op, i, from);
 			i += 2;
@@ -492,13 +477,14 @@ static void store_ptr(int size, bool minus_step)
 		}
 		if (delta >= 1)
 		{
-			//from = R11B;
+			//from = T2B;
 			printf("    %s %s, %s [%s + %d]\n", ASM_MOV, from, BYTE_PTR, T0, i);
 			printf("    %s %s [%s %s %d], %s\n", ASM_MOV, BYTE_PTR, dest, op, i, from);
 			i += 1;
 			delta -= 1;
 		}
 	}
+*/
 }
 
 // raxをraxに読み込む
@@ -727,14 +713,14 @@ static void	gen_call_exec(t_il *code)
 				continue ;
 			}
 
-			printf("    %s %s, [%s + %d]\n", ASM_MOV, R10, SP, pop_count * 8);
+			printf("    %s %s, [%s + %d]\n", ASM_MOV, T1, SP, pop_count * 8);
 			pop_count += 1;
 
 			for (j = size - 8; j >= 0; j -= 8)
 			{
 				printf("    %s %s, [%s + %d]\n", ASM_MOV,
 						arg_regs[tmp_regindex - j / 8],
-						R10, j);
+						T1, j);
 			}
 			continue ;
 		}
@@ -744,14 +730,14 @@ static void	gen_call_exec(t_il *code)
 		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
 		{
 			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
-			mov(R10, SP);
-			printf("    sub %s, %d\n", R10, (tmp_offset + 16) + rbp_offset);
+			mov(T1, SP);
+			printf("    sub %s, %d\n", T1, (tmp_offset + 16) + rbp_offset);
 			store_ptr(size, false);
 		}
 		{
 			printf("    %s %s, [%s + %d]\n", ASM_MOV, T0, SP, pop_count * 8);
-			mov(R10, SP);
-			printf("    sub %s, %d\n", R10, (tmp_offset + 16) + rbp_offset);
+			mov(T1, SP);
+			printf("    sub %s, %d\n", T1, (tmp_offset + 16) + rbp_offset);
 			store_value(size);
 		}
 		pop_count += 1; // doubleなら2とかになる？
@@ -795,7 +781,7 @@ static void	gen_call_exec(t_il *code)
 		if (size > 0)
 			printf("    mov [%s], %s\n", T1, T0);
 		if (size > 8)
-			printf("    mov [%s + 8], %s\n", T1, RDX);
+			printf("    mov [%s + 8], %s\n", T1, A1);
 		mov(T0, T1);
 		push();
 	}
@@ -926,7 +912,7 @@ static void	gen_func_epilogue(t_il *code)
 	if (is_memory_type(code->type))
 	{
 		pop(T0);
-		printf("    mov %s, [rbp - %d]\n", R10, g_locals_offset[0]);
+		printf("    mov %s, [rbp - %d]\n", T1, g_locals_offset[0]);
 		store_ptr(get_type_size(code->type), false);
 
 		// T1を復元する
@@ -938,7 +924,7 @@ static void	gen_func_epilogue(t_il *code)
 		pop(T0);
 		size = align_to(get_type_size(code->type), 8);
 		if (size > 8)
-			printf("    mov %s, [%s  - 8]\n", RDX, T0);
+			printf("    mov %s, [%s  - 8]\n", A1, T0);
 		if (size > 0)
 			printf("    mov %s, [%s]\n", T0, T0);
 	}
@@ -1069,10 +1055,10 @@ static void	gen_il(t_il *code)
 		{
 			// とりあえず型を何も考えずに交換する
 			pop(T0);
-			mov(R10, T0);
+			mov(T1, T0);
 
 			pop(T1);
-			mov(T0, R10);
+			mov(T0, T1);
 			push();
 
 			mov(T0, T1);
