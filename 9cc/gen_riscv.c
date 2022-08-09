@@ -26,6 +26,7 @@
 // 16 byteアライン
 // riscv-64
 
+static bool	is_memory_type(t_type *type);
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
@@ -67,6 +68,12 @@ extern t_str_elem		*g_str_literals[1000];
 extern t_il				*g_il;
 
 
+static bool	is_memory_type(t_type *type)
+{
+	if (type->ty != TY_STRUCT)
+		return (false);
+	return (get_type_size(type) > 16);
+}
 
 static int	max_align_size(t_type *type)
 {

@@ -364,7 +364,6 @@ bool	is_integer_type(t_type *type);
 bool	is_pointer_type(t_type *type);
 bool	is_declarable_type(t_type *type);
 bool	type_equal(t_type *t1, t_type *t2);
-bool	is_memory_type(t_type *type);
 
 bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
 bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);

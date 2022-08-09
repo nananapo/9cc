@@ -4,14 +4,14 @@
 #include <string.h>
 #include <stdlib.h>
 
-bool	issymbol(char c)
+bool	is_underscore(char c)
 {
 	return (c == '_');
 }
 
 int	can_use_beginning_of_var(char c)
 {
-	return (isalpha(c) || issymbol(c));
+	return (isalpha(c) || is_underscore(c));
 }
 
 int	is_escapedchar(char c)

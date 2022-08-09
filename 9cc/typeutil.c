@@ -341,10 +341,3 @@ bool	can_use_dot(t_type *type)
 {
 	return (type->ty == TY_STRUCT || type->ty == TY_UNION);
 }
-
-bool	is_memory_type(t_type *type)
-{
-	if (type->ty != TY_STRUCT)
-		return (false);
-	return (get_type_size(type) > 16);
-}
