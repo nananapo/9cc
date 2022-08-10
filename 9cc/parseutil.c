@@ -106,7 +106,7 @@ static bool	consume_type_alias(t_type **type)
 
 	if (g_token->kind != TK_IDENT)
 		return (false);
-	pair = linked_list_search(g_type_alias, strndup(g_token->str, g_token->len));
+	pair = linked_list_search(g_type_alias, my_strndup(g_token->str, g_token->len));
 	if (pair == NULL)
 		return (false);
 	consume_ident();

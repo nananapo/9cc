@@ -28,7 +28,7 @@ void	error_at(char *at, char *fmt, ...)
 	if (ret == NULL)
 		fprintf(stderr, "%s", at);
 	else
-		fprintf(stderr, "%s", strndup(at, ret - at));
+		fprintf(stderr, "%s", my_strndup(at, ret - at));
 	exit(1);
 }
 

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+TARGET="$1"
+if [ "$TARGET" = "" ]; then
+	TARGET="x8664"
+fi
+
 prefix="
 int pint(int i);
 int dint(int i);
@@ -12,7 +17,7 @@ int *my_malloc_int(int n);
 "
 
 testdir="../test/"
-ncc="./9cc"
+ncc="./9cc --arch $TARGET"
 prpr="../prpr/prpr --stddir ../std/"
 module="$testdir/sub/print.c"
 
@@ -511,7 +516,7 @@ assert "222" "int main(){
 	return i;
 }"
 
-assert_gcc "8queen.c"
+#assert_gcc "8queen.c"
 assert_gcc "9queen.c"
 
 assert_gcc "structsize1.c"
@@ -519,6 +524,7 @@ assert_gcc "structsize2.c"
 assert_gcc "structsize3.c"
 assert_gcc "structsize4.c"
 assert_gcc "structsize5.c"
+assert_gcc "structsize6.c"
 
 assert_gcc "struct2.c"
 assert_gcc "struct3.c"
@@ -635,6 +641,8 @@ assert_gcc "void2.c"
 assert_gcc "cast0.c"
 assert_gcc "cast1.c"
 assert_gcc "cast2.c"
+assert_gcc "cast3.c"
+assert_gcc "cast4.c"
 
 assert_gcc "implicit_cast0.c"
 
@@ -671,6 +679,7 @@ assert_gcc "continue3.c"
 assert_gcc "break1.c"
 assert_gcc "break2.c"
 assert_gcc "break3.c"
+assert_gcc "break4.c"
 
 assert_gcc "nostmt1.c"
 
@@ -736,6 +745,10 @@ assert_gcc "ret_struct2.c"
 assert_gcc "ret_struct3.c"
 assert_gcc "ret_struct4.c"
 assert_gcc "ret_struct5.c"
+assert_gcc "ret_struct6.c"
+assert_gcc "ret_struct7.c"
+
+assert "quine.c"
 
 echo OK
 

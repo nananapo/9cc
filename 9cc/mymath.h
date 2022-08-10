@@ -4,5 +4,6 @@
 int	max(int a, int b);
 int min(int a, int b);
 int	align_to(int n, int align);
+int	mylog2(int n);
 
 #endif

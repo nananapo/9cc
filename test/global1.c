@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int	g_a = 100100;
+int	g_a = 1000;
 
 int	main(void)
 {

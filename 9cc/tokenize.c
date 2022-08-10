@@ -37,7 +37,7 @@ static int	read_var_name(char *p)
 
 	while (*p)
 	{
-		if (!isalnum(*p) && !issymbol(*p))
+		if (!isalnum(*p) && !is_underscore(*p))
 			return l;
 		l++;
 		p++;
@@ -77,7 +77,7 @@ static int	match_word(char **str, t_token **last, char *needle, t_tokenkind kind
 	len = strlen(needle);
 	if (strncmp(*str, needle, len) != 0)
 		return 0;
-	if (isalnum((*str)[len]) || issymbol((*str)[len]))
+	if (isalnum((*str)[len]) || is_underscore((*str)[len]))
 		return 0;
 
 	*last = new_token(kind, *last, *str, len);

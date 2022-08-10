@@ -207,7 +207,7 @@ static t_node *analyze_var(t_node *node)
 		return (node);
 	}
 
-	error_at(node->analyze_var_name, "%sが定義されていません", strndup(node->analyze_var_name, node->analyze_var_name_len));
+	error_at(node->analyze_var_name, "%sが定義されていません", my_strndup(node->analyze_var_name, node->analyze_var_name_len));
 	return (NULL);
 }
 
@@ -245,7 +245,7 @@ static t_node	*analyze_member_value_ptr(t_node *node)
 							node->analyze_member_name_len);
 	if (elem == NULL)
 		error_at(node->analyze_source, "識別子が存在しません",
-				strndup(node->analyze_member_name, node->analyze_member_name_len));
+				my_strndup(node->analyze_member_name, node->analyze_member_name_len));
 
 	node->elem = elem;
 	node->type = elem->type;
@@ -265,7 +265,7 @@ static t_node	*analyze_member_value(t_node *node)
 							node->analyze_member_name_len);
 	if (elem == NULL)
 		error_at(node->analyze_source, "識別子が存在しません",
-				strndup(node->analyze_member_name, node->analyze_member_name_len));
+				my_strndup(node->analyze_member_name, node->analyze_member_name_len));
 
 	node->elem = elem;
 	node->type = elem->type;
@@ -299,7 +299,7 @@ static t_node	*analyze_call(t_node *node)
 
 	// function exist?
 	if (node->funcdef == NULL)
-		error_at(node->analyze_source, "関数%sがみつかりません", strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
+		error_at(node->analyze_source, "関数%sがみつかりません", my_strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
 
 	// set type
 	node->type = node->funcdef->type_return;
@@ -313,17 +313,17 @@ static t_node	*analyze_call(t_node *node)
 	// 引数の数を比較する
 	if (node->funcdef->is_zero_argument && node->funccall_argcount != 0)
 		error_at(node->analyze_source, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-				strndup(node->funcdef->name, node->funcdef->name_len),
+				my_strndup(node->funcdef->name, node->funcdef->name_len),
 				node->funcdef->argcount, node->funccall_argcount);
 	else
 	{
 		if (!node->funcdef->is_variable_argument && node->funccall_argcount != node->funcdef->argcount)
 			error_at(node->analyze_source, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-						strndup(node->funcdef->name, node->funcdef->name_len),
+						my_strndup(node->funcdef->name, node->funcdef->name_len),
 						node->funcdef->argcount, node->funccall_argcount);
 		if (node->funcdef->is_variable_argument && node->funccall_argcount < node->funcdef->argcount)
 			error_at(node->analyze_source, "関数%sの引数の数が一致しません\n expected : %d\n actual : %d",
-						strndup(node->funcdef->name, node->funcdef->name_len),
+						my_strndup(node->funcdef->name, node->funcdef->name_len),
 						node->funcdef->argcount, node->funccall_argcount);
 	}
 
@@ -340,8 +340,8 @@ static t_node	*analyze_call(t_node *node)
 				// 暗黙的なキャストの確認
 				if (!type_can_cast(argnode->type, node->funcdef->argument_types[i], false))
 					error_at(argnode->analyze_source, "関数%sの引数(%s)の型が一致しません\n %s と %s",
-							strndup(node->funcdef->name, node->funcdef->name_len),
-							strndup(node->funcdef->argument_names[i], node->funcdef->argument_name_lens[i]),
+							my_strndup(node->funcdef->name, node->funcdef->name_len),
+							my_strndup(node->funcdef->argument_names[i], node->funcdef->argument_name_lens[i]),
 							get_type_name(node->funcdef->argument_types[i]),
 							get_type_name(argnode->type));
 				node->funccall_args[i] = analyze_node(cast(argnode, node->funcdef->argument_types[i]));
@@ -389,10 +389,10 @@ static t_node	*analyze_mul(t_node *node)
 	node->rhs = analyze_node(node->rhs);
 
 	if (!is_integer_type(node->lhs->type))
-		error_at(node->analyze_source, "%sに演算子を適用できません(L*/%)", get_type_name(node->lhs->type));
+		error_at(node->analyze_source, "* か / か %% の左辺が整数ではありません", get_type_name(node->lhs->type));
 
 	if (!is_integer_type(node->rhs->type))
-		error_at(node->analyze_source, "%sに演算子を適用できません(R*/%)", get_type_name(node->rhs->type));
+		error_at(node->analyze_source, "* か / か %% の右辺が整数ではありません", get_type_name(node->rhs->type));
 
 	node->type = new_primitive_type(TY_INT);
 
@@ -814,7 +814,10 @@ static t_node	*analyze_node(t_node *node)
 			return (node);
 		case ND_STR_LITERAL:
 		{
-			node->type = new_type_ptr_to(new_primitive_type(TY_CHAR));
+			node->type = new_type_array(new_primitive_type(TY_CHAR));
+			node->type->array_size = node->def_str->len;
+			// TODO 実際のサイズではない
+			//fprintf(stderr, "array : %d\n", node->def_str->len);
 			return (node);
 		}
 		case ND_BLOCK:

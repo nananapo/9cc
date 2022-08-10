@@ -28,7 +28,7 @@ extern t_il				*g_il;
 
 static char	*get_function_epi_label(char *name, int len)
 {
-	return (my_strcat("Lepi_", strndup(name, len)));
+	return (my_strcat("Lepi_", my_strndup(name, len)));
 }
 
 static char	*get_label_str(int i)
@@ -88,7 +88,7 @@ static void	translate_condtional_and(t_node *node)
 	code->type	= node->type;
 
 	// 0ならジャンプ
-	code			= append_il(IL_JUMP_EQUAL);
+	code			= append_il(IL_JUMP_FALSE);
 	code->label_str	= get_label_str(lend);
 
 	// 右辺を評価
@@ -131,7 +131,7 @@ static void	translate_condtional_or(t_node *node)
 	code->type	= node->type;
 
 	// 0以外ならジャンプ
-	code			= append_il(IL_JUMP_NEQUAL);
+	code			= append_il(IL_JUMP_TRUE);
 	code->label_str	= get_label_str(lend);
 
 	// 結果は使わないのでpopする
@@ -177,11 +177,13 @@ static void	translate_return(t_node *node)
 
 	if (node->lhs != NULL)
 		translate_node(node->lhs);
-	else
-		append_il_pushnum(0);
 
 	code			= append_il(IL_JUMP);
 	code->label_str	= get_function_epi_label(node->funcdef->name, node->funcdef->name_len);
+
+	// push数を合わせるためのpushnum
+	if (node->lhs == NULL)
+		append_il_pushnum(0);
 }
 
 static void	translate_block(t_node *node)
@@ -227,7 +229,8 @@ static void	translate_conditional_op(t_node *node)
 	code		= append_il(IL_EQUAL);
 	code->type	= node->lhs->type;
 
-	code			= append_il(IL_JUMP_EQUAL);
+	// 0ならジャンプ
+	code			= append_il(IL_JUMP_TRUE);
 	code->label_str	= get_label_str(lelse);
 
 	// trueなら実行してlendにジャンプ
@@ -265,7 +268,8 @@ static void	translate_if(t_node *node)
 	code		= append_il(IL_EQUAL);
 	code->type	= node->lhs->type;
 
-	code			= append_il(IL_JUMP_EQUAL);
+	// 0ならelseにジャンプ
+	code			= append_il(IL_JUMP_TRUE);
 	code->label_str	= get_label_str(lelse);
 
 	// trueなら実行してlendにジャンプ
@@ -323,7 +327,7 @@ static void	translate_while(t_node *node)
 	code		= append_il(IL_EQUAL);
 	code->type	= node->lhs->type;
 
-	code			= append_il(IL_JUMP_EQUAL);
+	code			= append_il(IL_JUMP_TRUE);
 	code->label_str	= get_label_str(lend);
 
 	// while () rhs
@@ -381,7 +385,8 @@ static void	translate_dowhile(t_node *node)
 	code		= append_il(IL_NEQUAL);
 	code->type	= node->rhs->type;
 
-	code			= append_il(IL_JUMP_NEQUAL);
+	// 0ではないならlbeginにジャンプ
+	code			= append_il(IL_JUMP_TRUE);
 	code->label_str	= get_label_str(lbegin);
 
 	// end
@@ -426,7 +431,8 @@ static void	translate_for(t_node *node)
 		code		= append_il(IL_EQUAL);
 		code->type	= node->for_expr[1]->type; // TODO これ、構造体かどうかとかのチェックしてます?
 
-		code			= append_il(IL_JUMP_EQUAL);
+		// 0ならlendにジャンプ
+		code			= append_il(IL_JUMP_TRUE);
 		code->label_str = get_label_str(lend);
 	}
 
@@ -500,7 +506,7 @@ static void	translate_switch(t_node *node)
 		code		= append_il(IL_EQUAL);
 		code->type	= node->lhs->type;
 
-		code			= append_il(IL_JUMP_EQUAL);
+		code			= append_il(IL_JUMP_TRUE);
 		code->label_str	= get_label_str(cases->label);
 	}
 
@@ -803,7 +809,7 @@ static void	translate_func(t_deffunc *func)
 	t_lvar	*lvar;
 
 	code						= append_il(IL_LABEL);
-	code->label_str				= strndup(func->name, func->name_len);
+	code->label_str				= my_strndup(func->name, func->name_len);
 	code->label_is_deffunc		= true;
 	code->label_is_static_func	= func->is_static;
 

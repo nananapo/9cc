@@ -18,3 +18,16 @@ int	align_to(int n, int align)
 		return (n);
 	return ((n + align - 1) / align * align);
 }
+
+int	mylog2(int n)
+{
+	int	r;
+
+	r = 0;
+	while (n > 1)
+	{
+		r += 1;
+		n = n / 2;
+	}
+	return (r);
+}

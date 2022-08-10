@@ -288,9 +288,6 @@ bool	is_declarable_type(t_type *type)
 
 bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
 {
-	int	size1;
-	int	size2;
-
 	if (type_equal(from, to))
 		return (true);
 
@@ -311,11 +308,9 @@ bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
 		return (true);
 
 	// どちらも数字？
-	size1 = get_type_size(from);
-	size2 = get_type_size(to);
-
+	if (is_explicit)
+		debug("");
 	is_explicit = false;
-
 	return (true);
 }
 
@@ -345,11 +340,4 @@ bool	can_use_arrow(t_type *type)
 bool	can_use_dot(t_type *type)
 {
 	return (type->ty == TY_STRUCT || type->ty == TY_UNION);
-}
-
-bool	is_memory_type(t_type *type)
-{
-	if (type->ty != TY_STRUCT)
-		return (false);
-	return (get_type_size(type) > 16);
 }

@@ -7,6 +7,41 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#define ASM_MOV "mov"
+#define ASM_PUSH "push"
+#define ASM_LEA "lea"
+
+#define RAX "rax"
+#define RDI "rdi"
+#define RSI "rsi"
+#define RBP "rbp"
+#define RSP "rsp"
+#define R10 "r10"
+#define R11 "r11"
+#define RDX "rdx"
+
+#define EAX "eax"
+#define EDI "edi"
+#define ESI "esi"
+#define R11D "r11d"
+
+#define AX "ax"
+#define SI "si"
+#define R11W "r11w"
+
+#define AL "al"
+#define DIL "dil"
+#define SIL "sil"
+#define CL "cl"
+#define R11B "r11b"
+
+#define BYTE_PTR "byte ptr"
+#define WORD_PTR "word ptr"
+#define DWORD_PTR "dword ptr"
+
+#define ARGREG_SIZE 6
+
+static bool	is_memory_type(t_type *type);
 static void	push(void);
 static void	pushi(int data);
 static void	pop(char *reg);
@@ -47,6 +82,12 @@ extern t_str_elem		*g_str_literals[1000];
 extern t_il				*g_il;
 
 
+static bool	is_memory_type(t_type *type)
+{
+	if (type->ty != TY_STRUCT)
+		return (false);
+	return (get_type_size(type) > 16);
+}
 
 static int	max_align_size(t_type *type)
 {
@@ -110,7 +151,6 @@ static int	get_member_offset(t_member *mem)
 }
 
 // TODO voidのarray
-
 static int	get_struct_size(t_type *type)
 {
 	t_defstruct	*def;
@@ -135,13 +175,12 @@ static int	get_union_size(t_defunion *def)
 	return (tmp_size);
 }
 
-int	get_array_align_size(t_type *type)
+int	get_array_align_size_x8664(t_type *type)
 {
 	return (get_type_size(type));
 }
 
-// 型のサイズを取得する
-int	get_type_size(t_type *type)
+int	get_type_size_x8664(t_type *type)
 {
 	switch (type->ty)
 	{
@@ -618,7 +657,7 @@ static void gen_defglobal(t_defvar *node)
 
 	if (node->is_extern)
 		return ;
-	name = strndup(node->name, node->name_len);
+	name = my_strndup(node->name, node->name_len);
 	if (!node->is_static)
 		printf(".globl _%s\n", name);
 	if (node->assign == NULL)
@@ -637,7 +676,7 @@ static void	gen_call_start(t_il *code)
 {
 	t_lvar	*lvar;
 
-	debug("start call %s", strndup(code->funccall_callee->name, code->funccall_callee->name_len));
+	debug("start call %s", my_strndup(code->funccall_callee->name, code->funccall_callee->name_len));
 
 	g_call_locals_count = 0;
 
@@ -740,7 +779,7 @@ static void	gen_call_exec(t_il *code)
 			continue ;
 		}
 
-		debug("offset : %d (%s)", tmp_offset, strndup(defarg->name, defarg->name_len));
+		debug("offset : %d (%s)", tmp_offset, my_strndup(defarg->name, defarg->name_len));
 
 		if (defarg->type->ty == TY_STRUCT || defarg->type->ty == TY_UNION)
 		{
@@ -775,7 +814,7 @@ static void	gen_call_exec(t_il *code)
 	{
 		movi(AL, 0);
 	}
-	printf("    call _%s\n", strndup(deffunc->name, deffunc->name_len));
+	printf("    call _%s\n", my_strndup(deffunc->name, deffunc->name_len));
 
 	// rspを元に戻す
 	printf("    add %s, %d\n", RSP, rbp_offset);
@@ -1025,16 +1064,20 @@ static void	gen_il(t_il *code)
 			printf("    jmp %s\n", code->label_str);
 			return ;
 		}
-		case IL_JUMP_EQUAL:
+		case IL_JUMP_TRUE:
 		{
 			pop(RAX);
+			printf("    mov %s, %d\n", RDI, 1);
+			printf("    cmp %s, %s\n", RAX, RDI);
 			printf("    je %s\n", code->label_str);
 			return ;
 		}
-		case IL_JUMP_NEQUAL:
+		case IL_JUMP_FALSE:
 		{
 			pop(RAX);
-			printf("    jne %s\n", code->label_str);
+			printf("    mov %s, %d\n", RDI, 0);
+			printf("    cmp %s, %s\n", RAX, RDI);
+			printf("    je %s\n", code->label_str);
 			return;
 		}
 		case IL_FUNC_PROLOGUE:
@@ -1228,7 +1271,7 @@ static void	gen_il(t_il *code)
 			return ;
 		case IL_VAR_GLOBAL_ADDR:
 			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
-					strndup(code->var_global->name, code->var_global->name_len));
+					my_strndup(code->var_global->name, code->var_global->name_len));
 			push();
 			return ;
 		// TODO genでoffsetの解決 , analyzeで宣言のチェック
@@ -1288,7 +1331,7 @@ static void	gen_il(t_il *code)
 	}
 }
 
-void	codegen(void)
+void	codegen_x8664(void)
 {
 	int		i;
 	t_il	*code;

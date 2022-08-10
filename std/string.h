@@ -31,7 +31,6 @@ char	*strerror(int errnum);
 size_t	strlen(char *s);
 
 char	*strdup(char *s1);
-char	*strndup(char *s1, size_t n);
 
 /*
 void	*memcpy(void *s1, void *s2, size_t n)

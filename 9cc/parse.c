@@ -134,7 +134,7 @@ static t_node	*call(t_token *tok)
 {
 	t_node		*node;
 
-	debug("CALL %s", strndup(tok->str, tok->len));
+	debug("CALL %s", my_strndup(tok->str, tok->len));
 
 	node							= new_node(ND_CALL, NULL, NULL, tok->str);
 	node->analyze_funccall_name		= tok->str;
@@ -814,7 +814,7 @@ static t_node	*stmt(void)
 		}
 	}
 	if(!consume(";"))
-		error_at(g_token->str, ";ではないトークン(Kind : %d , %s)です", g_token->kind, strndup(g_token->str, g_token->len));
+		error_at(g_token->str, ";ではないトークン(Kind : %d , %s)です", g_token->kind, my_strndup(g_token->str, g_token->len));
 
 	return node;
 }
@@ -978,7 +978,7 @@ t_type	*read_enum_block(t_token *ident)
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が見つかりません");
 
-		def->kinds[def->kind_len++] = strndup(ident->str, ident->len);
+		def->kinds[def->kind_len++] = my_strndup(ident->str, ident->len);
 
 		if (!consume(","))
 		{
@@ -1129,7 +1129,7 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 		def->stmt = stmt();
 	}
 	
-	debug(" func %s created", strndup(def->name, def->name_len));
+	debug(" func %s created", my_strndup(def->name, def->name_len));
 }
 
 static void	read_typedef(void)
@@ -1270,7 +1270,11 @@ static void	filescope(void)
 		if (consume("("))
 			funcdef(type, ident, is_static);
 		else
+		{
+			if (is_inline)
+				error_at(ident->str, "グローバル変数にinlineは使えません");
 			global_var(type, ident, false, is_static);
+		}
 		return ;
 	}
 

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "prlib.h"
 
 #define BUF_SIZE 1024
 
@@ -89,5 +90,5 @@ char	*getdir(char *full)
 	end = strrchr(full, '/');
 	if (end == NULL)
 		return ("./");
-	return (strndup(full, end - full));
+	return (my_strndup(full, end - full));
 }

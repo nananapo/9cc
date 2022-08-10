@@ -90,19 +90,19 @@ static void	codes(Node *node) // 8
 		//fprintf(stderr, "#  WHILE IN %d %p\n", i, code);
 		if (code->kind == TK_STR_LIT)
 		{
-			printf("\"%s\"", strndup(code->str, code->len));
+			printf("\"%s\"", my_strndup(code->str, code->len));
 		}
 		else if (code->kind == TK_CHAR_LIT)
 		{
-			printf("'%s'", strndup(code->str, code->len));
+			printf("'%s'", my_strndup(code->str, code->len));
 		}
 		else if (code->kind == TK_IDENT)
 		{
-			//fprintf(stderr, "#   IS IDENT %s\n", strndup(code->str, code->len));
-			mactmp = get_macro(strndup(code->str, code->len));
+			//fprintf(stderr, "#   IS IDENT %s\n", my_strndup(code->str, code->len));
+			mactmp = get_macro(my_strndup(code->str, code->len));
 			if (mactmp == NULL)
 			{
-				printf("%s ", strndup(code->str, code->len));
+				printf("%s ", my_strndup(code->str, code->len));
 			}
 			else
 			{
@@ -133,12 +133,12 @@ static void	codes(Node *node) // 8
 			}
 			else
 			{
-				printf("%s ", strndup(code->str, code->len));
+				printf("%s ", my_strndup(code->str, code->len));
 			}
 		}
 		else
 		{
-			printf("%s", strndup(code->str, code->len));
+			printf("%s", my_strndup(code->str, code->len));
 		}
 
 		code = code->next;

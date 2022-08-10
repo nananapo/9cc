@@ -4,44 +4,6 @@
 #include <stdbool.h>
 #include "list.h"
 
-# define ASM_MOV "mov"
-# define ASM_PUSH "push"
-# define ASM_LEA "lea"
-
-// 64
-# define RAX "rax"
-# define RDI "rdi"
-# define RSI "rsi"
-# define RBP "rbp"
-# define RSP "rsp"
-# define R10 "r10"
-# define R11 "r11"
-# define RDX "rdx"
-
-// 32
-# define EAX "eax"
-# define EDI "edi"
-# define ESI "esi"
-# define R11D "r11d"
-
-// 16
-# define AX "ax"
-# define SI "si"
-# define R11W "r11w"
-
-// 8
-# define AL "al"
-# define DIL "dil"
-# define SIL "sil"
-# define CL "cl"
-# define R11B "r11b"
-
-#define BYTE_PTR "byte ptr"
-# define WORD_PTR "word ptr"
-# define DWORD_PTR "dword ptr"
-
-# define ARGREG_SIZE 6
-
 typedef enum e_tokenkind
 {
 	TK_RESERVED,
@@ -370,6 +332,13 @@ typedef struct s_typedefpair
 	t_type	*type;
 }	t_typedefpair;
 
+typedef enum s_arch
+{
+	ARCH_X8664,
+	ARCH_RISCV
+}	t_arch;
+
+char	*my_strndup(char *s, int len);
 
 void	debug(char *fmt, ...);
 void	error(char *fmt, ...);
@@ -395,7 +364,6 @@ bool	is_integer_type(t_type *type);
 bool	is_pointer_type(t_type *type);
 bool	is_declarable_type(t_type *type);
 bool	type_equal(t_type *t1, t_type *t2);
-bool	is_memory_type(t_type *type);
 
 bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
 bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
@@ -412,7 +380,6 @@ t_defvar	*find_global(char *str, int len);
 void	parse(void);
 void	analyze();
 
-// gen.c
 void	codegen(void);
 int		get_type_size(t_type *type);
 int		get_array_align_size(t_type *type);
