@@ -18,6 +18,7 @@ int refresh(void);
 int usleep(int microseconds);
 int mvcur(int oldrow, int oldcol, int newrow, int n);
 int endwin(void);
+int mvprintw(int y, int x, char *fmt, ...);
 
 #define TRUE 1
 #define FALSE 0
