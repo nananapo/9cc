@@ -84,7 +84,7 @@ extern t_il				*g_il;
 
 static bool	is_memory_type(t_type *type)
 {
-	if (type->ty != TY_STRUCT)
+	if (type->ty != TY_STRUCT && type->ty != TY_UNION)
 		return (false);
 	return (get_type_size(type) > 16);
 }
@@ -823,6 +823,8 @@ static void	gen_call_exec(t_il *code)
 	printf("    add %s, %d\n", RSP, pop_count * 8);
 	stack_count -= pop_count * 8;
 
+	printf("# return_type : %s (%d)\n", get_type_name(deffunc->type_return), get_type_size(deffunc->type_return));
+
 	// 返り値がMEMORYなら、raxにアドレスを入れる
 	if (is_memory_type(deffunc->type_return))
 	{
@@ -976,7 +978,7 @@ static void	gen_func_epilogue(t_il *code)
 		pop(RAX);
 		size = align_to(get_type_size(code->type), 8);
 		if (size > 8)
-			printf("    mov %s, [%s  - 8]\n", RDX, RAX);
+			printf("    mov %s, [%s + 8]\n", RDX, RAX);
 		if (size > 0)
 			printf("    mov %s, [%s]\n", RAX, RAX);
 	}
