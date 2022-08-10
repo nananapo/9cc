@@ -433,6 +433,13 @@ assert "ret_struct7.c"
 
 assert "quine.c"
 
+
+#assert "float1.c"
+#assert "float2.c"
+#assert "float3.c"
+#assert "float4.c"
+#assert "float5.c"
+
 wait
 
 end_time=`date +%s`

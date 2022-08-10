@@ -120,6 +120,11 @@ t_type	*consume_type_before(bool read_def)
 {
 	t_type	*type;
 	t_token	*ident;
+	bool	is_unsigned;
+
+	is_unsigned = false;
+	while (consume_kind(TK_UNSIGNED))
+		is_unsigned = true;
 
 	// type name
 	if (consume_kind(TK_INT))
@@ -130,6 +135,8 @@ t_type	*consume_type_before(bool read_def)
 		type = new_primitive_type(TY_BOOL);
 	else if (consume_kind(TK_VOID))
 		type = new_primitive_type(TY_VOID);
+	else if (consume_kind(TK_FLOAT))
+		type = new_primitive_type(TY_FLOAT);
 	else if (consume_kind(TK_STRUCT))
 	{
 		ident = consume_ident();
@@ -171,6 +178,9 @@ t_type	*consume_type_before(bool read_def)
 	}
 	else
 		return (NULL);
+
+	// TODO unsignedを許容するかはとりあえず無視
+	type->is_unsigned = is_unsigned;
 
 	consume_type_ptr(&type);
 	return type;

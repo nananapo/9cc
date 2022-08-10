@@ -182,6 +182,8 @@ int	get_type_size_riscv(t_type *type)
 			return (1);
 		case TY_BOOL:
 			return (1);
+		case TY_FLOAT:
+			return (4);
 		case TY_PTR:
 			return (8);
 		case TY_ARRAY:
@@ -198,6 +200,20 @@ int	get_type_size_riscv(t_type *type)
 			error("size of unknown type %d", type->ty);
 	}
 	return (-1);
+}
+
+bool	is_unsigned_abi_riscv(t_typekind kind)
+{
+	switch (kind)
+	{
+		case TY_CHAR:
+		case TY_PTR:
+		case TY_ARRAY:
+			return (true);
+		default:
+			return (false);
+	}
+	return (false);
 }
 
 static int	alloc_argument(t_lvar *lvar)
@@ -539,18 +555,21 @@ static void	cast(t_type *from, t_type *to)
 	if (is_pointer_type(from) && is_pointer_type(to))
 		return ;
 	
-	size1 = get_type_size(from);
-	size2 = get_type_size(to);
-
+	// ポインタから整数も何もしない
 	if (is_pointer_type(from) && is_integer_type(to))
 		return ;
 
+	size1 = get_type_size(from);
+	size2 = get_type_size(to);
+
+	// 整数からポインタ
 	if (is_integer_type(from) && is_pointer_type(to))
 	{
 		printf("    sext.w %s, %s\n", T0, T0);
 		return ;
 	}
 
+	// 整数から整数
 	if (is_integer_type(from) && is_integer_type(to))
 	{
 		if (size1 < size2)
@@ -568,12 +587,7 @@ static void	cast(t_type *from, t_type *to)
 		return ;
 	}
 
-	if (from != NULL)
-		fprintf(stderr, "from : %d\n", from->ty);
-	if (to != NULL)
-		fprintf(stderr, "to : %d\n", to->ty);
-		
-	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
+	error("%sから%sへのキャストが定義されていません", name1, name2);
 }
 
 static void	print_global_constant(t_node *node, t_type *type)

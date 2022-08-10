@@ -36,6 +36,7 @@ typedef enum e_tokenkind
 	TK_ENUM,
 	TK_UNION,
 	TK_FLOAT,
+	TK_UNSIGNED,
 
 	TK_STATIC,
 	TK_TYPEDEF,
@@ -164,6 +165,8 @@ typedef struct s_type
 {
 	t_typekind		ty;
 	struct s_type	*ptr_to;
+
+	bool			is_unsigned;
 
 	int 			array_size;
 
@@ -385,5 +388,6 @@ void	analyze();
 void	codegen(void);
 int		get_type_size(t_type *type);
 int		get_array_align_size(t_type *type);
+bool	is_unsigned_abi(t_typekind type);
 
 #endif

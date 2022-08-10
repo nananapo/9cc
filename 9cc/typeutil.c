@@ -44,9 +44,12 @@ bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value)
 
 t_type	*new_primitive_type(t_typekind pri)
 {
-	t_type	*type = calloc(1, sizeof(t_type));
-	type->ty = pri;
-	type->ptr_to = NULL;
+	t_type	*type;
+
+	type				= calloc(1, sizeof(t_type));
+	type->ty			= pri;
+	type->ptr_to		= NULL;
+	type->is_unsigned	= is_unsigned_abi(pri);
 	return type;
 }
 
@@ -245,6 +248,8 @@ static void	typename_loop(t_type *type, char *str)
 		strcat(str, "_Bool");
 	else if (type->ty == TY_VOID)
 		strcat(str, "void");
+	else if (type->ty == TY_FLOAT)
+		strcat(str, "float");
 	else if (type->ty == TY_STRUCT)
 	{
 		strcat(str, "struct[");

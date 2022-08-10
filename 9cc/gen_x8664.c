@@ -81,6 +81,62 @@ extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
 extern t_il				*g_il;
 
+typedef enum e_numkind
+{
+	NUM_I8,
+	NUM_I16,
+	NUM_I32,
+	NUM_I64,
+	NUM_U8,
+	NUM_U16,
+	NUM_U32,
+	NUM_U64,
+	NUM_F32,
+	NUM_F64,
+}	t_numkind;
+
+#define i08i64 "movsx rax, al"
+#define i32i64 "movsx rax, eax"
+#define i08u64 "movzx rax, al"
+#define i32u64 "push 0\n    mov [rsp], eax\n    pop rax"
+#define i32i08 "movsx rax, al"
+#define i32i16 "movsx rax, ax"
+
+static char	*g_cast_table[10][10] = 
+{
+//        i8     i16    i32    i64    u8     u16    u32    u64    f32    f64
+/* i8 */{  NULL,i08i64,i08i64,i08i64,i08u64,i08u64,i08u64,i08u64,  NULL,  NULL}, 
+/* i16*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* i32*/{i32i08,i32i16,  NULL,i32i64,i32u64,i32u64,i32u64,i32u64,  NULL,  NULL}, 
+/* i64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u8 */{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u16*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u32*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* f32*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* f64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}
+};
+
+static int	get_type_id(t_type *type)
+{
+	switch(type->ty)
+	{
+		case TY_CHAR:
+			return (type->is_unsigned ? NUM_U8 : NUM_I8);
+		case TY_INT:
+			return (type->is_unsigned ? NUM_U32 : NUM_I32);
+		case TY_ENUM:
+			return (NUM_I32);
+		case TY_PTR:
+		case TY_ARRAY:
+			return (type->is_unsigned ? NUM_U64 : NUM_I64);
+		case TY_FLOAT:
+			return (NUM_F32);
+		default:
+			return (-1);
+	}
+	return (-1);
+}
 
 static bool	is_memory_type(t_type *type)
 {
@@ -190,6 +246,8 @@ int	get_type_size_x8664(t_type *type)
 			return (1);
 		case TY_BOOL:
 			return (1);
+		case TY_FLOAT:
+			return (4);
 		case TY_PTR:
 			return (8);
 		case TY_ARRAY:
@@ -206,6 +264,19 @@ int	get_type_size_x8664(t_type *type)
 			error("size of unknown type %d", type->ty);
 	}
 	return (-1);
+}
+
+bool	is_unsigned_abi_x8664(t_typekind kind)
+{
+	switch (kind)
+	{
+		case TY_PTR:
+		case TY_ARRAY:
+			return (true);
+		default:
+			return (false);
+	}
+	return (false);
 }
 
 static int	alloc_argument(t_lvar *lvar)
@@ -551,75 +622,21 @@ static void	load(t_type *type)
 // raxに入っている型fromをtoに変換する
 static void	cast(t_type *from, t_type *to)
 {
-	int		size1;
-	int		size2;
-	char	*name1;
-	char	*name2;
+	int	id1;
+	int	id2;
 
-	// 型が同じなら何もしない
-	if (type_equal(from, to))
+	id1 = get_type_id(from);
+	id2 = get_type_id(to);
+
+	printf("# %d(%s) %d(%s)\n", id1, get_type_name(from), id2, get_type_name(to));
+
+	if (id1 == -1 || id2 == -1)
 		return ;
 
-	name1 = get_type_name(from);
-	name2 = get_type_name(to);
-	debug("cast %s -> %s", name1, name2);
-
-	// ポインタからポインタのキャストは何もしない
-	if (is_pointer_type(from)
-	&& is_pointer_type(to))
-		return ;
-	
-	size1 = get_type_size(from);
-	size2 = get_type_size(to);
-
-	// ポインタから整数へのキャストは情報を落とす
-	if (is_pointer_type(from)
-	&& is_integer_type(to))
+	if (g_cast_table[id1][id2] != NULL)
 	{
-		pushi(0);
-		mov(R10, RSP);
-		store_value(size2);
-		pop(RAX);
-		return ;
+		printf("    %s\n", g_cast_table[id1][id2]);
 	}
-
-	// 整数からポインタは0埋めで拡張
-	// (ポインタはunsinged long long intなので)
-	if (is_integer_type(from)
-	&& is_pointer_type(to))
-	{
-		pushi(0);
-		mov(R10, RSP);
-		store_value(size1);
-		pop(RAX);
-		return ;
-	}
-
-	// 整数から整数は符号を考えながらキャスト
-	if (is_integer_type(from)
-	&& is_integer_type(to))
-	{
-		// TODO unsigned
-		// 符号拡張する
-		if (size1 < size2)
-		{
-			debug("cast %d -> %d", size1, size2);
-			if (size1 == 1)
-				printf("    movsx %s, %s\n", RAX, AL);
-			else if (size1 == 4)
-				printf("    movsx %s, %s\n", RAX, EAX);
-			else
-				error("8byte -> 8byteのキャストは無い");
-		}
-		return ;
-	}
-
-	if (from != NULL)
-		fprintf(stderr, "from : %d\n", from->ty);
-	if (to != NULL)
-		fprintf(stderr, "to : %d\n", to->ty);
-		
-	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
 static void	print_global_constant(t_node *node, t_type *type)
