@@ -126,7 +126,7 @@ t_type	*consume_type_before(bool read_def)
 		type = new_primitive_type(TY_INT);
 	else if (consume_kind(TK_CHAR))
 		type = new_primitive_type(TY_CHAR);
-	else if (consume_kind(TK__BOOL))
+	else if (consume_kind(TK_BOOL))
 		type = new_primitive_type(TY_BOOL);
 	else if (consume_kind(TK_VOID))
 		type = new_primitive_type(TY_VOID);

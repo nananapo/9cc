@@ -178,7 +178,8 @@ t_token	*tokenize(char *p)
 		if (match_word(&p, &last, "struct",	TK_STRUCT))		continue ;
 		if (match_word(&p, &last, "int",	TK_INT))		continue ;
 		if (match_word(&p, &last, "char",	TK_CHAR))		continue ;
-		if (match_word(&p, &last, "_Bool",	TK__BOOL))		continue ;
+		if (match_word(&p, &last, "_Bool",	TK_BOOL))		continue ;
+		if (match_word(&p, &last, "float",	TK_FLOAT))		continue ;
 		if (match_word(&p, &last, "void",	TK_VOID))		continue ;
 		if (match_word(&p, &last, "union",	TK_UNION))		continue ;
 		if (match_word(&p, &last, "enum",	TK_ENUM))		continue ;

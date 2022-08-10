@@ -253,13 +253,13 @@ static void	typename_loop(t_type *type, char *str)
 	}
 	else if (type->ty == TY_ENUM)
 	{
-		strcat(str, "enum");
+		strcat(str, "enum[");
 		strncat(str, type->enm->name, type->enm->name_len);
 		strcat(str, "]");
 	}
 	else if (type->ty == TY_UNION)
 	{
-		strcat(str, "union");
+		strcat(str, "union[");
 		strncat(str, type->unon->name, type->unon->name_len);
 		strcat(str, "]");
 	}
@@ -275,7 +275,8 @@ static void	typename_loop(t_type *type, char *str)
 	}
 	else
 	{
-		error("未対応の型 %d", type->ty);
+		fprintf(stderr, "get_type_name : 未対応の型が渡されました");
+		strcat(str, "unknown");
 	}
 }
 

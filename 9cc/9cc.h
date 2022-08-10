@@ -30,11 +30,12 @@ typedef enum e_tokenkind
 
 	TK_INT,
 	TK_CHAR,
- 	TK__BOOL,
+ 	TK_BOOL,
 	TK_VOID,
 	TK_STRUCT,
 	TK_ENUM,
 	TK_UNION,
+	TK_FLOAT,
 
 	TK_STATIC,
 	TK_TYPEDEF,
@@ -146,8 +147,9 @@ typedef enum e_typekind
 	TY_ENUM,
 	TY_UNION,
 	TY_BOOL,
-	TY_VOID
-} t_typekind;
+	TY_VOID,
+	TY_FLOAT
+}	t_typekind;
 
 typedef struct s_defenum
 {

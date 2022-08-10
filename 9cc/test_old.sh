@@ -496,7 +496,7 @@ assert_out "Hello" "int printf(char *a);
 int main()
 {
 	char	*s;
-	s = \"Hello\\n\";
+	s = \"Hello\\\n\";
 	printf(s);
 }"
 
