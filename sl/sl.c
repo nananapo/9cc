@@ -136,14 +136,8 @@ int main(int argc, char **argv)
            {LOGO1, LOGO2, LOGO3, LOGO4, LWHL51, LWHL52, DELLN},
            {LOGO1, LOGO2, LOGO3, LOGO4, LWHL61, LWHL62, DELLN}};
 
-    static char *coal[11]
-        = {COAL01, COAL02, COAL03, COAL04, COAL05,
-           COAL06, COAL07, COAL08, COAL09, COAL10, COALDEL};
-
-/*
     char *coal[7]
         = {LCOAL1, LCOAL2, LCOAL3, LCOAL4, LCOAL5, LCOAL6, DELLN};
-*/
 
     char *car[7]
         = {LCAR1, LCAR2, LCAR3, LCAR4, LCAR5, LCAR6, DELLN};
