@@ -147,7 +147,7 @@ bool	type_equal(t_type *t1, t_type *t2)
 		return (t1->unon == t2->unon);
 	if (t1->ty == TY_ENUM)
 		return (t1->enm == t2->enm);
-	return (true);
+	return (t1->is_unsigned == t2->is_unsigned);
 }
 
 // 整数型かどうか判定する
@@ -240,6 +240,9 @@ t_member	*get_member_by_name(t_type *type, char *name, int len)
 
 static void	typename_loop(t_type *type, char *str)
 {
+	if (type->is_unsigned)
+		strcat(str, "unsigned ");
+
 	if (type->ty == TY_INT)
 		strcat(str, "int");
 	else if (type->ty == TY_CHAR)
@@ -292,31 +295,46 @@ bool	is_declarable_type(t_type *type)
 	return (type->ty != TY_VOID);
 }
 
-bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
+t_type	*get_common_type(t_type *ty1, t_type *ty2)
+{
+	int	size1;
+	int	size2;
+
+	if (ty1->ty == TY_FLOAT || ty2->ty == TY_FLOAT)
+		return (new_primitive_type(TY_FLOAT));
+	if (ty1->ty == TY_CHAR)
+		ty1 = new_primitive_type(TY_INT);
+	if (ty2->ty == TY_CHAR)
+		ty2 = new_primitive_type(TY_INT);
+	if (type_equal(ty1, ty2))
+		return (ty1);
+	size1 = get_type_size(ty1);
+	size2 = get_type_size(ty2);
+	if (size1 != size2)
+		return (size1 < size2) ? ty2 : ty1;
+	// unsingedな方を返す
+	if (ty2->is_unsigned)
+		return (ty2);
+	return (ty1);
+}
+
+bool	type_can_cast(t_type *from, t_type *to)
 {
 	if (type_equal(from, to))
 		return (true);
-
 	// structはダメ
-	if (from->ty == TY_STRUCT || to->ty == TY_STRUCT)
-		return (false);
-
 	// unionもダメ
-	if (from->ty == TY_UNION || to->ty == TY_UNION)
+	if (from->ty == TY_STRUCT || to->ty == TY_STRUCT
+	|| from->ty == TY_UNION || to->ty == TY_UNION)
 		return (false);
-
 	// どちらもポインタ
 	if (is_pointer_type(from) && is_pointer_type(to))
 		return (true);
-
 	// どちらかがポインタ
 	if (is_pointer_type(from) != is_pointer_type(to))
 		return (true);
 
-	// どちらも数字？
-	if (is_explicit)
-		debug("");
-	is_explicit = false;
+	// 数字から数字
 	return (true);
 }
 

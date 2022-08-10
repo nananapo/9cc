@@ -169,6 +169,10 @@ static t_node *analyze_var_def(t_node *node)
 		node = new_node(ND_ASSIGN, node, node->lvar_assign, node->analyze_source);
 		node = analyze_node(node);
 	}
+	else if (node->lvar_const != NULL)
+	{
+		node->kind = ND_VAR_DEF_ARRAY;
+	}
 	else
 		node->kind = ND_NONE;
 	return (node);
@@ -338,7 +342,7 @@ static t_node	*analyze_call(t_node *node)
 			if (!type_equal(node->funcdef->argument_types[i], argnode->type))
 			{
 				// 暗黙的なキャストの確認
-				if (!type_can_cast(argnode->type, node->funcdef->argument_types[i], false))
+				if (!type_can_cast(argnode->type, node->funcdef->argument_types[i]))
 					error_at(argnode->analyze_source, "関数%sの引数(%s)の型が一致しません\n %s と %s",
 							my_strndup(node->funcdef->name, node->funcdef->name_len),
 							my_strndup(node->funcdef->argument_names[i], node->funcdef->argument_name_lens[i]),
@@ -366,25 +370,33 @@ static t_node *analyze_bitwise_not(t_node *node)
 // kindとtypeを変える副作用があるので、関数の最後で実行する
 static void	analyze_replace_lval(t_node *node)
 {
-	// TODO 文字列も?
-	if (node->kind == ND_VAR_LOCAL)
-		node->kind = ND_VAR_LOCAL_ADDR;
-	else if (node->kind == ND_VAR_GLOBAL)
-		node->kind = ND_VAR_GLOBAL_ADDR;
-	else if (node->kind == ND_DEREF)
-		node->kind = ND_DEREF_ADDR;
-	else if (node->kind == ND_MEMBER_VALUE)
-		node->kind = ND_MEMBER_VALUE_ADDR;
-	else if (node->kind == ND_MEMBER_PTR_VALUE)
-		node->kind = ND_MEMBER_PTR_VALUE_ADDR;
-	else
-		error_at(node->analyze_source, "左辺値ではありません");
-
+	switch (node->kind)
+	{
+		case ND_VAR_LOCAL:
+			node->kind = ND_VAR_LOCAL_ADDR;
+			break ;
+		case ND_VAR_GLOBAL:
+			node->kind = ND_VAR_GLOBAL_ADDR;
+			break ;
+		case ND_DEREF:
+			node->kind = ND_DEREF_ADDR;
+			break ;
+		case ND_MEMBER_VALUE:
+			node->kind = ND_MEMBER_VALUE_ADDR;
+			break ;
+		case ND_MEMBER_PTR_VALUE:
+			node->kind = ND_MEMBER_PTR_VALUE_ADDR;
+			break ;
+		default:
+			error_at(node->analyze_source, "左辺値ではありません");
+	}
 	node->type = new_type_ptr_to(node->type);
 }
 
 static t_node	*analyze_mul(t_node *node)
 {
+	t_type	*result_type;
+
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
 
@@ -394,7 +406,13 @@ static t_node	*analyze_mul(t_node *node)
 	if (!is_integer_type(node->rhs->type))
 		error_at(node->analyze_source, "* か / か %% の右辺が整数ではありません", get_type_name(node->rhs->type));
 
-	node->type = new_primitive_type(TY_INT);
+	result_type = get_common_type(node->lhs->type, node->rhs->type);
+
+
+	if (node->kind != ND_COMP_MUL && node->kind != ND_COMP_DIV && node->kind != ND_COMP_MOD)
+		node->lhs	= analyze_node(cast(node->lhs, result_type));
+	node->rhs	= analyze_node(cast(node->rhs, result_type));
+	node->type	= result_type;
 
 	// assignは置き換える
 	if (node->kind == ND_COMP_MUL || node->kind == ND_COMP_DIV || node->kind == ND_COMP_MOD)
@@ -424,9 +442,6 @@ static t_node	*analyze_add(t_node *node)
 		size = get_type_size(l->ptr_to);
 		if (size == 0 || size > 1)
 		{
-			if (size == 0)
-				fprintf(stderr, "WARNING : サイズ0の型のポインタ型どうしの加減算は未定義動作です\n");
-
 			node		= new_node(ND_DIV, node, new_node_num(size, node->analyze_source), node->analyze_source);
 			node->type	= new_primitive_type(TY_INT);
 			node		= analyze_node(node);
@@ -457,14 +472,12 @@ static t_node	*analyze_add(t_node *node)
 			node->lhs->analyze_source = node->lhs->lhs->analyze_source;
 			node->lhs = analyze_node(node->lhs);
 		}
-		// 両方整数なら型の優先順位を考慮
 		else if (is_integer_type(l) || is_integer_type(r))
 		{
-			// TODO とりあえずサイズの大きいほうの型にしている
-			if (get_type_size(l) > get_type_size(r))
-				node->type = l;
-			else
-				node->type = r;
+			node->type = get_common_type(l, r);
+			if (node->kind != ND_COMP_ADD && node->kind != ND_COMP_SUB)
+				node->lhs = analyze_node(cast(node->lhs, node->type));
+			node->rhs = analyze_node(cast(node->rhs, node->type));
 		}
 		else
 			error_at(node->analyze_source, "演算子が%sと%sの間に定義されていません",
@@ -506,11 +519,8 @@ static t_node	*analyze_relational(t_node *node)
 		error_at(node->analyze_source, "%sと%sを比較することはできません",
 				get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 
-	// キャストする必要があるならキャスト
-	if (!type_equal(node->lhs->type, l_to))
-		node->lhs = analyze_node(cast(node->lhs, l_to));
-	if (!type_equal(node->rhs->type, r_to))
-		node->rhs = analyze_node(cast(node->rhs, r_to));
+	node->lhs = analyze_node(cast(node->lhs, l_to));
+	node->rhs = analyze_node(cast(node->rhs, r_to));
 
 	node->type = new_primitive_type(TY_INT);
 	return (node);
@@ -529,11 +539,8 @@ static t_node	*analyze_equality(t_node *node)
 		error_at(node->analyze_source, "%sと%sを比較することはできません",
 				get_type_name(node->lhs->type), get_type_name(node->rhs->type));
 
-	// キャストする必要があるならキャスト
-	if (!type_equal(node->lhs->type, l_to))
-		node->lhs = analyze_node(cast(node->lhs, l_to));
-	if (!type_equal(node->rhs->type, r_to))
-		node->rhs = analyze_node(cast(node->rhs, r_to));
+	node->lhs = analyze_node(cast(node->lhs, l_to));
+	node->rhs = analyze_node(cast(node->rhs, r_to));
 
 	node->type = new_primitive_type(TY_INT);
 	return (node);
@@ -631,7 +638,7 @@ static t_node	*analyze_assign(t_node *node)
 
 	if (!type_equal(node->rhs->type, node->lhs->type))
 	{
-		if (type_can_cast(node->rhs->type, node->lhs->type, false))
+		if (type_can_cast(node->rhs->type, node->lhs->type))
 		{
 			debug("assign (%s) <- (%s)",
 					get_type_name(node->lhs->type),
@@ -906,7 +913,7 @@ static t_node	*analyze_node(t_node *node)
 		case ND_CAST:
 		{
 			node->lhs = analyze_node(node->lhs);
-			if (!type_can_cast(node->lhs->type, node->type, true))
+			if (!type_can_cast(node->lhs->type, node->type))
 				error_at(node->analyze_source, "%sを%sにキャストできません",
 						get_type_name(node->lhs->type), get_type_name(node->type));
 			return (node);
