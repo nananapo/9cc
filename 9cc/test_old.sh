@@ -18,7 +18,7 @@ int *my_malloc_int(int n);
 
 testdir="../test/"
 ncc="./9cc --arch $TARGET"
-prpr="../prpr/prpr --stddir ../std/"
+prpr="../prpr/prpr --stddir ../std/$TARGET/"
 module="$testdir/sub/print.c"
 
 rm -rf tmp

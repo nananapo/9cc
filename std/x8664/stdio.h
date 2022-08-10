@@ -11,8 +11,6 @@ int		scanf(char *fmt, ...);
 #include <stdarg.h>
 void	vfprintf(void *stream, char *format, va_list ap);
 
-/*
-x86_64 mac
 extern	void *__stdinp;
 extern	void *__stdoutp;
 extern	void *__stderrp;
@@ -20,9 +18,5 @@ extern	void *__stderrp;
 # define stdin __stdinp
 # define stdout __stdoutp
 # define stderr __stderrp
-*/
 
-extern void *stdin;
-extern void *stdout;
-extern void *stderr;
 #endif

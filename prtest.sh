@@ -14,7 +14,7 @@ cd prpr
 echo "`pwd`"
 
 NCC="../9cc/9cc --arch $TARGET "
-PRPR="./prpr --stddir ../std/"
+PRPR="./prpr --stddir ../std/$TARGET/"
 
 rm -rf $DIR
 mkdir $DIR
