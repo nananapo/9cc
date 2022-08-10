@@ -832,6 +832,19 @@ static t_node	*expect_constant(t_type *type)
 	{
 		node = new_node_num(number, source);
 	}
+	// とりあえずマイナスも読めるように....
+	else if (consume("-"))
+	{
+		if (is_integer_type(type) && consume_number(&number))
+		{
+			node = new_node_num(number, source);
+		}
+		else
+		{
+			error("Error");
+			node = NULL;
+		}
+	}
 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& (tok = consume_str_literal()) != NULL)
 	{
