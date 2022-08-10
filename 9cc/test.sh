@@ -85,6 +85,7 @@ assert_async(){
   	  echo "OUTPUT KO $1 > $actresname $expresname" >> tmp/err
   	  exit 1
   	fi
+	echo "OK $1"
 }
 
 assert() {
