@@ -55,7 +55,8 @@ typedef enum e_ilkind
 
 	IL_MACRO_VASTART,
 	IL_CAST,
-	IL_LOAD
+	IL_LOAD,
+	IL_DEF_VAR_LOCAL_ARRAY,
 }	t_ilkind;
 
 typedef struct s_il
@@ -89,6 +90,8 @@ typedef struct s_il
 	t_type		*stack_down;
 
 	t_member	*member;
+
+	t_node		*lvar_array;
 }	t_il;
 
 void	translate_il(void);

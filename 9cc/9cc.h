@@ -86,6 +86,7 @@ typedef enum e_nodekind
 
 
 	ND_VAR_DEF,
+	ND_VAR_DEF_ARRAY,
 	ND_VAR_LOCAL,
  	ND_VAR_GLOBAL,
 	ND_SHIFT_LEFT,
@@ -248,6 +249,7 @@ typedef struct s_node
 
 	t_lvar			*lvar; // local var
 	struct s_node	*lvar_assign; // type ident = expr;
+	struct s_node	*lvar_const; // type ident = {...};
 
 	t_str_elem		*def_str;
 struct s_defvar
@@ -263,7 +265,7 @@ struct s_defvar
 	struct s_node	*assign;
 }	*var_global;
 
-	struct s_node	*global_assign_next;
+	struct s_node	*global_array_next;
 
 	// num
 	int				val;
@@ -371,10 +373,11 @@ bool	is_declarable_type(t_type *type);
 bool	type_equal(t_type *t1, t_type *t2);
 
 bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
-bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
+bool	type_can_cast(t_type *from, t_type *to);
 bool	can_use_arrow(t_type *type);
 bool	can_use_dot(t_type *type);
 t_member	*get_member_by_name(t_type *type, char *name, int len);
+t_type	*get_common_type(t_type *ty1, t_type *ty2);
 
 char	*get_type_name(t_type *type);
 

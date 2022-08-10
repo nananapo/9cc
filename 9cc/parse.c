@@ -598,6 +598,33 @@ static t_node	*read_ifblock(void)
 	return (node);
 }
 
+static t_node	*consume_const_local(t_type *type)
+{
+	t_node	*first;
+	t_node	*tmp;
+	t_node	*last;
+
+	first = NULL;
+	last = NULL;
+	if (is_pointer_type(type) && consume("{"))
+	{
+		for (;;)
+		{
+			tmp = new_node(ND_NONE, expect_constant(type->ptr_to), NULL, NULL);
+			if (last == NULL)
+				first = tmp;
+			else
+				last->global_array_next = tmp;
+			last = tmp;
+			if (consume("}"))
+				break ;
+			if (!consume(","))
+				error_at(g_token->str, ",が必要です");
+		}
+	}
+	return (first);
+}
+
 // TODO 条件の中身がintegerか確認する
 static t_node	*stmt(void)
 {
@@ -806,7 +833,11 @@ static t_node	*stmt(void)
 
 			// 宣言と同時に代入
 			if (consume("="))
-				node->lvar_assign = expr();
+			{
+				node->lvar_const = consume_const_local(node->type);
+				if (node->lvar_const == NULL)
+					node->lvar_assign = expr();
+			}
 		}
 		else
 		{
@@ -822,10 +853,13 @@ static t_node	*stmt(void)
 static t_node	*expect_constant(t_type *type)
 {
 	t_node	*node;
-	t_node	**next;
 	int		number;
 	t_token	*tok;
 	char	*source;
+
+	t_node	*first;
+	t_node	*last;
+	t_node	*tmp;
 
 	source = g_token->str;
 	if (is_integer_type(type) && consume_number(&number))
@@ -833,7 +867,7 @@ static t_node	*expect_constant(t_type *type)
 		node = new_node_num(number, source);
 	}
 	// とりあえずマイナスも読めるように....
-	else if (consume("-"))
+	else if (is_integer_type(type) && consume("-"))
 	{
 		if (is_integer_type(type) && consume_number(&number))
 		{
@@ -845,12 +879,19 @@ static t_node	*expect_constant(t_type *type)
 			node = NULL;
 		}
 	}
+	// char *でstrlit
 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& (tok = consume_str_literal()) != NULL)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL, source);
 		node->def_str = get_str_literal(tok->str, tok->len);
 	}
+	// pointerで数字
+	else if (is_pointer_type(type) && consume_number(&number))
+	{
+		node = new_node_num(number, source);
+	}
+	// char でcharlit
 	else if (type_equal(type, new_primitive_type(TY_CHAR)) 
 			&& (tok = consume_char_literal()) != NULL)
 	{
@@ -861,22 +902,27 @@ static t_node	*expect_constant(t_type *type)
 	}
 	else if (is_pointer_type(type) && consume("{"))
 	{
-		node = NULL;
-		next = &node;
+		first = NULL;
+		last = NULL;
 		for (;;)
 		{
-			*next = expect_constant(type->ptr_to);
-			next = &(*next)->global_assign_next;
+			tmp = new_node(ND_NONE, expect_constant(type->ptr_to), NULL, NULL);
+			if (last == NULL)
+				first = tmp;
+			else
+				last->global_array_next = tmp;
+			last = tmp;
 			if (consume("}"))
 				break ;
 			if (!consume(","))
 				error_at(g_token->str, ",が必要です");
 		}
+		node = first;
 	}
 	else
 	{
 		node = NULL;
-		error_at(g_token->str, "定数が必要です");
+		error_at(g_token->str, "定数が必要です(c)");
 	}
 	return (node);
 }
@@ -1112,6 +1158,8 @@ static void	funcdef(t_type *type, t_token *ident, bool is_static)
 
 			// arrayを読む
 			expect_type_after(&type);
+
+			type = type_array_to_ptr(type);
 
 			// save
 			def->argument_names[def->argcount]		= arg->str;

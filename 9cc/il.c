@@ -164,7 +164,7 @@ static void	translate_call(t_node *node)
 	{
 		code					= append_il(IL_CALL_ADD_ARG);
 		code->funccall_callee	= node->funcdef;
-		code->type				= node->funccall_args[i]->type;
+		code->type				= type_array_to_ptr(node->funccall_args[i]->type);
 	}
 
 	code					= append_il(IL_CALL_EXEC);
@@ -787,6 +787,16 @@ static void	translate_node(t_node *node)
 		case ND_SWITCH:
 			translate_switch(node);
 			return ;
+		case ND_VAR_DEF_ARRAY:
+		{
+			code			= append_il(IL_VAR_LOCAL_ADDR);
+			code->var_local	= node->lvar;
+
+			code = append_il(IL_DEF_VAR_LOCAL_ARRAY);
+			code->type = node->lvar->type;
+			code->lvar_array = node->lvar_const;
+			return ;
+		}
 		case ND_NONE:
 			append_il_pushnum(0);
 			return ;

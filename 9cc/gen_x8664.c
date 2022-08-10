@@ -117,6 +117,29 @@ static char	*g_cast_table[10][10] =
 /* f64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}
 };
 
+static void	put_str_literal(char *str, int len)
+{
+	int	i;
+
+	i = -1;
+	while (++i < len)
+	{
+		if (str[i] == '\\')
+		{
+			i++;
+			if (str[i] != '\'')
+				printf("\\");
+			if (str[i] == 'e')
+			{
+				printf("033");
+				continue ;
+			}
+		}
+		printf("%c", str[i]);
+	}
+}
+
+
 static int	get_type_id(t_type *type)
 {
 	switch(type->ty)
@@ -642,6 +665,7 @@ static void	cast(t_type *from, t_type *to)
 static void	print_global_constant(t_node *node, t_type *type)
 {
 	t_node	*notmp;
+	int		i;
 
 	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
@@ -659,10 +683,25 @@ static void	print_global_constant(t_node *node, t_type *type)
 	}
 	else if (is_pointer_type(type))
 	{
+		if (node->kind == ND_NUM)
+		{
+			// 数字は無視....
+			for (i = get_type_size(type); i > 0; i -= 8)
+			{
+				if (i >= 8)
+				{
+					printf("    .quad 0\n");
+					continue ;
+				}
+				for (; i > 0; i--)
+					printf("    .byte 0\n");
+			}
+			return ;
+		}
 		// TODO 数のチェックはしてない
 		// array array
-		for (notmp = node; notmp; notmp = notmp->global_assign_next)
-			print_global_constant(notmp, type->ptr_to);
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_global_constant(notmp->lhs, type->ptr_to);
 	}
 	else
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
@@ -687,6 +726,50 @@ static void gen_defglobal(t_defvar *node)
 		printf("_%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}
+}
+
+// R10にアドレスを入れておく
+static void	print_local_array(t_node *node, t_type *type)
+{
+	t_node	*notmp;
+
+	if (type_equal(type, new_primitive_type(TY_INT)))
+	{
+		printf("    mov dword ptr [%s], %d\n", R10, node->val);
+		printf("    add %s, %d\n", R10, 4);
+	}
+	else if (type_equal(type, new_primitive_type(TY_CHAR)))
+	{
+		printf("    mov byte ptr [%s], %d\n", R10, node->val);
+		printf("    add %s, %d\n", R10, 1);
+	}
+ 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR))) && node->def_str != NULL)
+	{
+		printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, RAX, node->def_str->index);
+		printf("    mov [%s], %s\n", R10, RAX);
+		printf("    add r10, 8\n");
+	}
+	else if (is_pointer_type(type))
+	{
+		if (node->kind == ND_NUM)
+		{
+			printf("    mov qword ptr [%s], %d\n", R10, node->val);
+			printf("    add %s, %d\n", R10, get_type_size(type));
+			return ;
+		}
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_local_array(notmp->lhs, type->ptr_to);
+	}
+	else
+		error("print_local_array : 未対応の型 %s", get_type_name(type));
+}
+
+static void	gen_lvar_array(t_il *code)
+{
+	pop(RAX);
+	push();
+	mov(R10, RAX);
+	print_local_array(code->lvar_array, code->type);
 }
 
 static void	gen_call_start(t_il *code)
@@ -1326,7 +1409,6 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_CAST:
-			// TODO とりあえずpop / pushしてます
 			printf("#CAST\n");
 			pop(RAX);
 			cast(code->cast_from, code->cast_to);
@@ -1335,10 +1417,13 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_LOAD:
-			// TODO とりあえずpop / pushしてます
 			pop(RAX);
 			load(code->type);
 			push();
+			return ;
+
+		case IL_DEF_VAR_LOCAL_ARRAY:
+			gen_lvar_array(code);
 			return ;
 
 		default:
