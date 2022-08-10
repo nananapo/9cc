@@ -8,4 +8,7 @@ int close(int fildes);
 
 int	read(int fd, char *buf, size_t count);
 
+#define useconds_t int
+int usleep(useconds_t microseconds);
+
 #endif
