@@ -95,9 +95,7 @@ char	*strlit_to_str(char *str, int len)
 			}
 		}
 		else
-		{
 			c = str[i];
-		}
 		buf[bi++] = c;
 	}
 	return (buf);
