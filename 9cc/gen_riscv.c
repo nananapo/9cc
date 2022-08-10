@@ -77,7 +77,7 @@ extern t_il				*g_il;
 
 static bool	is_memory_type(t_type *type)
 {
-	if (type->ty != TY_STRUCT)
+	if (type->ty != TY_STRUCT && type->ty != TY_UNION)
 		return (false);
 	return (get_type_size(type) > 16);
 }
@@ -761,11 +761,6 @@ static void	gen_call_exec(t_il *code)
 		addi(A0, FP, get_call_memory(code));
 	}
 
-	// call
-	if (deffunc->is_variable_argument)
-	{
-		// TODO
-	}
 	printf("    call %s\n", my_strndup(deffunc->name, deffunc->name_len));
 
 	// rspを元に戻す

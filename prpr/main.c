@@ -47,15 +47,9 @@ int	main(int argc, char **argv)
 
 	tok = tokenize(str);
 
-	//fprintf(stderr, "# Tokenize End\n");
-
 	node = parse(&tok, 0);
 
-	//fprintf(stderr, "# Parse End\n");
-
 	set_currentdir(stddir, filename);
-
-	//fprintf(stderr, "# Set Current Dir End\n");
 
 	gen(node);
 }
