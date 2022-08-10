@@ -65,6 +65,7 @@ static int		g_call_memory_count;
 static t_il		*g_call_memory_codes[1000];
 static t_lvar	*g_call_memory_lvars[1000];
 
+static int		g_va_start_offset;
 
 // main
 extern char				*g_filename;
@@ -802,43 +803,31 @@ static void	gen_call_exec(t_il *code)
 
 static void	gen_macro_va_start()
 {
-	int		min_offset;
 	int		max_argregindex;
 	int		i;
 
-	pop(T0);
-
-	addi(SP, SP, 48);
-	printf("    sd %s, %d(%s)\n", A0, 8 * 0, SP);
-	printf("    sd %s, %d(%s)\n", A1, 8 * 1, SP);
-	printf("    sd %s, %d(%s)\n", A2, 8 * 2, SP);
-	printf("    sd %s, %d(%s)\n", A3, 8 * 3, SP);
-	printf("    sd %s, %d(%s)\n", A4, 8 * 4, SP);
-	printf("    sd %s, %d(%s)\n", A5, 8 * 5, SP);
-	printf("    sd %s, %d(%s)\n", A6, 8 * 5, SP);
-	printf("    sd %s, %d(%s)\n", A7, 8 * 6, SP);
-
-	min_offset = 0;
 	max_argregindex = -1;
-
 	for (i = 0; i < g_locals_count; i++)
-	{
-		min_offset = min(g_locals_offset[i], min_offset);
 		max_argregindex = max(max_argregindex, g_locals_regindex[i]);
+
+	addi(T0, FP, 16); // ra, fpより上に保存する
+	for (i = max_argregindex + 1; i < ARGREG_SIZE; i++)
+		printf("    sd %s, %d(%s)\n", arg_regs[i], 8 * i, T0);
+
+	pop(T0);
+	addi(T1, FP, 16 + (max_argregindex + 1) * 8);
+	printf("    sd %s, %d(%s)\n", T1, 0, T0);
+}
+
+// va_startの呼び出しを先読みしてFPをどれだけずらすか決める
+static int	get_va_start_call_offset(t_il *code)
+{
+	for (; code != NULL && code->kind != IL_FUNC_EPILOGUE; code = code->next)
+	{
+		if (code->kind == IL_MACRO_VASTART)
+			return (48);
 	}
-
-	mov(T1, T0);
-
-	printf("    mov dword ptr [rdi], %d\n", (1 + max_argregindex) * 8); // gp offset
-	printf("    mov dword ptr [rdi + 4], 0\n\n"); // fp_offset
-
-	printf("    mov rax, rbp\n");
-	printf("    add rax, %d\n", - min_offset);
-	printf("    mov [rdi + 8], rax\n"); // overflow arg area
-	printf("    mov [rdi + 16], rsp\n\n"); // reg save area
-
-	debug("    gp_offset : %d", (1 + max_argregindex) * 8);
-	debug("    fp_offset : %d", 0 * 8);
+	return (0);
 }
 
 static void	gen_save_rdi(t_il *code)
@@ -874,20 +863,21 @@ static void gen_call_memory(t_il *code)
 
 	for (; code != NULL && code->kind != IL_FUNC_EPILOGUE; code = code->next)
 	{
-		if (code->kind != IL_CALL_EXEC)
-			continue ;
-		type_return = code->funccall_callee->type_return;
-		// 返り値がMEMORYなら、それを保存する用の場所を確保する
-		if (is_memory_type(type_return) || type_return->ty == TY_STRUCT)
+		if (code->kind == IL_CALL_EXEC)
 		{
-			lvar				= calloc(1, sizeof(t_lvar));
-			lvar->name			= "";
-			lvar->name_len		= 0;
-			lvar->type			= type_return;
-			lvar->is_argument	= false;
-			lvar->is_dummy		= true;
-			append_local(lvar);
-			set_call_memory(code, lvar);
+			type_return = code->funccall_callee->type_return;
+			// 返り値がMEMORYなら、それを保存する用の場所を確保する
+			if (is_memory_type(type_return) || type_return->ty == TY_STRUCT)
+			{
+				lvar				= calloc(1, sizeof(t_lvar));
+				lvar->name			= "";
+				lvar->name_len		= 0;
+				lvar->type			= type_return;
+				lvar->is_argument	= false;
+				lvar->is_dummy		= true;
+				append_local(lvar);
+				set_call_memory(code, lvar);
+			}
 		}
 	}
 }
@@ -901,7 +891,9 @@ static void gen_func_prologue(t_il *code)
 	locals_stack_add		= 0;
 	aligned_stack_def_var_end	= 0;
 
+	g_va_start_offset		= get_va_start_call_offset(code);
 
+	addi(SP, SP, -g_va_start_offset);
 	mov(T0, FP);
 	push();
 	mov(T0, RA);
@@ -948,6 +940,7 @@ static void	gen_func_epilogue(t_il *code)
 
 	pop(RA);
 	pop(FP);
+	addi(SP, SP, g_va_start_offset);
 	printf("    jr %s\n", RA);
 	
 	g_locals_count = 0;

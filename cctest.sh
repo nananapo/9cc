@@ -60,7 +60,7 @@ compile "il"
 compile "abst"
 compile "gen_x8664"
 compile "gen_riscv"
-#compile "error"
+compile "error"
 
 #mgcc "charutil"
 #mgcc "fileutil"
@@ -78,7 +78,7 @@ compile "gen_riscv"
 #mgcc "abst"
 #mgcc "gen_x8664"
 #mgcc "get_riscv"
-mgcc "error"
+#mgcc "error"
 
 cd $DIR
 gcc -o ../9cc charutil.s fileutil.s list.s main.s parse.s parseutil.s stack.s tokenize.s typeutil.s varutil.s analyze.s mymath.s il.s abst.s gen_x8664.s gen_riscv.s error.s

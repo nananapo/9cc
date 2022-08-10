@@ -52,7 +52,7 @@ compile "parse"
 compile "strutil"
 compile "tokenize"
 compile "tokenutil"
-#compile "error"
+compile "error"
 
 #mgcc "fileutil"
 #mgcc "gen"
@@ -61,7 +61,7 @@ compile "tokenutil"
 #mgcc "strutil"
 #mgcc "tokenize"
 #mgcc "tokenutil"
-mgcc "error"
+#mgcc "error"
 
 cd $DIR
 gcc -o ../prpr fileutil.s gen.s main.s parse.s strutil.s tokenize.s tokenutil.s error.s
