@@ -17,6 +17,12 @@
 #define T2 "t2"
 #define A0 "a0"
 #define A1 "a1"
+#define A2 "a2"
+#define A3 "a3"
+#define A4 "a4"
+#define A5 "a5"
+#define A6 "a6"
+#define A7 "a7"
 #define RA "ra"
 
 
@@ -382,7 +388,7 @@ static int	get_call_memory(t_il *code)
 			for (j = 0; j < g_locals_count; j++)
 			{
 				if (g_call_memory_lvars[i] == g_locals[j])
-					return (g_locals_offset[j]);
+					return (-g_locals_offset[j]);
 			}
 			return (-1);
 		}
@@ -748,7 +754,7 @@ static void	gen_call_exec(t_il *code)
 	// rsp += rbp_offsetする
 	addi(SP, SP, -rbp_offset);
 
-	// 返り値がMEMORYなら、返り値の格納先のアドレスをA0に設定する
+	// 返り値がMEMORYなら、A0を返り値の格納先のアドレスにする
 	if (is_memory_type(deffunc->type_return))
 	{
 		addi(A0, FP, get_call_memory(code));
@@ -802,15 +808,16 @@ static void	gen_macro_va_start()
 
 	pop(T0);
 
-	printf("    sub rsp, 48\n");
-	printf("    mov [rsp + 0], rdi\n");
-	printf("    mov [rsp + 8], rsi\n");
-	printf("    mov [rsp + 16], rdx\n");
-	printf("    mov [rsp + 24], rcx\n");
-	printf("    mov [rsp + 32], r8\n");
-	printf("    mov [rsp + 40], r9\n");
+	addi(SP, SP, 48);
+	printf("    sd %s, %d(%s)\n", A0, 8 * 0, SP);
+	printf("    sd %s, %d(%s)\n", A1, 8 * 1, SP);
+	printf("    sd %s, %d(%s)\n", A2, 8 * 2, SP);
+	printf("    sd %s, %d(%s)\n", A3, 8 * 3, SP);
+	printf("    sd %s, %d(%s)\n", A4, 8 * 4, SP);
+	printf("    sd %s, %d(%s)\n", A5, 8 * 5, SP);
+	printf("    sd %s, %d(%s)\n", A6, 8 * 5, SP);
+	printf("    sd %s, %d(%s)\n", A7, 8 * 6, SP);
 
-	// overflow arg area
 	min_offset = 0;
 	max_argregindex = -1;
 
@@ -838,7 +845,7 @@ static void	gen_save_rdi(t_il *code)
 {
 	t_lvar	*lvar;
 
-	// 返り値がMEMORYなら、rdiからアドレスを取り出す
+	// 返り値がMEMORYなら、a0からアドレスを取り出す
 	if (is_memory_type(code->deffunc_def->type_return))
 	{
 		// for save rdi
@@ -909,15 +916,17 @@ static void	gen_func_epilogue(t_il *code)
 {
 	int	size;
 
+	printf("# return_type : %s (%d)\n", get_type_name(code->type), get_type_size(code->type));
+
 	// MEMORYなら、A0のアドレスに格納
 	if (is_memory_type(code->type))
 	{
 		pop(T0);
-		printf("    ld %s, %d(%s)\n", T1, g_locals_offset[0], FP);
+		printf("    ld %s, %d(%s)\n", T1, -g_locals_offset[0], FP);
 		store_ptr(get_type_size(code->type));
 
-		// T1を復元する
-		printf("    ld %s, %d(%s)\n", T1, g_locals_offset[0], FP);
+		// A0を復元する
+		printf("    ld %s, %d(%s)\n", A0, -g_locals_offset[0], FP);
 	}
 	// STRUCTなら、A0, A1に格納
 	else if (code->type->ty == TY_STRUCT)
@@ -925,7 +934,7 @@ static void	gen_func_epilogue(t_il *code)
 		pop(T0);
 		size = align_to(get_type_size(code->type), 8);
 		if (size > 8)
-			printf("    ld %s, -8(%s)\n", A1, T0);
+			printf("    ld %s, 8(%s)\n", A1, T0);
 		if (size > 0)
 			printf("    ld %s, 0(%s)\n", A0, T0);
 	}
@@ -961,6 +970,8 @@ static void	gen_def_var_end(void)
 {
 	int	old;
 
+	
+
 	old			= stack_count;
 	stack_count	= align_to(stack_count, 16);
 
@@ -990,7 +1001,7 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
-	//printf("# kind %d\n", code->kind);
+	printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
 		case IL_LABEL:

@@ -745,6 +745,8 @@ assert_gcc "ret_struct2.c"
 assert_gcc "ret_struct3.c"
 assert_gcc "ret_struct4.c"
 assert_gcc "ret_struct5.c"
+assert_gcc "ret_struct6.c"
+assert_gcc "ret_struct7.c"
 
 assert "quine.c"
 

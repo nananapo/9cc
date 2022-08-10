@@ -428,6 +428,8 @@ assert "ret_struct2.c"
 assert "ret_struct3.c"
 assert "ret_struct4.c"
 assert "ret_struct5.c"
+assert "ret_struct6.c"
+assert "ret_struct7.c"
 
 assert "quine.c"
 
