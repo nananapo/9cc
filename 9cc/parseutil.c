@@ -124,16 +124,21 @@ t_token	*consume_any(void)
 
 static void	consume_array(t_type **type)
 {
-	int		size;
+	int	i;
+	int	size[100];
 
+	i = 0;
 	while (consume("["))
 	{
-		*type = new_type_array(*type);
-		if (!consume_number(&size))
+		if (!consume_number(size + i++))
 			error_at(g_token->str, "配列のサイズが定義されていません");
-		(*type)->array_size = size;
 		if (!consume("]"))
 			error_at(g_token->str, "]がありません");
+	}
+	while (i > 0)
+	{
+		*type = new_type_array(*type);
+		(*type)->array_size = size[--i];
 	}
 }
 
