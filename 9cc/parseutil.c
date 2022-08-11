@@ -114,12 +114,91 @@ static bool	consume_type_alias(t_type **type)
 	return (true);
 }
 
-// 型宣言の前部分 (type ident arrayのtype部分)を読む
-// read_def	: structの宣言を読むかどうか
-t_type	*consume_type_before(bool read_def)
+t_token	*consume_any(void)
+{
+	t_token	*ret;
+	ret = g_token;
+	g_token = g_token->next;
+	return ret;
+}
+
+t_type	*consume_type_specifier(void)
+{
+	t_typekind	res;
+	t_token		*ident;
+	t_type		*type;
+
+	switch (g_token->kind)
+	{
+		case TK_INT:
+			res = TY_INT;
+			break ;
+		case TK_CHAR:
+			res = TY_CHAR;
+			break ;
+		case TK_BOOL:
+			res = TY_BOOL;
+			break ;
+		case TK_VOID:
+			res = TY_VOID;
+			break ;
+		case TK_FLOAT:
+			res = TY_FLOAT;
+			break ;
+		case TK_STRUCT:
+		{
+			consume_any();
+			ident = consume_ident();
+			if (ident == NULL)
+				return (NULL);
+			if (consume("{"))
+				read_struct_block(ident);
+			type = new_struct_type(ident->str, ident->len);
+			if (type == NULL)
+				return (NULL);
+			return (type);
+		}
+		case TK_ENUM:
+		{
+			consume_any();
+			ident = consume_ident();
+			if (ident == NULL)
+				return (NULL);
+			if (consume("{"))
+				read_enum_block(ident);
+			type = new_enum_type(ident->str, ident->len);
+			if (type == NULL)
+				return (NULL);
+			return (type);
+		}
+		case TK_UNION:
+		{
+			consume_any();
+			ident = consume_ident();
+			if (ident == NULL)
+				return (NULL);
+			if (consume("{"))
+				read_union_block(ident);
+			type = new_union_type(ident->str, ident->len);
+			if (type == NULL)
+				return (NULL);
+			return (type);
+		}
+		default:
+		{
+			if (consume_type_alias(&type))
+				return (type);
+			return (NULL);
+		}
+	}
+	consume_any();
+	type = new_primitive_type(res);
+	return (type);
+}
+
+t_type	*consume_type_before(void)
 {
 	t_type	*type;
-	t_token	*ident;
 	bool	is_unsigned;
 
 	is_unsigned = false;
@@ -127,56 +206,8 @@ t_type	*consume_type_before(bool read_def)
 		is_unsigned = true;
 
 	// type name
-	if (consume_kind(TK_INT))
-		type = new_primitive_type(TY_INT);
-	else if (consume_kind(TK_CHAR))
-		type = new_primitive_type(TY_CHAR);
-	else if (consume_kind(TK_BOOL))
-		type = new_primitive_type(TY_BOOL);
-	else if (consume_kind(TK_VOID))
-		type = new_primitive_type(TY_VOID);
-	else if (consume_kind(TK_FLOAT))
-		type = new_primitive_type(TY_FLOAT);
-	else if (consume_kind(TK_STRUCT))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			return (NULL);
-		if (read_def && consume("{"))
-			read_struct_block(ident);
-
-		type = new_struct_type(ident->str, ident->len);
-		if (type == NULL)
-			return (NULL);
-	}
-	else if (consume_kind(TK_ENUM))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			return (NULL);
-		if (read_def && consume("{"))
-			read_enum_block(ident);
-
-		type = new_enum_type(ident->str, ident->len);
-		if (type == NULL)
-			return (NULL);
-	}
-	else if (consume_kind(TK_UNION))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			return (NULL);
-		if (read_def && consume("{"))
-			read_union_block(ident);
-
-		type = new_union_type(ident->str, ident->len);
-		if (type == NULL)
-			return (NULL);
-	}
-	else if (consume_type_alias(&type))
-	{
-	}
-	else
+	type = consume_type_specifier();
+	if (type == NULL)
 		return (NULL);
 
 	// TODO unsignedを許容するかはとりあえず無視

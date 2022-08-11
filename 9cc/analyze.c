@@ -276,34 +276,66 @@ static t_node	*analyze_member_value(t_node *node)
 	return (node);
 }
 
+// ident () : analyze_funccall_name () & funcdef
+// lhs ()
 static t_node	*analyze_call(t_node *node)
 {
 	int		i;
 	t_node	*argnode;
+	t_lvar		*lvar;
+	t_defvar	*defvar;
 
 	// set caller
 	node->funccall_caller = g_func_now;
 
-	// is va_start macro?
-	if (node->analyze_funccall_name_len == 8
-	&& strncmp(node->analyze_funccall_name, "va_start", 8) == 0)
+	if (node->analyze_funccall_name_len != 0)
 	{
-		node->kind = ND_CALL_MACRO_VA_START;
-		
-		// analyze arguments
-		for (i = 0; i < node->funccall_argcount; i++)
-			node->funccall_args[i] = analyze_node(node->funccall_args[i]);
+		// is va_start macro?
+		if (node->analyze_funccall_name_len == 8
+		&& strncmp(node->analyze_funccall_name, "va_start", 8) == 0)
+		{
+			node->kind = ND_CALL_MACRO_VA_START;
+			
+			// analyze arguments
+			for (i = 0; i < node->funccall_argcount; i++)
+				node->funccall_args[i] = analyze_node(node->funccall_args[i]);
+	
+			if (node->funccall_argcount == 0)
+				error_at(node->analyze_source, "va_startに引数がありません");
+	
+			analyze_replace_lval(node->funccall_args[0]);
+			return (node);
+		}
+		// is local var?
+		else if ((lvar = find_lvar(g_func_now, node->analyze_var_name, node->analyze_var_name_len)) != NULL)
+		{
+			node->lhs		= new_node(ND_VAR_LOCAL, NULL, NULL, node->analyze_var_name);
+			node->lhs->lvar	= lvar;
+			node->lhs->type	= lvar->type;
+		}
 
-		if (node->funccall_argcount == 0)
-			error_at(node->analyze_source, "va_startに引数がありません");
-
-		analyze_replace_lval(node->funccall_args[0]);
-		return (node);
+		// is global var?
+		else if ((defvar = find_global(node->analyze_var_name, node->analyze_var_name_len)) != NULL)
+		{
+			node->lhs				= new_node(ND_VAR_GLOBAL, NULL, NULL, node->analyze_var_name);
+			node->lhs->var_global	= defvar;
+			node->lhs->type			= defvar->type;
+		}
+		// function ?
+		else if (node->funcdef == NULL)
+		{
+			error_at(node->analyze_source, "関数%sがみつかりません", my_strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
+		}
 	}
 
-	// function exist?
-	if (node->funcdef == NULL)
-		error_at(node->analyze_source, "関数%sがみつかりません", my_strndup(node->analyze_funccall_name, node->analyze_funccall_name_len));
+	// lhs ()
+	if (node->lhs != NULL)
+	{
+		node->lhs = analyze_node(node->lhs);
+		if (node->type->ty != TY_FUNCTION)
+			error_at(node->analyze_source, "関数ではありません");
+		node->funcdef = (t_deffunc *)node->lhs->type->funcdef; // TODO 不完全型がないのでとりあえずvoid *で....
+	}
 
 	// set type
 	node->type = node->funcdef->type_return;
@@ -406,13 +438,19 @@ static t_node	*analyze_mul(t_node *node)
 	if (!is_integer_type(node->rhs->type))
 		error_at(node->analyze_source, "* か / か %% の右辺が整数ではありません", get_type_name(node->rhs->type));
 
-	result_type = get_common_type(node->lhs->type, node->rhs->type);
-
-
 	if (node->kind != ND_COMP_MUL && node->kind != ND_COMP_DIV && node->kind != ND_COMP_MOD)
+	{
+		result_type = get_common_type(node->lhs->type, node->rhs->type);
 		node->lhs	= analyze_node(cast(node->lhs, result_type));
-	node->rhs	= analyze_node(cast(node->rhs, result_type));
-	node->type	= result_type;
+		node->rhs	= analyze_node(cast(node->rhs, result_type));
+		node->type	= result_type;
+	}
+	else
+	{
+		// 右辺を左辺の型にする
+		node->rhs	= analyze_node(cast(node->rhs, node->lhs->type));
+		node->type	= node->lhs->type;
+	}
 
 	// assignは置き換える
 	if (node->kind == ND_COMP_MUL || node->kind == ND_COMP_DIV || node->kind == ND_COMP_MOD)
@@ -476,8 +514,15 @@ static t_node	*analyze_add(t_node *node)
 		{
 			node->type = get_common_type(l, r);
 			if (node->kind != ND_COMP_ADD && node->kind != ND_COMP_SUB)
+			{
 				node->lhs = analyze_node(cast(node->lhs, node->type));
-			node->rhs = analyze_node(cast(node->rhs, node->type));
+				node->rhs = analyze_node(cast(node->rhs, node->type));
+			}
+			else
+			{
+				// 右辺を左辺の型にキャストする
+				node->rhs = analyze_node(cast(node->rhs, node->lhs->type));
+			}
 		}
 		else
 			error_at(node->analyze_source, "演算子が%sと%sの間に定義されていません",

@@ -11,7 +11,7 @@ t_token	*consume_ident_str(char *p);
 t_token	*consume_str_literal(void);
 t_token	*consume_char_literal(void);
 void	consume_type_ptr(t_type **type);
-t_type	*consume_type_before(int read_def);
+t_type	*consume_type_before(void);
 void	expect_type_after(t_type **type);
 void	expect(char *op);
 int		expect_number(void);

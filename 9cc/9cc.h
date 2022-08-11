@@ -36,6 +36,7 @@ typedef enum e_tokenkind
 	TK_ENUM,
 	TK_UNION,
 	TK_FLOAT,
+	TK_SIGNED,
 	TK_UNSIGNED,
 
 	TK_STATIC,
@@ -150,7 +151,8 @@ typedef enum e_typekind
 	TY_UNION,
 	TY_BOOL,
 	TY_VOID,
-	TY_FLOAT
+	TY_FLOAT,
+	TY_FUNCTION
 }	t_typekind;
 
 typedef struct s_defenum
@@ -196,6 +198,7 @@ typedef struct s_type
 	}	*strct;
 	t_defenum			*enm;
 	struct s_defunion *unon;
+	void			*funcdef;
 } t_type;
 
 typedef struct s_defstruct	t_defstruct;
@@ -322,11 +325,11 @@ struct s_deffunc
 	char		*analyze_var_name;
 	int			analyze_var_name_len;
 
-	char		*analyze_funccall_name;
-	int			analyze_funccall_name_len;
-
 	char		*analyze_member_name;
 	int			analyze_member_name_len;
+
+	char		*analyze_funccall_name;
+	int			analyze_funccall_name_len;
 }	t_node;
 
 typedef struct s_deffunc t_deffunc;
