@@ -36,6 +36,7 @@ typedef enum e_tokenkind
 	TK_ENUM,
 	TK_UNION,
 	TK_FLOAT,
+	TK_DOUBLE,
 	TK_SIGNED,
 	TK_UNSIGNED,
 
@@ -51,6 +52,7 @@ typedef struct s_token
 	struct s_token	*next;
 
 	int				val;			// number
+	float			val_float;			// number
 	char			*str;			// token str
 	int				len;			// length
 	int				strlen_actual;	// charlit
@@ -63,6 +65,7 @@ typedef enum e_nodekind
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
+	ND_FLOAT,
 
 	ND_ADD,
 	ND_SUB,
@@ -152,6 +155,7 @@ typedef enum e_typekind
 	TY_BOOL,
 	TY_VOID,
 	TY_FLOAT,
+	TY_DOUBLE,
 	TY_FUNCTION
 }	t_typekind;
 
@@ -272,6 +276,7 @@ struct s_defvar
 
 	// num
 	int				val;
+	float			val_float;
 
 	// else of if
 	struct s_node	*elsif;

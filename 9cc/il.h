@@ -16,6 +16,7 @@ typedef enum e_ilkind
 	IL_DEF_VAR_END,
 	IL_PUSH_AGAIN,
 	IL_PUSH_NUM,
+	IL_PUSH_FLOAT,
 
 	IL_STACK_SWAP,
 	IL_POP,
@@ -71,6 +72,7 @@ typedef struct s_il
 	bool		label_is_static_func;
 
 	int			number_int;
+	float		number_float;
 
 	t_deffunc	*deffunc_def;
 	t_lvar		*deffunc_locals;

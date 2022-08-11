@@ -159,6 +159,12 @@ bool	is_integer_type(t_type *type)
 			|| type->ty == TY_BOOL);
 }
 
+bool	is_flonum(t_type *type)
+{
+	return (type->ty == TY_FLOAT
+			|| type->ty == TY_DOUBLE);
+}
+
 // 配列かどうか確認する
 bool	is_pointer_type(t_type *type)
 {
@@ -193,6 +199,14 @@ bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt)
 	{
 		*lt = new_type_ptr_to(new_primitive_type(TY_VOID));
 		*rt = new_type_ptr_to(new_primitive_type(TY_VOID));
+		return (true);
+	}
+
+	if (is_flonum(l) || is_flonum(r))
+	{
+		// とりあえずfloat
+		*lt = new_primitive_type(TY_FLOAT);
+		*rt = new_primitive_type(TY_FLOAT);
 		return (true);
 	}
 
@@ -253,6 +267,8 @@ static void	typename_loop(t_type *type, char *str)
 		strcat(str, "void");
 	else if (type->ty == TY_FLOAT)
 		strcat(str, "float");
+	else if (type->ty == TY_DOUBLE)
+		strcat(str, "double");
 	else if (type->ty == TY_STRUCT)
 	{
 		strcat(str, "struct[");
@@ -283,7 +299,7 @@ static void	typename_loop(t_type *type, char *str)
 	}
 	else
 	{
-		fprintf(stderr, "get_type_name : 未対応の型が渡されました");
+		fprintf(stderr, "get_type_name : 未対応の型が渡されました %d\n", type->ty);
 		strcat(str, "unknown");
 	}
 }
@@ -300,7 +316,8 @@ t_type	*get_common_type(t_type *ty1, t_type *ty2)
 	int	size1;
 	int	size2;
 
-	if (ty1->ty == TY_FLOAT || ty2->ty == TY_FLOAT)
+	// とりあえずfloat
+	if (is_flonum(ty1) || is_flonum(ty2))
 		return (new_primitive_type(TY_FLOAT));
 	if (ty1->ty == TY_CHAR)
 		ty1 = new_primitive_type(TY_INT);
@@ -322,11 +339,13 @@ bool	type_can_cast(t_type *from, t_type *to)
 {
 	if (type_equal(from, to))
 		return (true);
+
 	// structはダメ
 	// unionもダメ
 	if (from->ty == TY_STRUCT || to->ty == TY_STRUCT
 	|| from->ty == TY_UNION || to->ty == TY_UNION)
 		return (false);
+
 	// どちらもポインタ
 	if (is_pointer_type(from) && is_pointer_type(to))
 		return (true);

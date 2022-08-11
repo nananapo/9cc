@@ -433,6 +433,8 @@ assert "ret_struct6.c"
 assert "ret_struct7.c"
 
 assert "quine.c"
+assert "pi.c"
+assert "e.c"
 
 
 #assert "float1.c"

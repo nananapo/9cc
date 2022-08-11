@@ -42,6 +42,9 @@ static void		analyze_func(t_deffunc *func);
 static void		analyze_global_var(t_defvar *def);
 
 
+bool	is_flonum(t_type *type);
+
+
 // main
 extern t_deffunc		*g_func_defs[1000];
 extern t_deffunc		*g_func_protos[1000];
@@ -432,13 +435,17 @@ static t_node	*analyze_mul(t_node *node)
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
 
+/*
 	if (!is_integer_type(node->lhs->type))
 		error_at(node->analyze_source, "* か / か %% の左辺が整数ではありません", get_type_name(node->lhs->type));
 
 	if (!is_integer_type(node->rhs->type))
 		error_at(node->analyze_source, "* か / か %% の右辺が整数ではありません", get_type_name(node->rhs->type));
+*/
 
-	if (node->kind != ND_COMP_MUL && node->kind != ND_COMP_DIV && node->kind != ND_COMP_MOD)
+	if (node->kind != ND_COMP_MUL
+	&& node->kind != ND_COMP_DIV
+	&& node->kind != ND_COMP_MOD)
 	{
 		result_type = get_common_type(node->lhs->type, node->rhs->type);
 		node->lhs	= analyze_node(cast(node->lhs, result_type));
@@ -521,6 +528,21 @@ static t_node	*analyze_add(t_node *node)
 			else
 			{
 				// 右辺を左辺の型にキャストする
+				node->rhs = analyze_node(cast(node->rhs, node->lhs->type));
+			}
+		}
+		else if ((is_integer_type(l) && is_flonum(r))
+				|| (is_flonum(l) && is_integer_type(r))
+				|| (is_flonum(l) && is_flonum(r)))
+		{
+			node->type = get_common_type(l, r);
+			if (node->kind != ND_COMP_ADD && node->kind != ND_COMP_SUB)
+			{
+				node->lhs = analyze_node(cast(node->lhs, node->type));
+				node->rhs = analyze_node(cast(node->rhs, node->type));
+			}
+			else
+			{
 				node->rhs = analyze_node(cast(node->rhs, node->lhs->type));
 			}
 		}
@@ -654,17 +676,17 @@ static t_node	*analyze_conditional(t_node *node)
 }
 
 // lhs ? rhs : els
+// TODO lhsがboolになれるかチェックする
 static t_node	*analyze_conditional_op(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
 	node->rhs = analyze_node(node->rhs);
 	node->els = analyze_node(node->els);
 
-	// TODO lhsがboolになれるかチェックする
-
-	// TODO キャストできるかチェックする -> そもそもキャストするの？
+/* TODO
 	if (!type_equal(node->rhs->type, node->els->type))
 		error_at(node->analyze_source, "条件演算子の型が一致しません");
+*/
 
 	node->type = node->rhs->type;
 
@@ -863,6 +885,7 @@ static t_node	*analyze_node(t_node *node)
 	{
 		case ND_NONE:
 		case ND_NUM:
+		case ND_FLOAT:
 			return (node);
 		case ND_STR_LITERAL:
 		{

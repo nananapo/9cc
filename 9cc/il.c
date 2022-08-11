@@ -61,6 +61,14 @@ static t_il	*append_il_pushnum(int i)
 	return (code);
 }
 
+static t_il	*append_il_pushflonum(float i)
+{
+	t_il	*code;
+	code				= append_il(IL_PUSH_FLOAT);
+	code->number_float	= i;
+	return (code);
+}
+
 static t_il	*append_il_pop(t_type *type)
 {
 	t_il	*code;
@@ -542,6 +550,9 @@ static void	translate_node(t_node *node)
 			return ;
 		case ND_NUM:
 			append_il_pushnum(node->val);
+			return ;
+		case ND_FLOAT:
+			append_il_pushflonum(node->val_float);
 			return ;
 
 		// TODO analyzeで両方の型が一致している状態にする

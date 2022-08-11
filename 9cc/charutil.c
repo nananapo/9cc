@@ -16,7 +16,7 @@ int	can_use_beginning_of_var(char c)
 
 int	is_escapedchar(char c)
 {
-	return (c == '"' || c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'e' || c == 'r' || c == 't' || c == 'v' || c == '0' || c == '\'' || c == '\\');
+	return (c == '"' || c == 'a' || c == 'b' || c == 'f' || c == 'n' || c == 'e' || c == 'x' || c == 'r' || c == 't' || c == 'v' || c == '0' || c == '\'' || c == '\\');
 }
 
 // lenはstrlen_actualを使う

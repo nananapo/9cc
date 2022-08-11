@@ -1,6 +1,9 @@
 #include "9cc.h"
+#include "parse.h"
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 t_node	*read_struct_block(t_token *ident);
 t_node	*read_enum_block(t_token *ident);
@@ -34,6 +37,15 @@ bool consume_number(int *result)
 	if (g_token->kind != TK_NUM)
 		return false;
 	*result = g_token->val;
+	g_token = g_token->next;
+	return true;	
+}
+
+bool consume_float(float *result)
+{
+	if (g_token->kind != TK_FLOAT)
+		return false;
+	*result = g_token->val_float;
 	g_token = g_token->next;
 	return true;	
 }
@@ -88,18 +100,6 @@ t_token	*consume_char_literal(void)
 	return ret;
 }
 
-void	consume_type_ptr(t_type **type)
-{
-	t_type	*tmp;
-
-	while (consume("*"))
-	{
-		tmp = new_primitive_type(TY_PTR);
-		tmp->ptr_to = *type;
-		*type = tmp;
-	}
-}
-
 static bool	consume_type_alias(t_type **type)
 {
 	t_typedefpair	*pair;
@@ -120,6 +120,21 @@ t_token	*consume_any(void)
 	ret = g_token;
 	g_token = g_token->next;
 	return ret;
+}
+
+static void	consume_array(t_type **type)
+{
+	int		size;
+
+	while (consume("["))
+	{
+		*type = new_type_array(*type);
+		if (!consume_number(&size))
+			error_at(g_token->str, "配列のサイズが定義されていません");
+		(*type)->array_size = size;
+		if (!consume("]"))
+			error_at(g_token->str, "]がありません");
+	}
 }
 
 t_type	*consume_type_specifier(void)
@@ -144,6 +159,9 @@ t_type	*consume_type_specifier(void)
 			break ;
 		case TK_FLOAT:
 			res = TY_FLOAT;
+			break ;
+		case TK_DOUBLE:
+			res = TY_DOUBLE;
 			break ;
 		case TK_STRUCT:
 		{
@@ -196,42 +214,148 @@ t_type	*consume_type_specifier(void)
 	return (type);
 }
 
-t_type	*consume_type_before(void)
+static t_type *expect_function(t_token *name, bool is_static)
 {
-	t_type	*type;
-	bool	is_unsigned;
+	t_deffunc	*def;
+	t_token		*ident;
+	t_type		*type;
 
-	is_unsigned = false;
-	while (consume_kind(TK_UNSIGNED))
-		is_unsigned = true;
+	def					= calloc(1, sizeof(t_deffunc));
+	def->name			= name->str;
+	def->name_len		= name->len;
+	def->argcount		= 0;
+	def->is_static		= is_static;
 
-	// type name
-	type = consume_type_specifier();
-	if (type == NULL)
-		return (NULL);
+	//printf("exp %s\n", g_token->str);
 
-	// TODO unsignedを許容するかはとりあえず無視
-	type->is_unsigned = is_unsigned;
+	// 引数を読む
+	if (!consume(")"))
+	{
+		for (;;)
+		{
+			// variable argument
+			if (consume("..."))
+			{
+				if (def->argument_types[0] == NULL)
+					error_at(g_token->str, "可変長引数の宣言をするには、少なくとも一つの引数が必要です");
+				if (!consume(")"))
+					error_at(g_token->str, ")が必要です");
+				def->is_variable_argument = true;
+				break ;
+			}
 
-	consume_type_ptr(&type);
-	return type;
+			// 型宣言の確認
+			if (!consume_type(&type, &ident, NULL, NULL))
+				error_at(g_token->str,"宣言が必要です\n (funcdef)");
+			if (ident == NULL)
+			{
+				// voidなら引数0個
+				if (type->ty == TY_VOID)
+				{
+					if (def->argument_types[0] != NULL)
+						error_at(g_token->str, "既に引数が宣言されています");
+					if (!consume(")"))
+						error_at(g_token->str, ")が見つかりませんでした。");
+					def->is_zero_argument = true;
+					break ;
+				}
+				error_at(g_token->str, "仮引数が必要です");
+			}
+			type = type_array_to_ptr(type);
+
+			// save
+			def->argument_names[def->argcount]		= ident->str;
+			def->argument_name_lens[def->argcount]	= ident->len;
+			def->argument_types[def->argcount]		= type;
+			def->argcount += 1;
+
+			// )か,
+			if (consume(")"))
+				break;
+			if (!consume(","))
+				error_at(g_token->str, ",が必要です (ef)");
+		}
+	}
+
+	type			= new_primitive_type(TY_FUNCTION);
+	type->funcdef	= (void *)def;
+
+	//printf("dexp %s\n", g_token->str);
+
+	return (type);
 }
 
-// 型宣言のarray部分を読む
-void	expect_type_after(t_type **type)// expect size
+bool	consume_type(t_type **r_type, t_token **r_ident, bool *is_static, bool *is_extern)
 {
-	int		size;
+	t_type	*type;
+	t_type	*functype;
+	t_token	*ident;
+	int		pointer_count;
+	bool	__iss;
+	bool	__ise;
 
-	while (consume("["))
+	if (is_static == NULL)
+		is_static = &__iss;
+	if (is_extern == NULL)
+		is_extern = &__ise;
+
+	if (consume_kind(TK_STATIC))
+			*is_static = true;
+	else
+			*is_static = false;
+
+	if (consume_kind(TK_EXTERN))
+			*is_extern = true;
+	else
+			*is_extern = false;
+
+	if ((type = consume_type_specifier()) == NULL)
+		return (false);
+
+	while (consume("*"))
+		type = new_type_ptr_to(type);
+
+	ident = NULL;
+	if (consume("("))
 	{
-		*type = new_type_array(*type);
-		if (!consume_number(&size))
-			error_at(g_token->str, "配列のサイズが定義されていません");
-		(*type)->array_size = size;
-		if (!consume("]"))
-			error_at(g_token->str, "]がありません");
+		pointer_count = 0;
+		while (consume("*"))
+			pointer_count += 1;
+		ident = consume_ident();
+		if (!consume(")"))
+			error_at(g_token->str, "not func 0");
+		if (!consume("("))
+			error_at(g_token->str, "not func 1");
+		functype = expect_function(ident, *is_static);
+		if (functype == NULL)
+			error_at(g_token->str, "functype is NULL 1");
+		((t_deffunc *)functype->funcdef)->type_return = type;
+		for (; pointer_count > 0; pointer_count--)
+			functype = new_type_ptr_to(functype);
+		*r_ident = ident;
+		*r_type = functype;
+		return (true);
 	}
-	return;
+
+	consume_array(&type);
+
+	ident = consume_ident();
+	if (consume("("))
+	{
+		functype = expect_function(ident, *is_static);
+		if (functype == NULL)
+			error_at(g_token->str, "functype is NULL 2");
+		((t_deffunc *)functype->funcdef)->type_return = type;
+		*r_ident = ident;
+		*r_type = functype;
+		return (true);
+	}
+
+	consume_array(&type);
+
+	*r_type	= type;
+	*r_ident= ident;
+	return (true);
 }
 
 bool	consume_enum_key(t_type **type, int *value)
