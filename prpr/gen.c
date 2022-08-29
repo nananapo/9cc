@@ -84,10 +84,6 @@ static void	codes(Node *node) // 8
 	i = -1;
 	while (++i < node->codes_len)
 	{
-		//fprintf(stderr, "# node->codes %p\n", node->codes);
-		//fprintf(stderr, "# code %p\n", code);
-
-		//fprintf(stderr, "#  WHILE IN %d %p\n", i, code);
 		if (code->kind == TK_STR_LIT)
 		{
 			printf("\"%s\"", my_strndup(code->str, code->len));
@@ -98,7 +94,6 @@ static void	codes(Node *node) // 8
 		}
 		else if (code->kind == TK_IDENT)
 		{
-			//fprintf(stderr, "#   IS IDENT %s\n", my_strndup(code->str, code->len));
 			mactmp = get_macro(my_strndup(code->str, code->len));
 			if (mactmp == NULL)
 			{
@@ -133,7 +128,9 @@ static void	codes(Node *node) // 8
 			}
 			else
 			{
-				printf("%s ", my_strndup(code->str, code->len));
+				printf("%s", my_strndup(code->str, code->len));
+				if (code->len != 1 || code->str[0] != '.')
+					printf(" ");
 			}
 		}
 		else
@@ -234,34 +231,26 @@ static void ifdef(Node *node, bool is_ifdef)
 
 void	gen(Node *node)
 {
-	//fprintf(stderr, "# gen %p\n", node);
 	while (node)
 	{
 		switch (node->kind)
 		{
 			case ND_INIT:
-	//fprintf(stderr, "# init\n");
 				break ;
 			case ND_CODES:
-	//fprintf(stderr, "# codes\n");
 				codes(node);
-	//fprintf(stderr, "# codes end\n");
 				break ;
 			case ND_INCLUDE:
-	//fprintf(stderr, "# include\n");
 				include(node);
 				break ;
 			case ND_DEFINE_MACRO:
-	//fprintf(stderr, "# define macro\n");
 				define_macro(node);
 				break ;
 			case ND_UNDEF:
-	//fprintf(stderr, "# undef macro\n");
 				undef_macro(node);
 				break ;
 			case ND_IFDEF:
 			case ND_IFNDEF:
-	//fprintf(stderr, "# ifdef ifndef\n");
 				ifdef(node, node->kind == ND_IFDEF);
 				break ;
 		}

@@ -1116,6 +1116,7 @@ static void	filescope(void)
 	else
 		global_var(type, ident, is_extern, is_static);
 }
+
 /*
 static t_storage_class	consume_storage_class_specifier(void)
 {
@@ -1149,7 +1150,7 @@ static t_storage_class	consume_storage_class_specifier(void)
 static t_declaration_specifiers	*consume_declaration_specifiers(void)
 {
 	t_token						*tmp;
-	t_declaration_specifiers	*declaration_specifiers;
+	t_declaration_specifiers	*dec;
 	t_storage_class				storage_class;
 	t_declaration_specifiers	*spec1;
 	t_type_specifier			*type_specifier;
@@ -1161,11 +1162,27 @@ static t_declaration_specifiers	*consume_declaration_specifiers(void)
 	storage_class = consume_storage_class_specifier();
 	if (storage_class = SC_NONE)
 		return (NULL);
-	spec1 = consume_declatation_specifiers();
-	type_specifier = expect_type_specifier();
-	spec2 = consume_declatation_specifiers();
-	
-	spec3 = consume_declatation_specifiers();
+	spec1			= consume_declatation_specifiers();
+	type_specifier	= expect_type_specifier();
+	if (type_specifier == NULL)
+	{
+		g_token = tmp;
+		return (NULL);
+	}
+	spec2			= consume_declatation_specifiers();
+	type_qualifier	= consume_type_qualifier();
+	if (type_qualifier == NULL)
+	{
+		g_token = tmp;
+		return (NULL);
+	}
+	spec3			= consume_declatation_specifiers();
+
+	dec = calloc(1, sizeof(t_declaration_specifiers));
+	dec->storage = storage_class;
+	dec->spec1 = spec1;
+	dec->spec2 = spec2;
+	dec->spec3 = spec3;
 }
 
 static bool consume_function_definition(void)
@@ -1193,7 +1210,7 @@ static bool consume_function_definition(void)
 	function_definition->declaration_lists		= declaration_list;
 	function_definition->compound_statement 	= compound_statement;
 
-	// TODO save
+	// TODO 保存する
 }
 
 static void	external_declaration(void)
@@ -1204,6 +1221,7 @@ static void	external_declaration(void)
 		return ;
 }
 */
+
 void	parse(void)
 {
 	while (!at_eof())

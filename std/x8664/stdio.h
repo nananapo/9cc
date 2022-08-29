@@ -9,6 +9,7 @@ int		sprintf(char *str, char *fmt, ...);
 int		scanf(char *fmt, ...);
 
 int		putchar(char c);
+char	getchar(void);
 
 #include <stdarg.h>
 void	vfprintf(void *stream, char *format, va_list ap);

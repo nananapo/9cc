@@ -240,6 +240,7 @@ assert "array34.c"
 assert "array35.c"
 assert "array36.c"
 assert "array37.c"
+assert "array38.c"
 
 assert "global1.c"
 assert "global2.c"
