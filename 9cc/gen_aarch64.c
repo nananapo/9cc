@@ -8,7 +8,6 @@
 #include <stdlib.h>
 
 #define ASM_MOV "mov"
-#define ASM_PUSH "push"
 #define ASM_LEA "lea"
 
 #define RAX "rax"
@@ -40,6 +39,10 @@
 #define DWORD_PTR "dword ptr"
 
 #define ARGREG_SIZE 6
+
+#define REG_TMP1 "w0"
+#define REG_SP "sp"
+
 bool	is_flonum(t_type *type);
 
 static bool	is_memory_type(t_type *type);
@@ -48,13 +51,13 @@ static void	pushi(int data);
 static void	pop(char *reg);
 static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
-static void	cmps(char *dst, char *from);
 static void	cmp(t_type *type);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
 static void	load(t_type *type);
 static void	cast(t_type *from, t_type *to);
-static void	print_global_constant(t_node *node, t_type *type);
+
+//static void	print_global_constant(t_node *node, t_type *type);
 
 static char		*arg_regs[6] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
 static int		stack_count = 0;
@@ -74,7 +77,6 @@ static int		g_call_locals_regindex[1000];
 static int		g_call_memory_count;
 static t_il		*g_call_memory_codes[1000];
 static t_lvar	*g_call_memory_lvars[1000];
-
 
 // main
 extern t_deffunc		*g_func_defs[1000];
@@ -122,6 +124,7 @@ static char	*g_cast_table[10][10] =
 /* f64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}
 };
 
+/*
 static void	put_str_literal(char *str, int len)
 {
 	int	i;
@@ -145,7 +148,7 @@ static void	put_str_literal(char *str, int len)
 		printf("%c", str[i]);
 	}
 }
-
+*/
 
 static int	get_type_id(t_type *type)
 {
@@ -236,7 +239,6 @@ static int	get_member_offset(t_member *mem)
 	return (offset);
 }
 
-// TODO voidのarray
 static int	get_struct_size(t_type *type)
 {
 	t_defstruct	*def;
@@ -510,39 +512,59 @@ static int	get_call_memory(t_il *code)
 	return (-1);
 }
 
+static void	mov(char *dst, char *from)
+{
+	printf("    mov %s, %s\n", dst, from);
+}
 
+static void	movi(char *dst, int i)
+{
+	printf("    mov %s, %d\n", dst, i);
+}
+
+static void	loadasm(char *dst, char *from, int offset)
+{
+	printf("    ldr %s, [%s, %d]\n", dst, from, offset);
+}
+
+static void strasm(char *dst, char *from, int offset)
+{
+	printf("    str %s, [%s, %d]\n", dst, from, offset);
+}
+
+static void	add(char *dst, char *reg1, char *reg2)
+{
+	printf("    add %s, %s, %s\n", dst, reg1, reg2);
+}
+
+static void addi(char *dst, char *reg, int num)
+{
+	if (num > 0)
+		printf("    add %s, %s, %d\n", dst, reg, num);
+	else
+		printf("    sub %s, %s, %d\n", dst, reg, -num);
+}
 
 static void	push()
 {
 	stack_count += 8;
-	printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	addi(REG_SP, REG_SP, -8);
+	strasm(REG_TMP1, REG_SP, 0);
 }
 
 static void	pushi(int num)
 {
 	stack_count += 8;
-	printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
+	addi(REG_SP, REG_SP, -8);
+	printf("    mov %s, %d\n", REG_TMP1, num);
+	strasm(REG_TMP1, REG_SP, 0);
 }
 
-static void	pop(char *reg)
+static void	pop(char *dst)
 {
 	stack_count -= 8;
-	printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
-}
-
-static void	mov(char *dst, char *from)
-{
-	printf("    %s %s, %s\n", ASM_MOV, dst, from);
-}
-
-static void	movi(char *dst, int i)
-{
-	printf("    %s %s, %d\n", ASM_MOV, dst, i);
-}
-
-static void	cmps(char *dst, char *from)
-{
-	printf("    cmp %s, %s\n", dst, from);
+	loadasm(dst, REG_SP, 0);
+	addi(REG_SP, REG_SP, 8);
 }
 
 // TODO 構造体の比較
@@ -550,11 +572,11 @@ static void	cmps(char *dst, char *from)
 static void	cmp(t_type *dst)
 {
 	if (dst->ty == TY_PTR || dst->ty == TY_ARRAY)
-		cmps(RAX, RDI);
+		printf("    cmp %s, %s\n", RAX, RDI);
 	else if (dst->ty == TY_CHAR || dst->ty == TY_BOOL)
-		cmps(AL, DIL);
+		printf("    cmp %s, %s\n", AL, DIL);
 	else if (dst->ty == TY_INT || dst->ty == TY_ENUM)
-		cmps(EAX, EDI);
+		printf("    cmp %s, %s\n", EAX, EDI);
 	return ;
 }
 
@@ -671,6 +693,7 @@ static void	cast(t_type *from, t_type *to)
 	}
 }
 
+/*
 static void	print_global_constant(t_node *node, t_type *type)
 {
 	t_node	*notmp;
@@ -736,6 +759,7 @@ static void gen_defglobal(t_defvar *node)
 		print_global_constant(node->assign, node->type);
 	}
 }
+*/
 
 // R10にアドレスを入れておく
 static void	print_local_array(t_node *node, t_type *type)
@@ -1073,9 +1097,11 @@ static void gen_func_prologue(t_il *code)
 	locals_stack_add		= 0;
 	aligned_stack_def_var_end	= 0;
 
+/*
 	mov(RAX, RBP);
 	push();
 	mov(RBP, RSP);
+*/
 
 	gen_save_rdi(code);
 	gen_call_memory(code);
@@ -1106,15 +1132,13 @@ static void	gen_func_epilogue(t_il *code)
 			printf("    mov %s, [%s]\n", RAX, RAX);
 	}
 	else if (code->type->ty != TY_VOID)
-		pop(RAX);
+		pop(REG_TMP1);
 
-	printf("    add %s, %d # %d\n", RSP, aligned_stack_def_var_end, stack_count);
+	addi(REG_SP, REG_SP, aligned_stack_def_var_end);
 	stack_count -= aligned_stack_def_var_end;
-	printf("    add %s, %d # %d\n", RSP, locals_stack_add, stack_count);
+	addi(REG_SP, REG_SP, locals_stack_add);
 	stack_count -= locals_stack_add;
 
-	mov(RSP, RBP);
-	pop(RBP);
 	printf("    ret\n");
 
 	g_locals_count = 0;
@@ -1140,7 +1164,7 @@ static void	gen_def_var_end(void)
 	old			= stack_count;
 	stack_count	= align_to(stack_count, 16);
 
-	printf("    sub %s, %d\n", RSP, stack_count - old);
+	addi(REG_SP, REG_SP, stack_count - old);
 	aligned_stack_def_var_end = stack_count - old;
 }
 
@@ -1169,7 +1193,7 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
-	//printf("# kind %d\n", code->kind);
+	// printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
 		case IL_LABEL:
@@ -1177,8 +1201,8 @@ static void	gen_il(t_il *code)
 			if (code->label_is_deffunc)
 			{
 				if (!code->label_is_static_func)
-					printf(".globl _%s\n", code->label_str);
-				printf("_%s:\n", code->label_str);
+					printf(".globl %s\n", code->label_str);
+				printf("%s:\n", code->label_str);
 			}
 			else	
 				printf("%s:\n", code->label_str);
@@ -1186,7 +1210,7 @@ static void	gen_il(t_il *code)
 		}
 		case IL_JUMP:
 		{
-			printf("    jmp %s\n", code->label_str);
+			printf("    b %s\n", code->label_str);
 			return ;
 		}
 		case IL_JUMP_TRUE:
@@ -1250,7 +1274,7 @@ static void	gen_il(t_il *code)
 		}
 		case IL_POP:
 			// TODO 型
-			pop(RAX);
+			pop(REG_TMP1);
 			return ;
 
 		case IL_ADD:
@@ -1258,7 +1282,7 @@ static void	gen_il(t_il *code)
 			{
 				pop(RDI);
 				pop(RAX);
-				printf("    add %s, %s\n", RAX, RDI);
+				add(RAX, RAX, RDI);
 				push();
 			}
 			else
@@ -1519,17 +1543,13 @@ static void	gen_il(t_il *code)
 
 void	codegen_aarch64(void)
 {
-	int		i;
 	t_il	*code;
 
-	printf(".intel_syntax noprefix\n");
-	printf(".p2align	4, 0x90\n");
+	printf(".arch armv8-a\n");
+	printf(".align 2\n");
 
-	printf(".LC6.28:\n.long   1086911939\n");
-	printf(".LC0.07:\n.long   1032805417\n");
-	printf(".LC0.04:\n.long   1025758986\n");
-	printf(".LC0.02:\n.long   1017370378\n");
-
+/*
+	int		i;
 	// 文字列リテラル生成
 	for (i = 0; g_str_literals[i] != NULL; i++)
 	{
@@ -1543,9 +1563,9 @@ void	codegen_aarch64(void)
 	printf(".section	__DATA, __data\n");
 	for (i = 0; g_global_vars[i] != NULL; i++)
 		gen_defglobal(g_global_vars[i]);
+*/
 
 	// コードを生成
-	printf(".section	__TEXT,__text,regular,pure_instructions\n");
 	for (code = g_il; code != NULL; code = code->next)
 		gen_il(code);
 }

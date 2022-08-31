@@ -48,7 +48,6 @@ static void	pushi(int data);
 static void	pop(char *reg);
 static void	mov(char *dst, char *from);
 static void	movi(char *dst, int i);
-static void	cmps(char *dst, char *from);
 static void	cmp(t_type *type);
 static void	store_value(int size);
 static void	store_ptr(int size, bool minus_step);
@@ -540,21 +539,16 @@ static void	movi(char *dst, int i)
 	printf("    %s %s, %d\n", ASM_MOV, dst, i);
 }
 
-static void	cmps(char *dst, char *from)
-{
-	printf("    cmp %s, %s\n", dst, from);
-}
-
 // TODO 構造体の比較
 // rax, rdi
 static void	cmp(t_type *dst)
 {
 	if (dst->ty == TY_PTR || dst->ty == TY_ARRAY)
-		cmps(RAX, RDI);
+		printf("    cmp %s, %s\n", RAX, RDI);
 	else if (dst->ty == TY_CHAR || dst->ty == TY_BOOL)
-		cmps(AL, DIL);
+		printf("    cmp %s, %s\n", AL, DIL);
 	else if (dst->ty == TY_INT || dst->ty == TY_ENUM)
-		cmps(EAX, EDI);
+		printf("    cmp %s, %s\n", EAX, EDI);
 	return ;
 }
 
