@@ -52,9 +52,11 @@ int main(int argc, char **argv)
 				g_arch = ARCH_X8664;
 			else if (strcmp("riscv", argv[2]) == 0)
 				g_arch = ARCH_RISCV;
+			else if (strcmp("aarch64", argv[2]) == 0)
+				g_arch = ARCH_AARCH64;
 			else
 			{
-				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
+				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv / aarch64] [filename]");
 				return (1);
 			}
 

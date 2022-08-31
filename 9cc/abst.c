@@ -2,11 +2,20 @@
 
 extern t_arch	g_arch;
 
+bool	is_unsigned_abi_x8664(t_typekind kind);
+int		get_array_align_size_x8664(t_type *type);
+int		get_type_size_x8664(t_type *type);
 void    codegen_x8664(void);
+
+bool	is_unsigned_abi_riscv(t_typekind kind);
+int		get_array_align_size_riscv(t_type *type);
+int		get_type_size_riscv(t_type *type);
 void    codegen_riscv(void);
 
-bool	is_unsigned_abi_x8664(t_typekind kind);
-bool	is_unsigned_abi_riscv(t_typekind kind);
+bool	is_unsigned_abi_aarch64(t_typekind kind);
+int		get_array_align_size_aarch64(t_type *type);
+int		get_type_size_aarch64(t_type *type);
+void    codegen_aarch64(void);
 
 bool	is_unsigned_abi(t_typekind type)
 {
@@ -14,14 +23,10 @@ bool	is_unsigned_abi(t_typekind type)
 		return (is_unsigned_abi_x8664(type));
 	else if (g_arch == ARCH_RISCV)
 		return (is_unsigned_abi_riscv(type));
+	else if (g_arch == ARCH_AARCH64)
+		return (is_unsigned_abi_aarch64(type));
 	return (-1);
 }
-
-int	get_array_align_size_x8664(t_type *type);
-int	get_type_size_x8664(t_type *type);
-
-int	get_array_align_size_riscv(t_type *type);
-int	get_type_size_riscv(t_type *type);
 
 int	get_type_size(t_type *type)
 {
@@ -29,6 +34,8 @@ int	get_type_size(t_type *type)
 		return (get_type_size_x8664(type));
 	else if (g_arch == ARCH_RISCV)
 		return (get_type_size_riscv(type));
+	else if (g_arch == ARCH_AARCH64)
+		return (get_type_size_aarch64(type));
 	return (-1);
 }
 
@@ -38,6 +45,8 @@ int	get_array_align_size(t_type *type)
 		return (get_array_align_size_x8664(type));
 	else if (g_arch == ARCH_RISCV)
 		return (get_array_align_size_riscv(type));
+	else if (g_arch == ARCH_AARCH64)
+		return (get_array_align_size_aarch64(type));
 	return (-1);
 }
 
@@ -47,4 +56,6 @@ void	codegen(void)
 		codegen_x8664();
 	else if (g_arch == ARCH_RISCV)
 		codegen_riscv();
+	else if (g_arch == ARCH_AARCH64)
+		codegen_aarch64();
 }

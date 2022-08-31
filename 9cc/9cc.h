@@ -350,7 +350,8 @@ typedef struct s_typedefpair
 typedef enum s_arch
 {
 	ARCH_X8664,
-	ARCH_RISCV
+	ARCH_RISCV,
+	ARCH_AARCH64
 }	t_arch;
 
 char	*my_strndup(char *s, int len);
