@@ -41,9 +41,8 @@ int	get_type_size_verilog(t_type *type)
 		case TY_ENUM:
 			return  (4);
 		case TY_STRUCT:
-			return (get_struct_size(type));
 		case TY_UNION:
-			return (get_union_size(type->unon));
+			error("Not impl : size of struct / union%d", type->ty);
 		default:
 			error("size of unknown type %d", type->ty);
 	}
@@ -63,23 +62,15 @@ bool	is_unsigned_abi_verilog(t_typekind kind)
 	return (false);
 }
 
-static void	gen_il(t_il *code)
+void	gen_func(t_deffunc *func)
 {
-	switch (code->kind)
-	{
-		default:
-		{
-			fprintf(stderr, "gen not implemented\nkind : %d\n", code->kind);
-			error("Error");
-			return ;
-		}
-	}
+	printf("func %s\n", my_strndup(func->name, func->name_len));
 }
 
 void	codegen_verilog(void)
 {
-	int		i;
-	t_il	*code;
-	for (code = g_il; code != NULL; code = code->next)
-		gen_il(code);
+	int	i;
+
+	for (i = 0; g_func_defs[i] != NULL; i++)
+		gen_func(g_func_defs[i]);
 }

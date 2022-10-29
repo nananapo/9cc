@@ -87,6 +87,13 @@ int main(int argc, char **argv)
 
 	analyze();
 
+	// verilogは特別扱い！
+	if (g_arch == ARCH_VERILOG)
+	{
+		codegen();
+		return 0;
+	}
+
 	translate_il();
 
 	codegen();
