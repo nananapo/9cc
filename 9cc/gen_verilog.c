@@ -64,7 +64,27 @@ bool	is_unsigned_abi_verilog(t_typekind kind)
 
 void	gen_func(t_deffunc *func)
 {
-	printf("func %s\n", my_strndup(func->name, func->name_len));
+	t_lvar *lvar;
+
+	printf("module %s(\n", my_strndup(func->name, func->name_len));
+	printf("    input wire clock,");
+	printf("    input wire n_reset");
+	// 引数は考えない
+	printf(");\n\n");
+
+	// 変数
+	printf("reg [31:0] state;\n");
+	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
+	{
+		int		size = get_type_size(lvar->type);
+		char	*name = my_strndup(lvar->name, lvar->name_len);
+		printf("reg [%d:0] val_%s;\n", size * 8 - 1, name);
+	}
+	printf("\n");
+
+	// ロジック TODO
+
+	printf("endmodule\n");
 }
 
 void	codegen_verilog(void)
