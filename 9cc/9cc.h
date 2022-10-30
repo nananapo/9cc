@@ -235,6 +235,7 @@ typedef struct s_lvar
 	int				name_len;
 	bool			is_dummy;
 	bool			is_argument;
+	int				offset;
 
 	struct s_lvar	*next;
 } t_lvar;
