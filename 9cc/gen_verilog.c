@@ -196,14 +196,14 @@ static void	gen_process(t_veriproc *proc)
 	{
 		case VERI_NUM:
 		case VERI_ADDRESS:
-			printf("  sp = sp + 32'd%d;\n", 32);
+			printf("  sp = sp + 32'd1;\n");
 			printf("  stack[sp] = 32'd%d;\n", proc->num);
 			break ;
 		case VERI_ASSIGN:
-			printf("  r1 = stack[sp];\n");
-			printf("  r2 = stack[sp-32];\n");
-			printf("  stack[r2] = r1;\n");
-			printf("  sp = sp - 32'd64;\n");
+			printf("  r0 = stack[sp];\n");
+			printf("  r1 = stack[sp-32'd1];\n");
+			printf("  stack[r1] = r0;\n");
+			printf("  sp = sp - 32'd2;\n");
 			break ;
 		case VERI_FUNC_END:
 			printf("  // funcend\n");
@@ -217,7 +217,7 @@ static void	gen_process(t_veriproc *proc)
 	printf(" end");
 }
 
-#define STACK_SIZE 128
+#define STACK_SIZE 1024
 
 static void	gen_func(t_deffunc *func)
 {
@@ -235,7 +235,7 @@ static void	gen_func(t_deffunc *func)
 
 	// 変数
 	printf("reg [31:0] state;\n");
-	printf("reg [%d:0] stack;\n", STACK_SIZE - 1);
+	printf("reg [31:0] stack[0:%d];\n", STACK_SIZE - 1);
 	printf("reg [31:0] sp;\n");
 	printf("reg [31:0] r0;\n");
 	printf("reg [31:0] r1;\n");
@@ -243,7 +243,7 @@ static void	gen_func(t_deffunc *func)
 	val_offset = 0;
 	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
 	{
-		int	size = get_type_size(lvar->type) * BYTE2BIT;
+		int	size = get_type_size(lvar->type);
 		val_offset += size;
 		lvar->offset = val_offset;
 		// regに保存するならコレ
@@ -251,9 +251,6 @@ static void	gen_func(t_deffunc *func)
 		//printf("reg [%d:0] val_%s;\n", size * 8 - 1, name);
 	}
 	printf("\n");
-
-	// メモリを初期化
-	printf("integer i;\ninitial begin\n for (i = 0; i < %d; i = i + 1) \n  stack[i] = 0;\nend\n\n", STACK_SIZE);
 
 	// 終了状態を作成
 	funcend = create_proc(VERI_FUNC_END);
