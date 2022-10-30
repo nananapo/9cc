@@ -693,6 +693,7 @@ static t_node	*analyze_conditional_op(t_node *node)
 	return (node);
 }
 
+// lhs = rhs
 static t_node	*analyze_assign(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);

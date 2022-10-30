@@ -49,6 +49,7 @@ t_lvar	*append_lvar(t_deffunc *func, char *name, int name_len, t_type *type, boo
 	lvar->name_len		= name_len;
 	lvar->type			= type;
 	lvar->is_argument	= is_argument;
+	lvar->next			= NULL;
 
 	// append
 	if (func->locals == NULL)
