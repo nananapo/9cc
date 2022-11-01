@@ -139,6 +139,17 @@ static void	translate_process(t_node *node, t_veriproc **head, t_veriproc **tail
 			*tail = proc;
 			return ;
 		}
+		case ND_VAR_LOCAL:
+		{
+			proc = create_proc(VERI_ADDRESS);
+			proc->num = node->lvar->offset;
+			*head = proc;
+
+			proc = create_proc(VERI_LOAD);
+			*tail = proc;
+			(*head)->next = proc;
+			return ;
+		}
 		case ND_BLOCK:
 		{
 			for (; node != NULL && node->lhs != NULL; node = node->rhs)
@@ -161,17 +172,64 @@ static void	translate_process(t_node *node, t_veriproc **head, t_veriproc **tail
 		}
 		case ND_RETURN:
 		{
-			// 返り値は考えない
-			// 終了状態に移動
-			proc = create_proc(VERI_JUMP);
-			proc->next = g_funcend_state;
-			*head = proc;
+			// 返り値なしreturn
+			if (node->lhs == NULL)
+			{
+				proc = create_proc(VERI_JUMP);
+				proc->next = g_funcend_state;
+				*head = proc;
+				*tail = proc;
+				return ;
+			}
+
+			translate_process(node->lhs, head, tail);
+			proc = create_proc(VERI_RETURN);
+			(*tail)->next = proc;
+			*tail = proc;
+			return ;
+		}
+		case ND_ADD:
+		{
+			translate_process(node->lhs, head, &tmp_head);
+			translate_process(node->rhs, &tmp_tail, tail);
+			tmp_head->next = tmp_tail;
+
+			proc = create_proc(VERI_ADD);
+			proc->type = node->type;
+
+			(*tail)->next = proc;
+			*tail = proc;
+			return ;
+		}
+		case ND_SUB:
+		{
+			translate_process(node->lhs, head, &tmp_head);
+			translate_process(node->rhs, &tmp_tail, tail);
+			tmp_head->next = tmp_tail;
+
+			proc = create_proc(VERI_SUB);
+			proc->type = node->type;
+
+			(*tail)->next = proc;
+			*tail = proc;
+			return ;
+		}
+		case ND_CAST:
+		{
+			translate_process(node->lhs, head, tail);
+			
+			proc = create_proc(VERI_CAST);
+			proc->type = node->type;
+			proc->cast_from = node->lhs->type;
+
+			(*tail)->next = proc;
 			*tail = proc;
 			return ;
 		}
 		default:
 		{
 			printf("noimpl %d\n", node->kind);
+			exit(1);
 			return ;
 		}
 	}
@@ -185,6 +243,8 @@ static void	gen_process(t_veriproc *proc)
 	// next state
 	switch (proc->kind)
 	{
+		case VERI_RETURN:
+			break ;
 		default:
 			if (proc->next != NULL)
 				printf("  state <= 32'd%d;\n", proc->next->state_id);
@@ -203,16 +263,43 @@ static void	gen_process(t_veriproc *proc)
 			printf("  r0 = stack[sp];\n");
 			printf("  r1 = stack[sp-32'd1];\n");
 			printf("  stack[r1] = r0;\n");
-			printf("  sp = sp - 32'd2;\n");
+			printf("  sp = sp - 32'd1;\n");
+			printf("  stack[sp] = r0;\n");
 			break ;
 		case VERI_FUNC_END:
 			printf("  // funcend\n");
 			break ;
 		case VERI_JUMP:
 			break ;
-		default:
-			printf("  // not impl %d;\n", proc->kind);
+		case VERI_LOAD:
+			printf("  r0 = stack[sp];\n");
+			printf("  r1 = stack[r0];\n");
+			printf("  stack[sp] = r1;\n");
 			break ;
+		case VERI_CAST:
+			// printf("%s -> %s\n", get_type_name(proc->cast_from), get_type_name(proc->type));
+			// TODO
+			break ;
+		case VERI_RETURN:
+			printf("  ret = stack[sp];\n");
+			printf("  sp = sp - 32'd1;\n");
+			printf("  state <= 32'd%d;\n", g_funcend_state->state_id); // TODO nextで繋いでおきたい
+			break ;
+		case VERI_ADD:
+			printf("  r0 = stack[sp];\n");
+			printf("  r1 = stack[sp-32'd1];\n");
+			printf("  sp = sp - 32'd1;\n");
+			printf("  stack[sp] = r0 + r1;\n");
+			break ;
+		case VERI_SUB:
+			printf("  r0 = stack[sp];\n");
+			printf("  r1 = stack[sp-32'd1];\n");
+			printf("  sp = sp - 32'd1;\n");
+			printf("  stack[sp] = r1 - r0;\n");
+			break ;
+		default:
+			printf("noimpl %d\n", proc->kind);
+			exit(1);
 	}
 	printf(" end");
 }
@@ -240,6 +327,7 @@ static void	gen_func(t_deffunc *func)
 	printf("reg [31:0] r0;\n");
 	printf("reg [31:0] r1;\n");
 	printf("reg [31:0] r2;\n");
+	printf("reg [31:0] ret;\n");
 	val_offset = 0;
 	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
 	{

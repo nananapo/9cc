@@ -10,7 +10,12 @@ typedef enum e_verikind
 	VERI_ASSIGN,
 	VERI_JUMP,
 	VERI_FUNC_END,
-	VERI_ADDRESS
+	VERI_ADDRESS,
+	VERI_RETURN,
+	VERI_ADD,
+	VERI_SUB,
+	VERI_CAST,
+	VERI_LOAD
 }	t_verikind;
 
 typedef struct s_veriproc
@@ -22,8 +27,7 @@ typedef struct s_veriproc
 	int					num;
 	int					var_local_offset;
 	t_type				*type;
-
-	bool				is_generated;
+	t_type				*cast_from;
 }	t_veriproc;
 
 #endif
