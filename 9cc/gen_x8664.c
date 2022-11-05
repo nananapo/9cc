@@ -1171,6 +1171,15 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
+	printf("# ilid: %d, kind: %d\n", code->ilid_unique, code->kind);
+
+	if (code->gen_is_generated)
+	{
+		fprintf(stderr, "error : code is re-generated.\n");
+		return ;
+	}
+	code->gen_is_generated = true;
+
 	//printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{

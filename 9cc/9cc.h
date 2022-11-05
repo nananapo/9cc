@@ -394,7 +394,8 @@ t_lvar		*find_lvar(t_deffunc *func, char *str, int len);
 t_defvar	*find_global(char *str, int len);
 
 void	parse(void);
-void	analyze();
+void	analyze(void);
+void	optimize(void);
 
 void	codegen(void);
 int		get_type_size(t_type *type);

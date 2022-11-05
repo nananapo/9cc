@@ -97,6 +97,9 @@ typedef struct s_il
 	t_member	*member;
 
 	t_node		*lvar_array;
+
+
+	bool		gen_is_generated;
 }	t_il;
 
 void	translate_il(void);

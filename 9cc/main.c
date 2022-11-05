@@ -87,6 +87,8 @@ int main(int argc, char **argv)
 
 	translate_il();
 
+
+	optimize();
 	codegen();
 	return (0);
 }
