@@ -55,7 +55,6 @@ assert_async(){
 	
 	cc -o $targetname $asmname $module
 	if [ "$?" != "0" ]; then
-		echo "$input" > hey
 		echo "9CC COMPILE KO => $1"
 		echo "9CC COMPILE KO => $1" >> tmp/err
 		exit 1

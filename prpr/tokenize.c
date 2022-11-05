@@ -165,9 +165,10 @@ static bool	tokenize_str_literal(TokenizeEnv *env, bool is_inc)
 			tok->len += 1;
 		}
 	}
-	if (!(is_dq && *env->str == '\"') && !(!is_dq && *env->str == '>'))
+	if (!(is_dq && *env->str == '\"')
+	&& !(!is_dq && *env->str == '>'))
 	{
-		//fprintf(stderr, "err: %c\n", *env->str);
+		fprintf(stderr, "err: %c\n", *env->str);
 		error_at(tok->str - 1, "文字列リテラルが終了しませんでした(end)");
 	}
 	env->str += 1;

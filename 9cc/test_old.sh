@@ -78,12 +78,18 @@ tmpcfile="$testdir/tmp.c"
 assert_gcc(){
 	input="$prefix`cat $testdir/$1`"
 	
-    echo "$input" | $prpr - | $ncc > tmp.s
+    echo "$input" | $prpr - > $tmpcfile
+	if [ "$?" != "0" ]; then
+		echo "$1 => prpr KO"
+		exit 1
+	fi
+	
+	cat $tmpcfile | $ncc > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
 	fi
-	
+
 	cc -o tmp1 tmp.s $module
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc gcc compile KO"
@@ -113,6 +119,8 @@ assert_gcc(){
   	  exit 1
   	fi
 }
+
+#assert_gcc "structsize5.c"
 
 assert 0 "int main(){return 0;}"
 assert 42 "int main(){return 42;}"
