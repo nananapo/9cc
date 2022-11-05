@@ -21,6 +21,7 @@ void		translate_il(void);
 
 static t_il	*g_il_last;
 static int	jumpLabelCount;
+static int	ILID_UNIQUE;
 
 // main
 extern t_deffunc		*g_func_defs[1000];
@@ -42,8 +43,10 @@ static t_il	*append_il(t_ilkind kind)
 {
 	t_il	*tmp;
 
-	tmp			= calloc(1, sizeof(t_il));
-	tmp->kind	= kind;
+	tmp				= calloc(1, sizeof(t_il));
+	tmp->kind		= kind;
+	tmp->next		= NULL;
+	tmp->ilid_unique= ILID_UNIQUE++;
 
 	if (g_il == NULL)
 		g_il = tmp;

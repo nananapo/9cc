@@ -65,6 +65,8 @@ typedef struct s_il
 	t_ilkind	kind;
 	struct s_il	*next;
 
+	int			ilid_unique;
+
 	t_type		*type;
 
 	char		*label_str;
