@@ -33,8 +33,8 @@ static char	*get_function_epi_label(char *name, int len)
 
 static char	*get_label_str(int i)
 {
-	char	buf[100];
-	sprintf(buf, "%d", i);
+	char	buf[1000];
+	snprintf(buf, sizeof(buf), "%d", i);
 	return (my_strcat("L", buf));
 }
 
