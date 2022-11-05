@@ -1034,11 +1034,12 @@ static void	gen_func_epilogue(t_il *code)
 	
 	g_locals_count = 0;
 
+	/* 必要ない?
 	if (stack_count != 0)
 	{
 		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
 		error("Error");
-	}
+	}*/
 
 	stack_count = 0;
 }
@@ -1083,6 +1084,13 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
+	if (code->gen_is_generated)
+	{
+		fprintf(stderr, "error : code is re-generated.\n");
+		return ;
+	}
+
+	//code->gen_is_generated = true;
 	printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
@@ -1138,7 +1146,7 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_AGAIN:
 		{
 			// TODO 型
-			debug("AGAIN");
+			//debug("AGAIN");
 			push();
 			return ;
 		}
@@ -1305,9 +1313,7 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_VAR_LOCAL:
-			code->kind = IL_VAR_LOCAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_LOCAL;
+			gen_var_local_addr(code);
 			pop(T0);
 			load(code->var_local->type);
 			push();
@@ -1316,10 +1322,10 @@ static void	gen_il(t_il *code)
 			gen_var_local_addr(code);
 			return ;
 		case IL_VAR_GLOBAL:
-			code->kind = IL_VAR_GLOBAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_GLOBAL;
-			pop(T0);
+			printf("    lui %s,%%hi(%s)\n", T0,
+					my_strndup(code->var_global->name, code->var_global->name_len));
+			printf("    addi %s, %s, %%lo(%s)\n", T0, T0,
+					my_strndup(code->var_global->name, code->var_global->name_len));
 			load(code->var_global->type);
 			push();
 			return ;

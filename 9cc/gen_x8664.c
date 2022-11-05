@@ -660,7 +660,7 @@ static void	cast(t_type *from, t_type *to)
 	id1 = get_type_id(from);
 	id2 = get_type_id(to);
 
-	printf("# cast %d(%s) %d(%s)\n", id1, get_type_name(from), id2, get_type_name(to));
+	//printf("# cast %d(%s) %d(%s)\n", id1, get_type_name(from), id2, get_type_name(to));
 
 	if (id1 == -1 || id2 == -1)
 		return ;
@@ -1119,11 +1119,13 @@ static void	gen_func_epilogue(t_il *code)
 
 	g_locals_count = 0;
 
+	/* TODO 必要ない?
 	if (stack_count != 0)
 	{
 		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
 		error("Error");
 	}
+	*/
 
 	stack_count = 0;
 }
@@ -1435,9 +1437,7 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_VAR_LOCAL:
-			code->kind = IL_VAR_LOCAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_LOCAL;
+			gen_var_local_addr(code);
 			pop(RAX);
 			load(code->var_local->type);
 			push();
@@ -1446,16 +1446,16 @@ static void	gen_il(t_il *code)
 			gen_var_local_addr(code);
 			return ;
 		case IL_VAR_GLOBAL:
-			code->kind = IL_VAR_GLOBAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_GLOBAL;
-			pop(RAX);
+			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
+					my_strndup(code->var_global->name, 
+							code->var_global->name_len));
 			load(code->var_global->type);
 			push();
 			return ;
 		case IL_VAR_GLOBAL_ADDR:
 			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
-					my_strndup(code->var_global->name, code->var_global->name_len));
+					my_strndup(code->var_global->name, 
+							code->var_global->name_len));
 			push();
 			return ;
 		// TODO genでoffsetの解決 , analyzeで宣言のチェック
@@ -1491,11 +1491,11 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_CAST:
-			printf("#CAST\n");
+			//printf("#CAST\n");
 			pop(RAX);
 			cast(code->cast_from, code->cast_to);
 			push();
-			printf("#CAST END\n");
+			//printf("#CAST END\n");
 			return ;
 
 		case IL_LOAD:
