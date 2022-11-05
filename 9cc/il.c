@@ -51,7 +51,10 @@ static t_il	*append_il(t_ilkind kind)
 	if (g_il == NULL)
 		g_il = tmp;
 	else
+	{
+		tmp->before = g_il_last;
 		g_il_last->next = tmp;
+	}
 	g_il_last = tmp;
 	return (tmp);
 }

@@ -63,6 +63,7 @@ typedef enum e_ilkind
 typedef struct s_il
 {
 	t_ilkind	kind;
+	struct s_il	*before;
 	struct s_il	*next;
 
 	int			ilid_unique;
