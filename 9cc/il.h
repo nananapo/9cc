@@ -103,5 +103,6 @@ typedef struct s_il
 
 void	translate_il(void);
 void	print_il(t_il *code);
+char	*get_il_name(t_ilkind kind);
 
 #endif
