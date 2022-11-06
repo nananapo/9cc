@@ -248,7 +248,49 @@ static void	delete_cast_nonsense(void)
 				code->before->next = code->next;
 			if (code->next != NULL)
 				code->next->before = code->before;
+			if (code == g_il)
+				g_il = code->next;
 		}
+	}
+}
+
+static void	delete_push_pop(void)
+{
+	t_il	*code;
+
+	for (code = g_il; code != NULL; code = code->next)
+	{
+		if (code->before == NULL
+		|| code->kind != IL_POP)
+			continue ;
+
+		switch (code->before->kind)
+		{
+			case IL_PUSH_AGAIN:
+			case IL_PUSH_NUM:
+			case IL_PUSH_FLOAT:
+			case IL_VAR_LOCAL:
+			case IL_VAR_LOCAL_ADDR:
+			case IL_VAR_GLOBAL:
+			case IL_VAR_GLOBAL_ADDR:
+			case IL_MEMBER:
+			case IL_MEMBER_ADDR:
+			case IL_MEMBER_PTR:
+			case IL_MEMBER_PTR_ADDR:
+			case IL_STR_LIT:
+				// loadとか、そもそも結果を使わなくなるものはデータフロー解析で消す
+				// というか、データフロー解析するならこの処理いらない
+				break ;
+			default:
+				continue ;
+		}
+
+		if (code->before->before != NULL)
+			code->before->before->next = code->next;
+		if (code->next != NULL)
+			code->next->before = code->before->before;
+		if (code->before == g_il)
+			g_il = code->next;
 	}
 }
 
@@ -337,6 +379,9 @@ void	optimize(void)
 {
 	// int -> intのような意味のないキャストを削除する
 	delete_cast_nonsense();
+
+	// pushする以外に副作用がないt_ilの直後にpopがあったら消す
+	delete_push_pop();
 
 	debug_il();
 
