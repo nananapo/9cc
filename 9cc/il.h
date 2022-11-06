@@ -16,9 +16,8 @@ typedef enum e_ilkind
 	IL_DEF_VAR_END,
 	IL_PUSH_AGAIN,
 	IL_PUSH_NUM,
-	IL_PUSH_FLOAT,
 
-	IL_STACK_SWAP,
+	IL_PUSH_FLOAT,
 	IL_POP,
 	IL_ADD,
 	IL_SUB,

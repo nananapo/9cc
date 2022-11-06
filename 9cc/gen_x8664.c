@@ -1245,20 +1245,6 @@ static void	gen_il(t_il *code)
 			printf("sub rsp, 8\n");
 			stack_count += 8;
 			return ;
-		case IL_STACK_SWAP:
-		{
-			// とりあえず型を何も考えずに交換する
-			pop(RAX);
-			mov(R10, RAX);
-
-			pop(RDI);
-			mov(RAX, R10);
-			push();
-
-			mov(RAX, RDI);
-			push();
-			return ;
-		}
 		case IL_POP:
 			// TODO 型
 			pop(RAX);

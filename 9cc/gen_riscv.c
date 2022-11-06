@@ -1153,20 +1153,6 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_NUM:
 			pushi(code->number_int);
 			return ;
-		case IL_STACK_SWAP:
-		{
-			// とりあえず型を何も考えずに交換する
-			pop(T0);
-			mov(T1, T0);
-
-			pop(T1);
-			mov(T0, T1);
-			push();
-
-			mov(T0, T1);
-			push();
-			return ;
-		}
 		case IL_POP:
 			// TODO 型
 			pop(T0);
