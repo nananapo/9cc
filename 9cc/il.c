@@ -39,98 +39,98 @@ static char	*get_label_str(int i)
 	return (my_strcat("L", buf));
 }
 
-static char* get_il_name(t_ilkind kind)
+char* get_il_name(t_ilkind kind)
 {
 	switch (kind)
 	{
 		case IL_LABEL:
-			return "IL_LABEL";
+			return "LABEL";
 		case IL_JUMP:
-			return "IL_JUMP";
+			return "JUMP";
 		case IL_JUMP_TRUE:
-			return "IL_JUMP_TRUE";
+			return "JUMP_TRUE";
 		case IL_JUMP_FALSE:
-			return "IL_JUMP_FALSE";
+			return "JUMP_FALSE";
 		case IL_FUNC_PROLOGUE:
-			return "IL_FUNC_PROLOGUE";
+			return "FUNC_PROLOGUE";
 		case IL_FUNC_EPILOGUE:
-			return "IL_EPILOGUE";
+			return "EPILOGUE";
 		case IL_DEF_VAR_LOCAL:
-			return "IL_DEF_VAR_LOCAL";
+			return "DEF_VAR_LOCAL";
 		case IL_DEF_VAR_LOCAL_ARRAY:
-			return "IL_DEF_VAR_LOCAL_ARRAY";
+			return "DEF_VAR_LOCAL_ARRAY";
 		case IL_DEF_VAR_END:
-			return "IL_DEF_VAR_END";
+			return "DEF_VAR_END";
 		case IL_PUSH_AGAIN:
-			return "IL_PUSH_AGAIN";
+			return "PUSH_AGAIN";
 		case IL_PUSH_NUM:
-			return "IL_PUSH_NUM";
+			return "PUSH_NUM";
 		case IL_PUSH_FLOAT:
-			return "IL_PUSH_FLOAT";
+			return "PUSH_FLOAT";
 		case IL_POP:
-			return "IL_POP";
+			return "POP";
 		case IL_ADD:
-			return "IL_ADD";
+			return "ADD";
 		case IL_SUB:
-			return "IL_SUB";
+			return "SUB";
 		case IL_MUL:
-			return "IL_MUL";
+			return "MUL";
 		case IL_DIV:
-			return "IL_DIV";
+			return "DIV";
 		case IL_MOD:
-			return "IL_MOD";
+			return "MOD";
 		case IL_EQUAL:
-			return "IL_EQUAL";
+			return "EQUAL";
 		case IL_NEQUAL:
-			return "IL_NEQUAL";
+			return "NEQUAL";
 		case IL_LESS:
-			return "IL_LESS";
+			return "LESS";
 		case IL_LESSEQ:
-			return "IL_LESSQ";
+			return "LESSQ";
 		case IL_BITWISE_AND:
-			return "IL_BITWISE_AND";
+			return "BITWISE_AND";
 		case IL_BITWISE_OR:
-			return "IL_BITWISE_OR";
+			return "BITWISE_OR";
 		case IL_BITWISE_XOR:
-			return "IL_BITWISE_XOR";
+			return "BITWISE_XOR";
 		case IL_BITWISE_NOT:
-			return "IL_BITWISE_NOT";
+			return "BITWISE_NOT";
 		case IL_SHIFT_LEFT:
-			return "IL_SHIFT_LEFT";
+			return "SHIFT_LEFT";
 		case IL_SHIFT_RIGHT:
-			return "IL_SHIFT_RIGHT";
+			return "SHIFT_RIGHT";
 		case IL_ASSIGN:
-			return "IL_ASSIGN";
+			return "ASSIGN";
 		case IL_VAR_LOCAL:
-			return "IL_VAR_LOCAL";
+			return "VAR_LOCAL";
 		case IL_VAR_LOCAL_ADDR:
-			return "IL_VAR_LOCAL_ADDR";
+			return "VAR_LOCAL_ADDR";
 		case IL_VAR_GLOBAL:
-			return "IL_VAR_GLOBAL";
+			return "VAR_GLOBAL";
 		case IL_VAR_GLOBAL_ADDR:
-			return "IL_VAR_GLOBAL_ADDR";
+			return "VAR_GLOBAL_ADDR";
 		case IL_MEMBER:
-			return "IL_MEMBER";
+			return "MEMBER";
 		case IL_MEMBER_ADDR:
-			return "IL_MEMBER_ADDER";
+			return "MEMBER_ADDER";
 		case IL_MEMBER_PTR:
-			return "IL_MEMBER_PTR";
+			return "MEMBER_PTR";
 		case IL_MEMBER_PTR_ADDR:
-			return "IL_MEMBER_PTR_ADDR";
+			return "MEMBER_PTR_ADDR";
 		case IL_STR_LIT:
-			return "IL_STR_LIT";
+			return "STR_LIT";
 		case IL_CALL_START:
-			return "IL_CALL_START";
+			return "CALL_START";
 		case IL_CALL_ADD_ARG:
-			return "IL_CALL_ADD_ARG";
+			return "CALL_ADD_ARG";
 		case IL_CALL_EXEC:
-			return "IL_CALL_EXEC";
+			return "CALL_EXEC";
 		case IL_MACRO_VASTART:
-			return "IL_MACRO_VA_START";
+			return "MACRO_VA_START";
 		case IL_CAST:
-			return "IL_CAST";
+			return "CAST";
 		case IL_LOAD:
-			return "IL_LOAD";
+			return "LOAD";
 	}
 }
 
