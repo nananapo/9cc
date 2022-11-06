@@ -16,7 +16,7 @@ testo: $(NAME)
 	sh test_old.sh $(arch)
 
 clean:
-	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3
+	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3 debug.dot
 
 fclean: clean
 	rm -rf $(NAME)
