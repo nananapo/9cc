@@ -515,19 +515,22 @@ static int	get_call_memory(t_il *code)
 static void	push()
 {
 	stack_count += 8;
-	printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	//printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	printf("    %s %s\n", ASM_PUSH, RAX);
 }
 
 static void	pushi(int num)
 {
 	stack_count += 8;
-	printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
+	//printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
+	printf("    %s %d\n", ASM_PUSH, num);
 }
 
 static void	pop(char *reg)
 {
 	stack_count -= 8;
-	printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
+	//printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
+	printf("    pop %s\n", reg);
 }
 
 static void	mov(char *dst, char *from)
@@ -940,7 +943,7 @@ static void	gen_call_exec(t_il *code)
 	printf("    add %s, %d\n", RSP, pop_count * 8);
 	stack_count -= pop_count * 8;
 
-	printf("# return_type : %s (%d)\n", get_type_name(deffunc->type_return), get_type_size(deffunc->type_return));
+	//printf("# return_type : %s (%d)\n", get_type_name(deffunc->type_return), get_type_size(deffunc->type_return));
 
 	// 返り値がMEMORYなら、raxにアドレスを入れる
 	if (is_memory_type(deffunc->type_return))
@@ -1171,7 +1174,7 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
-	printf("# ilid: %d, kind: %d\n", code->ilid_unique, code->kind);
+	//printf("# ilid: %d, kind: %d\n", code->ilid_unique, code->kind);
 
 	if (code->gen_is_generated)
 	{
