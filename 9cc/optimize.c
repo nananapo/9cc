@@ -3,12 +3,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 extern t_il	*g_il;
 
 static t_basicblock		*g_basicblock;
 static t_il				*g_il_last;
 static int				BASICBLOCK_ID;
+static t_pair_ilblock	*g_all_blocks;
+
+static void	append_ilblock_pair(t_pair_ilblock **pairs, t_basicblock *block);
+
 
 static t_basicblock	*create_basicblock(t_il *start, t_il *end, t_basicblock *next, t_basicblock *next_if)
 {
@@ -20,6 +26,9 @@ static t_basicblock	*create_basicblock(t_il *start, t_il *end, t_basicblock *nex
 	block->next = next;
 	block->next = next_if;
 	block->uniqueid = BASICBLOCK_ID++;
+
+	// save
+	append_ilblock_pair(&g_all_blocks, block);
 	return (block);
 }
 
@@ -170,7 +179,9 @@ static void	mark_next_blocks(t_basicblock *parent, t_basicblock *target)
 	|| target->il_generated
 	|| target->mark_block != NULL)
 		return ;
-	for (;	target != NULL && target->mark_block == NULL;
+	for (;	target != NULL
+		&&	target->mark_block == NULL
+		&&	!target->mark_prohibited;
 			target = target->next)
 	{
 		target->mark_block = parent;
@@ -188,14 +199,17 @@ static void	unmark_next_blocks(t_basicblock *parent, t_basicblock *target)
 
 static void	generate_basicblock_il(t_basicblock *block)
 {
+	t_basicblock	*tmp;
+
+	// skip
 	if (block == NULL
 	|| block->il_generated
 	|| block->mark_block != NULL)
 		return ;
 	block->il_generated = true;
 
+	// ok
 	printf("# generate bblock(%d)\n", block->uniqueid);
-
 	if (g_il == NULL)
 	{
 		g_il = block->start;
@@ -207,6 +221,11 @@ static void	generate_basicblock_il(t_basicblock *block)
 		g_il_last = block->end;
 	}
 	g_il_last->next = NULL;
+
+	for (	tmp = block;
+			tmp != NULL && !tmp->mark_prohibited;
+			tmp = tmp->next)
+		tmp->mark_prohibited = true;
 
 	mark_next_blocks(block, block->next_if);
 	generate_basicblock_il(block->next);
@@ -245,6 +264,75 @@ static void	debug_il(void)
 	printf("# printil end\n");
 }
 
+static void debug_basicblock(FILE *fp, t_basicblock *block)
+{
+	t_il	*code;
+
+	fprintf(fp, "Block #%d\n", block->uniqueid);
+
+	code = block->start;
+	for (; code != block->end; code = code->next)
+		fprintf(fp, "#%d %s\\l", code->ilid_unique, get_il_name(code->kind));
+	fprintf(fp, "#%d %s\\l", code->ilid_unique, get_il_name(code->kind));
+}
+
+static void debug_basicblock_dot()
+{
+	FILE			*fp;
+	t_pair_ilblock	*pair;
+
+	fp = fopen("debug.dot", "w");
+	if (fp == NULL)
+		return ;
+
+	fprintf(fp,"digraph graph_name {\n");
+ 	fprintf(fp," graph [\n");
+ 	fprintf(fp,"   charset = \"UTF-8\";\n");
+ 	fprintf(fp,"   fontsize = 18,\n");
+ 	fprintf(fp,"   style = \"filled\",\n");
+ 	fprintf(fp,"   margin = 0.2,\n");
+ 	fprintf(fp,"   layout = dot\n");
+ 	fprintf(fp," ];\n");
+ 	fprintf(fp," node [\n");
+ 	fprintf(fp,"   shape = rect,\n");
+ 	fprintf(fp,"   fontsize = 14,\n");
+ 	fprintf(fp,"   fontname = \"明朝体\",\n");
+ 	fprintf(fp," ];\n");
+ 	fprintf(fp," edge [\n");
+ 	fprintf(fp,"   color = black\n");
+ 	fprintf(fp," ];\n");
+
+	for (pair = g_all_blocks; pair != NULL; pair = pair->next)
+	{
+		if (pair->block->next != NULL)
+		{
+			fprintf(fp, "\"");
+				debug_basicblock(fp, pair->block);
+			fprintf(fp, "\" -> \"");
+				debug_basicblock(fp, pair->block->next);
+			fprintf(fp, "\"[label = \"next\"];");
+		}
+
+		if (pair->block->next_if != NULL)
+		{
+			fprintf(fp, "\"");
+				debug_basicblock(fp, pair->block);
+			fprintf(fp, "\" -> \n\"");
+				debug_basicblock(fp, pair->block->next_if);
+			fprintf(fp, "\"[label = \"next_j\"];");
+		}
+
+		if (pair->block->next == NULL && pair->block->next_if == NULL)
+		{
+			fprintf(fp, "\"");
+				debug_basicblock(fp, pair->block);
+			fprintf(fp, "\";");
+		}
+	}
+
+	fprintf(fp, "\n}");
+}
+
 void	optimize(void)
 {
 	// int -> intのような意味のないキャストを削除する
@@ -259,4 +347,6 @@ void	optimize(void)
 	g_il_last = NULL;
 	//基本ブロックから中間表現の列を生成する
 	generate_basicblock_il(g_basicblock);
+
+	debug_basicblock_dot();
 }

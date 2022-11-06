@@ -13,7 +13,9 @@ typedef struct	s_basicblock
 
 	bool				is_constructed;
 	bool				il_generated;
+
 	struct s_basicblock	*mark_block;
+	bool				mark_prohibited;
 }	t_basicblock;
 
 typedef struct	s_pair_ilblock
