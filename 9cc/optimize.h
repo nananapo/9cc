@@ -9,9 +9,11 @@ typedef struct	s_basicblock
 	t_il				*end;
 	struct s_basicblock	*next;
 	struct s_basicblock	*next_if;
+	int					uniqueid;
 
 	bool				is_constructed;
 	bool				il_generated;
+	struct s_basicblock	*mark_block;
 }	t_basicblock;
 
 typedef struct	s_pair_ilblock

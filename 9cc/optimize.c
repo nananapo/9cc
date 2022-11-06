@@ -8,6 +8,7 @@ extern t_il	*g_il;
 
 static t_basicblock		*g_basicblock;
 static t_il				*g_il_last;
+static int				BASICBLOCK_ID;
 
 static t_basicblock	*create_basicblock(t_il *start, t_il *end, t_basicblock *next, t_basicblock *next_if)
 {
@@ -18,6 +19,7 @@ static t_basicblock	*create_basicblock(t_il *start, t_il *end, t_basicblock *nex
 	block->end = end;
 	block->next = next;
 	block->next = next_if;
+	block->uniqueid = BASICBLOCK_ID++;
 	return (block);
 }
 
@@ -81,6 +83,10 @@ static void	connect_basicblock_recursively(t_pair_ilblock *pairs, t_basicblock *
 	{
 		target_block = search_ilblock_pair(pairs, block->end->next);
 		block->next = target_block;
+
+		if (target_block != NULL)
+			printf("# block(%d)->next = %d\n", block->uniqueid, target_block->uniqueid);
+
 		connect_basicblock_recursively(pairs, target_block);
 	}
 
@@ -89,6 +95,13 @@ static void	connect_basicblock_recursively(t_pair_ilblock *pairs, t_basicblock *
 	|| block->end->kind == IL_JUMP_FALSE)
 	{
 		target_block = search_ilblock_with_label(pairs, block->end->label_str);
+
+		if (target_block != NULL)
+			printf("# block(%d)->next_if = %d\n", block->uniqueid, target_block->uniqueid);
+		else
+			printf("# failed to find Label:\"%s\" , block(%d,kind:%d)\n",
+						block->end->label_str, block->uniqueid, block->end->kind);
+
 		block->next_if = target_block;
 		connect_basicblock_recursively(pairs, target_block);
 	}
@@ -109,6 +122,8 @@ static t_basicblock	*construct_basicblock(void)
 	il_leader_pairs	= NULL;
 	headblock		= NULL;
 
+	printf("# start construct\n");
+
 	// 筆頭と中間表現のペアを作る
 	// ラベルをとりあえず筆頭にする
 	for (code = g_il; code != NULL; code = code->next)
@@ -122,6 +137,8 @@ static t_basicblock	*construct_basicblock(void)
 				block = create_basicblock(code, code, NULL, NULL);
 				block_now = block;
 				append_ilblock_pair(&il_leader_pairs, block);
+
+				printf("# Create Block(%d,kind:%d) start:%d\n", block->uniqueid, code->kind, code->ilid_unique);
 			}
 			else
 				block_now->end = code;
@@ -132,17 +149,14 @@ static t_basicblock	*construct_basicblock(void)
 			block = create_basicblock(code, NULL, NULL, NULL);
 			block_now = block;
 			append_ilblock_pair(&il_leader_pairs, block);
+
+			printf("# Create Block(%d, kind:%d) start:%d\n", block->uniqueid, code->kind, code->ilid_unique);
 		}
 		if (block_now != NULL)
 			block_now->end = code;
 	}
 
-	for (pair = il_leader_pairs; pair != NULL; pair = pair->next)
-	{
-		pair->block->start->before = NULL;
-		pair->block->end->next = NULL;
-	}
-
+	printf("# start connect\n");
 	// 基本ブロックをつなぐ
 	headblock = search_ilblock_pair(il_leader_pairs, g_il);
 	connect_basicblock_recursively(il_leader_pairs, headblock);
@@ -150,15 +164,37 @@ static t_basicblock	*construct_basicblock(void)
 	return headblock;
 }
 
-// とりあえずはnextを生成するだけ生成して、ifはスタック
+static void	mark_next_blocks(t_basicblock *parent, t_basicblock *target)
+{
+	if (target == NULL
+	|| target->il_generated
+	|| target->mark_block != NULL)
+		return ;
+	for (;	target != NULL && target->mark_block == NULL;
+			target = target->next)
+	{
+		target->mark_block = parent;
+	}
+}
+
+static void	unmark_next_blocks(t_basicblock *parent, t_basicblock *target)
+{
+	for (;	target != NULL && target->mark_block == parent;
+			target = target->next)
+	{
+		target->mark_block = NULL;
+	}
+}
+
 static void	generate_basicblock_il(t_basicblock *block)
 {
-	if (block == NULL || block->il_generated)
+	if (block == NULL
+	|| block->il_generated
+	|| block->mark_block != NULL)
 		return ;
 	block->il_generated = true;
 
-	printf("# New Block %d -> %d\n",
-			block->start->ilid_unique, block->end->ilid_unique);
+	printf("# generate bblock(%d)\n", block->uniqueid);
 
 	if (g_il == NULL)
 	{
@@ -170,22 +206,57 @@ static void	generate_basicblock_il(t_basicblock *block)
 		g_il_last->next = block->start;
 		g_il_last = block->end;
 	}
-
 	g_il_last->next = NULL;
-	printf("#next\n");
+
+	mark_next_blocks(block, block->next_if);
 	generate_basicblock_il(block->next);
-	printf("#next_if\n");
+	unmark_next_blocks(block, block->next_if);
+
 	generate_basicblock_il(block->next_if);
-	printf("#end\n");
+}
+
+static void	delete_cast_nonsense(void)
+{
+	t_il	*code;
+
+	for (code = g_il; code != NULL; code = code->next)
+	{
+		if (code->kind != IL_CAST)
+			continue ;
+		if (type_equal(code->cast_from, code->cast_to))
+		{
+			if (code->before != NULL)
+				code->before->next = code->next;
+			if (code->next != NULL)
+				code->next->before = code->before;
+		}
+	}
+}
+
+static void	debug_il(void)
+{
+	t_il	*tmpil;
+
+	printf("# printil start\n");
+	for (tmpil = g_il; tmpil != NULL; tmpil = tmpil->next)
+	{
+		print_il(tmpil);
+	}
+	printf("# printil end\n");
 }
 
 void	optimize(void)
 {
+	// int -> intのような意味のないキャストを削除する
+	delete_cast_nonsense();
+
+	debug_il();
+
+	// 基本ブロックを構成
 	g_basicblock = construct_basicblock();
 
 	g_il = NULL;
 	g_il_last = NULL;
-
 	//基本ブロックから中間表現の列を生成する
 	generate_basicblock_il(g_basicblock);
 }
