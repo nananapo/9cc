@@ -151,12 +151,12 @@ void	print_il(t_il *code)
 		case IL_VAR_LOCAL:
 		case IL_VAR_LOCAL_ADDR:
 			printf("#    name : %s\n",
-			 strndup(code->var_local->name, code->var_local->name_len));
+			 my_strndup(code->var_local->name, code->var_local->name_len));
 			break ;
 		case IL_VAR_GLOBAL:
 		case IL_VAR_GLOBAL_ADDR:
 			printf("#    name : %s\n",
-			 strndup(code->var_global->name, code->var_global->name_len));
+			 my_strndup(code->var_global->name, code->var_global->name_len));
 			break ;
 		case IL_ADD:
 		case IL_SUB:
