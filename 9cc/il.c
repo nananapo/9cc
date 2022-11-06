@@ -39,6 +39,169 @@ static char	*get_label_str(int i)
 	return (my_strcat("L", buf));
 }
 
+static char* get_il_name(t_ilkind kind)
+{
+	switch (kind)
+	{
+		case IL_LABEL:
+			return "IL_LABEL";
+		case IL_JUMP:
+			return "IL_JUMP";
+		case IL_JUMP_TRUE:
+			return "IL_JUMP_TRUE";
+		case IL_JUMP_FALSE:
+			return "IL_JUMP_FALSE";
+		case IL_FUNC_PROLOGUE:
+			return "IL_FUNC_PROLOGUE";
+		case IL_FUNC_EPILOGUE:
+			return "IL_EPILOGUE";
+		case IL_DEF_VAR_LOCAL:
+			return "IL_DEF_VAR_LOCAL";
+		case IL_DEF_VAR_LOCAL_ARRAY:
+			return "IL_DEF_VAR_LOCAL_ARRAY";
+		case IL_DEF_VAR_END:
+			return "IL_DEF_VAR_END";
+		case IL_PUSH_AGAIN:
+			return "IL_PUSH_AGAIN";
+		case IL_PUSH_NUM:
+			return "IL_PUSH_NUM";
+		case IL_PUSH_FLOAT:
+			return "IL_PUSH_FLOAT";
+		case IL_POP:
+			return "IL_POP";
+		case IL_ADD:
+			return "IL_ADD";
+		case IL_SUB:
+			return "IL_SUB";
+		case IL_MUL:
+			return "IL_MUL";
+		case IL_DIV:
+			return "IL_DIV";
+		case IL_MOD:
+			return "IL_MOD";
+		case IL_EQUAL:
+			return "IL_EQUAL";
+		case IL_NEQUAL:
+			return "IL_NEQUAL";
+		case IL_LESS:
+			return "IL_LESS";
+		case IL_LESSEQ:
+			return "IL_LESSQ";
+		case IL_BITWISE_AND:
+			return "IL_BITWISE_AND";
+		case IL_BITWISE_OR:
+			return "IL_BITWISE_OR";
+		case IL_BITWISE_XOR:
+			return "IL_BITWISE_XOR";
+		case IL_BITWISE_NOT:
+			return "IL_BITWISE_NOT";
+		case IL_SHIFT_LEFT:
+			return "IL_SHIFT_LEFT";
+		case IL_SHIFT_RIGHT:
+			return "IL_SHIFT_RIGHT";
+		case IL_ASSIGN:
+			return "IL_ASSIGN";
+		case IL_VAR_LOCAL:
+			return "IL_VAR_LOCAL";
+		case IL_VAR_LOCAL_ADDR:
+			return "IL_VAR_LOCAL_ADDR";
+		case IL_VAR_GLOBAL:
+			return "IL_VAR_GLOBAL";
+		case IL_VAR_GLOBAL_ADDR:
+			return "IL_VAR_GLOBAL_ADDR";
+		case IL_MEMBER:
+			return "IL_MEMBER";
+		case IL_MEMBER_ADDR:
+			return "IL_MEMBER_ADDER";
+		case IL_MEMBER_PTR:
+			return "IL_MEMBER_PTR";
+		case IL_MEMBER_PTR_ADDR:
+			return "IL_MEMBER_PTR_ADDR";
+		case IL_STR_LIT:
+			return "IL_STR_LIT";
+		case IL_CALL_START:
+			return "IL_CALL_START";
+		case IL_CALL_ADD_ARG:
+			return "IL_CALL_ADD_ARG";
+		case IL_CALL_EXEC:
+			return "IL_CALL_EXEC";
+		case IL_MACRO_VASTART:
+			return "IL_MACRO_VA_START";
+		case IL_CAST:
+			return "IL_CAST";
+		case IL_LOAD:
+			return "IL_LOAD";
+	}
+}
+
+void	print_il(t_il *code)
+{
+	printf("#%d %s (%p)\n", code->ilid_unique, get_il_name(code->kind), code);
+
+	switch (code->kind)
+	{
+		case IL_LABEL:
+		case IL_JUMP:
+		case IL_JUMP_TRUE:
+		case IL_JUMP_FALSE:
+			printf("#    label : %s\n", code->label_str);
+			break ;
+		case IL_DEF_VAR_LOCAL:
+		case IL_DEF_VAR_LOCAL_ARRAY:
+		case IL_VAR_LOCAL:
+		case IL_VAR_LOCAL_ADDR:
+			printf("#    name : %s\n",
+			 strndup(code->var_local->name, code->var_local->name_len));
+			break ;
+		case IL_VAR_GLOBAL:
+		case IL_VAR_GLOBAL_ADDR:
+			printf("#    name : %s\n",
+			 strndup(code->var_global->name, code->var_global->name_len));
+			break ;
+		case IL_ADD:
+		case IL_SUB:
+		case IL_MUL:
+		case IL_DIV:
+		case IL_MOD:
+		case IL_EQUAL:
+		case IL_NEQUAL:
+		case IL_LESS:
+		case IL_LESSEQ:
+		case IL_BITWISE_AND:
+		case IL_BITWISE_OR:
+		case IL_BITWISE_XOR:
+		case IL_BITWISE_NOT:
+		case IL_SHIFT_LEFT:
+		case IL_SHIFT_RIGHT:
+			printf("#    type : %s\n", get_type_name(code->type));
+			break ;
+		case IL_CAST:
+			printf("#    op : %s -> %s\n", get_type_name(code->cast_from), get_type_name(code->cast_to));
+			break ;
+		case IL_PUSH_NUM:
+			printf("#    num : %d\n", code->number_int);
+			break ;
+		case IL_FUNC_PROLOGUE:
+		case IL_FUNC_EPILOGUE:
+		case IL_DEF_VAR_END:
+		case IL_PUSH_AGAIN:
+		case IL_PUSH_FLOAT:
+		case IL_POP:
+		case IL_STR_LIT:
+		case IL_CALL_START:
+		case IL_CALL_ADD_ARG:
+		case IL_CALL_EXEC:
+		case IL_MACRO_VASTART:
+		case IL_LOAD:
+		case IL_MEMBER:
+		case IL_MEMBER_ADDR:
+		case IL_MEMBER_PTR:
+		case IL_MEMBER_PTR_ADDR:
+		case IL_ASSIGN:
+			break ;
+	}
+}
+
 static t_il	*append_il(t_ilkind kind)
 {
 	t_il	*tmp;

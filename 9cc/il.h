@@ -102,5 +102,6 @@ typedef struct s_il
 }	t_il;
 
 void	translate_il(void);
+void	print_il(t_il *code);
 
 #endif
