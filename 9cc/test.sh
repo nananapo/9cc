@@ -373,6 +373,7 @@ assert "return.c"
 assert "continue1.c"
 assert "continue2.c"
 assert "continue3.c"
+assert "continue4.c"
 
 assert "break1.c"
 assert "break2.c"
@@ -390,6 +391,7 @@ assert "declare_assign.c"
 assert "switch1.c"
 assert "switch2.c"
 assert "switch3.c"
+assert "switch4.c"
 
 assert "duffsdevice.c"
 
@@ -398,6 +400,7 @@ assert "defstruct1.c"
 assert "defstruct2.c"
 
 assert "elseif.c"
+assert "elseif2.c"
 
 assert "enum1.c"
 assert "enum2.c"
@@ -415,6 +418,7 @@ assert "union4.c"
 
 assert "condop.c"
 assert "condop2.c"
+assert "condop3.c"
 
 assert "bitwise_and.c"
 assert "bitwise_or.c"
