@@ -55,7 +55,6 @@ assert_async(){
 	
 	cc -o $targetname $asmname $module
 	if [ "$?" != "0" ]; then
-		echo "$input" > hey
 		echo "9CC COMPILE KO => $1"
 		echo "9CC COMPILE KO => $1" >> tmp/err
 		exit 1
@@ -85,6 +84,7 @@ assert_async(){
   	  echo "OUTPUT KO $1 > $actresname $expresname" >> tmp/err
   	  exit 1
   	fi
+	echo "OK $1"
 }
 
 assert() {
@@ -239,6 +239,7 @@ assert "array34.c"
 assert "array35.c"
 assert "array36.c"
 assert "array37.c"
+assert "array38.c"
 
 assert "global1.c"
 assert "global2.c"
@@ -372,6 +373,7 @@ assert "return.c"
 assert "continue1.c"
 assert "continue2.c"
 assert "continue3.c"
+assert "continue4.c"
 
 assert "break1.c"
 assert "break2.c"
@@ -389,6 +391,7 @@ assert "declare_assign.c"
 assert "switch1.c"
 assert "switch2.c"
 assert "switch3.c"
+assert "switch4.c"
 
 assert "duffsdevice.c"
 
@@ -397,6 +400,7 @@ assert "defstruct1.c"
 assert "defstruct2.c"
 
 assert "elseif.c"
+assert "elseif2.c"
 
 assert "enum1.c"
 assert "enum2.c"
@@ -414,6 +418,7 @@ assert "union4.c"
 
 assert "condop.c"
 assert "condop2.c"
+assert "condop3.c"
 
 assert "bitwise_and.c"
 assert "bitwise_or.c"
@@ -432,6 +437,15 @@ assert "ret_struct6.c"
 assert "ret_struct7.c"
 
 assert "quine.c"
+assert "pi.c"
+assert "e.c"
+
+
+#assert "float1.c"
+#assert "float2.c"
+#assert "float3.c"
+#assert "float4.c"
+#assert "float5.c"
 
 wait
 

@@ -19,7 +19,5 @@ check() {
 
 find $DIR1 -name "*.s" | awk -F/ "{print \$NF}" | awk -F. "{print \$1}" | while read line
 do
-check "$line"
+	check "$line"
 done
-
-echo "OK!!"

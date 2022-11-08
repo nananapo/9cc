@@ -72,8 +72,24 @@ extern char				*g_filename;
 extern t_deffunc		*g_func_defs[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
+static void	put_str_literal(char *str, int len)
+{
+	int	i;
+
+	i = -1;
+	while (++i < len)
+	{
+		if (str[i] == '\\')
+		{
+			i++;
+			if (str[i] != '\'')
+				printf("\\");
+		}
+		printf("%c", str[i]);
+	}
+}
 
 static bool	is_memory_type(t_type *type)
 {
@@ -182,6 +198,8 @@ int	get_type_size_riscv(t_type *type)
 			return (1);
 		case TY_BOOL:
 			return (1);
+		case TY_FLOAT:
+			return (4);
 		case TY_PTR:
 			return (8);
 		case TY_ARRAY:
@@ -198,6 +216,20 @@ int	get_type_size_riscv(t_type *type)
 			error("size of unknown type %d", type->ty);
 	}
 	return (-1);
+}
+
+bool	is_unsigned_abi_riscv(t_typekind kind)
+{
+	switch (kind)
+	{
+		case TY_CHAR:
+		case TY_PTR:
+		case TY_ARRAY:
+			return (true);
+		default:
+			return (false);
+	}
+	return (false);
 }
 
 static int	alloc_argument(t_lvar *lvar)
@@ -539,18 +571,21 @@ static void	cast(t_type *from, t_type *to)
 	if (is_pointer_type(from) && is_pointer_type(to))
 		return ;
 	
-	size1 = get_type_size(from);
-	size2 = get_type_size(to);
-
+	// ポインタから整数も何もしない
 	if (is_pointer_type(from) && is_integer_type(to))
 		return ;
 
+	size1 = get_type_size(from);
+	size2 = get_type_size(to);
+
+	// 整数からポインタ
 	if (is_integer_type(from) && is_pointer_type(to))
 	{
 		printf("    sext.w %s, %s\n", T0, T0);
 		return ;
 	}
 
+	// 整数から整数
 	if (is_integer_type(from) && is_integer_type(to))
 	{
 		if (size1 < size2)
@@ -568,17 +603,13 @@ static void	cast(t_type *from, t_type *to)
 		return ;
 	}
 
-	if (from != NULL)
-		fprintf(stderr, "from : %d\n", from->ty);
-	if (to != NULL)
-		fprintf(stderr, "to : %d\n", to->ty);
-		
-	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
+	error("%sから%sへのキャストが定義されていません", name1, name2);
 }
 
 static void	print_global_constant(t_node *node, t_type *type)
 {
 	t_node	*notmp;
+	int		i;
 
 	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
@@ -595,8 +626,23 @@ static void	print_global_constant(t_node *node, t_type *type)
 	}
 	else if (is_pointer_type(type))
 	{
-		for (notmp = node; notmp; notmp = notmp->global_assign_next)
-			print_global_constant(notmp, type->ptr_to);
+		if (node->kind == ND_NUM)
+		{
+			// 数字は無視....
+			for (i = get_type_size(type); i > 0; i -= 8)
+			{
+				if (i >= 8)
+				{
+					printf("    .dword 0\n");
+					continue ;
+				}
+				for (; i > 0; i--)
+					printf("    .byte 0\n");
+			}
+			return ;
+		}
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_global_constant(notmp->lhs, type->ptr_to);
 	}
 	else
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
@@ -625,6 +671,54 @@ static void gen_defglobal(t_defvar *node)
 		printf("%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}
+}
+
+// T2にアドレスを入れておく
+static void	print_local_array(t_node *node, t_type *type)
+{
+	t_node	*notmp;
+
+	if (type_equal(type, new_primitive_type(TY_INT)))
+	{
+		addi(T1, ZERO, node->val);
+		printf("    sw %s, %d(%s)\n", T1, 0, T2);
+		addi(T2, T2, 4);
+	}
+	else if (type_equal(type, new_primitive_type(TY_CHAR)))
+	{
+		addi(T1, ZERO, node->val);
+		printf("    sb %s, %d(%s)\n", T1, 0, T2);
+		addi(T2, T2, 1);
+	}
+ 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR))) && node->def_str != NULL)
+	{
+		printf("    lui %s, %%hi(.L_STR_%d)\n", T1, node->def_str->index);
+		printf("    addi %s, %s, %%lo(.L_STR_%d)\n", T1, T1, node->def_str->index);
+		printf("    sd %s, %d(%s)\n", T1, 0, T2);
+		addi(T2, T2, 8);
+	}
+	else if (is_pointer_type(type))
+	{
+		if (node->kind == ND_NUM)
+		{
+			addi(T1, ZERO, node->val);
+			printf("    sd %s, %d(%s)\n", T1, 0, T2);
+			addi(T2, T2, get_type_size(type));
+			return ;
+		}
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_local_array(notmp->lhs, type->ptr_to);
+	}
+	else
+		error("print_local_array : 未対応の型 %s", get_type_name(type));
+}
+
+static void	gen_lvar_array(t_il *code)
+{
+	pop(T0);
+	push();
+	mov(T2, T0);
+	print_local_array(code->lvar_array, code->type);
 }
 
 static void	gen_call_start(t_il *code)
@@ -938,14 +1032,6 @@ static void	gen_func_epilogue(t_il *code)
 	addi(SP, SP, g_va_start_offset);
 	printf("    jr %s\n", RA);
 	
-	g_locals_count = 0;
-
-	if (stack_count != 0)
-	{
-		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
-		error("Error");
-	}
-
 	stack_count = 0;
 }
 
@@ -957,8 +1043,6 @@ static void	gen_def_var_local(t_il *code)
 static void	gen_def_var_end(void)
 {
 	int	old;
-
-	
 
 	old			= stack_count;
 	stack_count	= align_to(stack_count, 16);
@@ -989,6 +1073,13 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
+	if (code->gen_is_generated)
+	{
+		fprintf(stderr, "error : code is re-generated.\n");
+		return ;
+	}
+
+	//code->gen_is_generated = true;
 	printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
@@ -1044,27 +1135,13 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_AGAIN:
 		{
 			// TODO 型
-			debug("AGAIN");
+			//debug("AGAIN");
 			push();
 			return ;
 		}
 		case IL_PUSH_NUM:
 			pushi(code->number_int);
 			return ;
-		case IL_STACK_SWAP:
-		{
-			// とりあえず型を何も考えずに交換する
-			pop(T0);
-			mov(T1, T0);
-
-			pop(T1);
-			mov(T0, T1);
-			push();
-
-			mov(T0, T1);
-			push();
-			return ;
-		}
 		case IL_POP:
 			// TODO 型
 			pop(T0);
@@ -1211,9 +1288,7 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_VAR_LOCAL:
-			code->kind = IL_VAR_LOCAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_LOCAL;
+			gen_var_local_addr(code);
 			pop(T0);
 			load(code->var_local->type);
 			push();
@@ -1222,10 +1297,10 @@ static void	gen_il(t_il *code)
 			gen_var_local_addr(code);
 			return ;
 		case IL_VAR_GLOBAL:
-			code->kind = IL_VAR_GLOBAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_GLOBAL;
-			pop(T0);
+			printf("    lui %s,%%hi(%s)\n", T0,
+					my_strndup(code->var_global->name, code->var_global->name_len));
+			printf("    addi %s, %s, %%lo(%s)\n", T0, T0,
+					my_strndup(code->var_global->name, code->var_global->name_len));
 			load(code->var_global->type);
 			push();
 			return ;
@@ -1282,6 +1357,10 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 
+		case IL_DEF_VAR_LOCAL_ARRAY:
+			gen_lvar_array(code);
+			return ;
+
 		default:
 		{
 			fprintf(stderr, "gen not implemented\nkind : %d\n", code->kind);
@@ -1295,7 +1374,7 @@ void	codegen_riscv(void)
 {
 	int		i;
 	t_il	*code;
-
+	t_funcil_pair	*pair;
 
 	printf("    .file \"%s\"\n", g_filename);
 
@@ -1312,8 +1391,12 @@ void	codegen_riscv(void)
 	}
 
 	printf("    .align 1\n");
-	for (code = g_il; code != NULL; code = code->next)
-		gen_il(code);
+	for (pair = g_func_ils; pair != NULL; pair = pair->next)
+	{
+		for (code = pair->code; code != NULL; code = code->next)
+			gen_il(code);
+		g_locals_count = 0;
+	}
 
 	// グローバル変数を生成
 	printf(".section  .sdata, \"aw\", @progbits\n");

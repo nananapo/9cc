@@ -44,9 +44,12 @@ bool	find_enum(char *str, int len, t_defenum **res_def, int *res_value)
 
 t_type	*new_primitive_type(t_typekind pri)
 {
-	t_type	*type = calloc(1, sizeof(t_type));
-	type->ty = pri;
-	type->ptr_to = NULL;
+	t_type	*type;
+
+	type				= calloc(1, sizeof(t_type));
+	type->ty			= pri;
+	type->ptr_to		= NULL;
+	type->is_unsigned	= is_unsigned_abi(pri);
 	return type;
 }
 
@@ -144,7 +147,7 @@ bool	type_equal(t_type *t1, t_type *t2)
 		return (t1->unon == t2->unon);
 	if (t1->ty == TY_ENUM)
 		return (t1->enm == t2->enm);
-	return (true);
+	return (t1->is_unsigned == t2->is_unsigned);
 }
 
 // 整数型かどうか判定する
@@ -154,6 +157,12 @@ bool	is_integer_type(t_type *type)
 			|| type->ty == TY_CHAR
 			|| type->ty == TY_ENUM
 			|| type->ty == TY_BOOL);
+}
+
+bool	is_flonum(t_type *type)
+{
+	return (type->ty == TY_FLOAT
+			|| type->ty == TY_DOUBLE);
 }
 
 // 配列かどうか確認する
@@ -190,6 +199,14 @@ bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt)
 	{
 		*lt = new_type_ptr_to(new_primitive_type(TY_VOID));
 		*rt = new_type_ptr_to(new_primitive_type(TY_VOID));
+		return (true);
+	}
+
+	if (is_flonum(l) || is_flonum(r))
+	{
+		// とりあえずfloat
+		*lt = new_primitive_type(TY_FLOAT);
+		*rt = new_primitive_type(TY_FLOAT);
 		return (true);
 	}
 
@@ -237,6 +254,9 @@ t_member	*get_member_by_name(t_type *type, char *name, int len)
 
 static void	typename_loop(t_type *type, char *str)
 {
+	if (type->is_unsigned)
+		strcat(str, "unsigned ");
+
 	if (type->ty == TY_INT)
 		strcat(str, "int");
 	else if (type->ty == TY_CHAR)
@@ -245,6 +265,10 @@ static void	typename_loop(t_type *type, char *str)
 		strcat(str, "_Bool");
 	else if (type->ty == TY_VOID)
 		strcat(str, "void");
+	else if (type->ty == TY_FLOAT)
+		strcat(str, "float");
+	else if (type->ty == TY_DOUBLE)
+		strcat(str, "double");
 	else if (type->ty == TY_STRUCT)
 	{
 		strcat(str, "struct[");
@@ -253,13 +277,13 @@ static void	typename_loop(t_type *type, char *str)
 	}
 	else if (type->ty == TY_ENUM)
 	{
-		strcat(str, "enum");
+		strcat(str, "enum[");
 		strncat(str, type->enm->name, type->enm->name_len);
 		strcat(str, "]");
 	}
 	else if (type->ty == TY_UNION)
 	{
-		strcat(str, "union");
+		strcat(str, "union[");
 		strncat(str, type->unon->name, type->unon->name_len);
 		strcat(str, "]");
 	}
@@ -275,7 +299,8 @@ static void	typename_loop(t_type *type, char *str)
 	}
 	else
 	{
-		error("未対応の型 %d", type->ty);
+		fprintf(stderr, "get_type_name : 未対応の型が渡されました %d\n", type->ty);
+		strcat(str, "unknown");
 	}
 }
 
@@ -286,31 +311,49 @@ bool	is_declarable_type(t_type *type)
 	return (type->ty != TY_VOID);
 }
 
-bool	type_can_cast(t_type *from, t_type *to, bool is_explicit)
+t_type	*get_common_type(t_type *ty1, t_type *ty2)
+{
+	int	size1;
+	int	size2;
+
+	// とりあえずfloat
+	if (is_flonum(ty1) || is_flonum(ty2))
+		return (new_primitive_type(TY_FLOAT));
+	if (ty1->ty == TY_CHAR)
+		ty1 = new_primitive_type(TY_INT);
+	if (ty2->ty == TY_CHAR)
+		ty2 = new_primitive_type(TY_INT);
+	if (type_equal(ty1, ty2))
+		return (ty1);
+	size1 = get_type_size(ty1);
+	size2 = get_type_size(ty2);
+	if (size1 != size2)
+		return (size1 < size2) ? ty2 : ty1;
+	// unsingedな方を返す
+	if (ty2->is_unsigned)
+		return (ty2);
+	return (ty1);
+}
+
+bool	type_can_cast(t_type *from, t_type *to)
 {
 	if (type_equal(from, to))
 		return (true);
 
 	// structはダメ
-	if (from->ty == TY_STRUCT || to->ty == TY_STRUCT)
-		return (false);
-
 	// unionもダメ
-	if (from->ty == TY_UNION || to->ty == TY_UNION)
+	if (from->ty == TY_STRUCT || to->ty == TY_STRUCT
+	|| from->ty == TY_UNION || to->ty == TY_UNION)
 		return (false);
 
 	// どちらもポインタ
 	if (is_pointer_type(from) && is_pointer_type(to))
 		return (true);
-
 	// どちらかがポインタ
 	if (is_pointer_type(from) != is_pointer_type(to))
 		return (true);
 
-	// どちらも数字？
-	if (is_explicit)
-		debug("");
-	is_explicit = false;
+	// 数字から数字
 	return (true);
 }
 

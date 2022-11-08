@@ -17,7 +17,7 @@ typedef enum e_ilkind
 	IL_PUSH_AGAIN,
 	IL_PUSH_NUM,
 
-	IL_STACK_SWAP,
+	IL_PUSH_FLOAT,
 	IL_POP,
 	IL_ADD,
 	IL_SUB,
@@ -55,13 +55,17 @@ typedef enum e_ilkind
 
 	IL_MACRO_VASTART,
 	IL_CAST,
-	IL_LOAD
+	IL_LOAD,
+	IL_DEF_VAR_LOCAL_ARRAY,
 }	t_ilkind;
 
 typedef struct s_il
 {
 	t_ilkind	kind;
+	struct s_il	*before;
 	struct s_il	*next;
+
+	int			ilid_unique;
 
 	t_type		*type;
 
@@ -70,6 +74,7 @@ typedef struct s_il
 	bool		label_is_static_func;
 
 	int			number_int;
+	float		number_float;
 
 	t_deffunc	*deffunc_def;
 	t_lvar		*deffunc_locals;
@@ -89,8 +94,22 @@ typedef struct s_il
 	t_type		*stack_down;
 
 	t_member	*member;
+
+	t_node		*lvar_array;
+
+
+	bool		gen_is_generated;
 }	t_il;
 
+typedef struct s_funcil_pair
+{
+	struct	s_funcil_pair	*next;
+	t_deffunc				*func;
+	t_il					*code;
+}	t_funcil_pair;
+
 void	translate_il(void);
+void	print_il(t_il *code);
+char	*get_il_name(t_ilkind kind);
 
 #endif

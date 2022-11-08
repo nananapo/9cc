@@ -40,6 +40,7 @@
 #define DWORD_PTR "dword ptr"
 
 #define ARGREG_SIZE 6
+bool	is_flonum(t_type *type);
 
 static bool	is_memory_type(t_type *type);
 static void	push(void);
@@ -79,8 +80,93 @@ static t_lvar	*g_call_memory_lvars[1000];
 extern t_deffunc		*g_func_defs[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
+typedef enum e_numkind
+{
+	NUM_I8,
+	NUM_I16,
+	NUM_I32,
+	NUM_I64,
+	NUM_U8,
+	NUM_U16,
+	NUM_U32,
+	NUM_U64,
+	NUM_F32,
+	NUM_F64,
+}	t_numkind;
+
+#define i08i64 "movsx rax, al"
+#define i32i64 "movsx rax, eax"
+#define i08u64 "movzx rax, al"
+#define i32u64 "push 0\n    mov [rsp], eax\n    pop rax"
+#define i32i08 "movsx rax, al"
+#define i32i16 "movsx rax, ax"
+
+#define i32f32 "mov [rsp - 8], rax\n pxor xmm0, xmm0\n cvtsi2ss xmm0, DWORD PTR [rsp - 8]\n movss DWORD PTR [rsp - 8], xmm0\n mov rax, [rsp - 8]"
+
+#define f32i32 "mov [rsp - 8], rax\n movss xmm0, dword ptr [rsp - 8]\n cvttss2si eax, xmm0"
+
+static char	*g_cast_table[10][10] = 
+{
+//        i8     i16    i32    i64    u8     u16    u32    u64    f32    f64
+/* i8 */{  NULL,i08i64,i08i64,i08i64,i08u64,i08u64,i08u64,i08u64,  NULL,  NULL}, 
+/* i16*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* i32*/{i32i08,i32i16,  NULL,i32i64,i32u64,i32u64,i32u64,i32u64,i32f32,  NULL}, 
+/* i64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u8 */{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u16*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u32*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* u64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* f32*/{  NULL,  NULL,f32i32,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}, 
+/* f64*/{  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL}
+};
+
+static void	put_str_literal(char *str, int len)
+{
+	int	i;
+
+	i = -1;
+	while (++i < len)
+	{
+		if (str[i] == '\\')
+		{
+			i++;
+			if (str[i] != '\'')
+				printf("\\");
+			if (str[i] == 'e' || str[i] == 'x')
+			{
+				printf("033");
+				if (str[i] == 'x')
+					i += 2;
+				continue ;
+			}
+		}
+		printf("%c", str[i]);
+	}
+}
+
+
+static int	get_type_id(t_type *type)
+{
+	switch(type->ty)
+	{
+		case TY_CHAR:
+			return (type->is_unsigned ? NUM_U8 : NUM_I8);
+		case TY_INT:
+			return (type->is_unsigned ? NUM_U32 : NUM_I32);
+		case TY_ENUM:
+			return (NUM_I32);
+		case TY_PTR:
+		case TY_ARRAY:
+			return (type->is_unsigned ? NUM_U64 : NUM_I64);
+		case TY_FLOAT:
+			return (NUM_F32);
+		default:
+			return (-1);
+	}
+	return (-1);
+}
 
 static bool	is_memory_type(t_type *type)
 {
@@ -190,6 +276,10 @@ int	get_type_size_x8664(t_type *type)
 			return (1);
 		case TY_BOOL:
 			return (1);
+		case TY_FLOAT:
+			return (4);
+		case TY_DOUBLE:
+			return (4);
 		case TY_PTR:
 			return (8);
 		case TY_ARRAY:
@@ -206,6 +296,19 @@ int	get_type_size_x8664(t_type *type)
 			error("size of unknown type %d", type->ty);
 	}
 	return (-1);
+}
+
+bool	is_unsigned_abi_x8664(t_typekind kind)
+{
+	switch (kind)
+	{
+		case TY_PTR:
+		case TY_ARRAY:
+			return (true);
+		default:
+			return (false);
+	}
+	return (false);
 }
 
 static int	alloc_argument(t_lvar *lvar)
@@ -412,19 +515,22 @@ static int	get_call_memory(t_il *code)
 static void	push()
 {
 	stack_count += 8;
-	printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	//printf("    %s %s # %d -> %d\n", ASM_PUSH, RAX, stack_count - 8, stack_count);
+	printf("    %s %s\n", ASM_PUSH, RAX);
 }
 
 static void	pushi(int num)
 {
 	stack_count += 8;
-	printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
+	//printf("    %s %d # %d -> %d\n", ASM_PUSH, num, stack_count - 8, stack_count);
+	printf("    %s %d\n", ASM_PUSH, num);
 }
 
 static void	pop(char *reg)
 {
 	stack_count -= 8;
-	printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
+	//printf("    pop %s # %d -> %d\n", reg, stack_count + 8, stack_count);
+	printf("    pop %s\n", reg);
 }
 
 static void	mov(char *dst, char *from)
@@ -536,7 +642,7 @@ static void	load(t_type *type)
 		printf("    movzx %s, %s\n", RAX, AL);
 		return ;
 	}
-	else if (type->ty == TY_INT || type->ty == TY_ENUM)
+	else if (type->ty == TY_INT || type->ty == TY_ENUM || type->ty == TY_FLOAT)
 	{
 		printf("    mov %s, %s [%s]\n", EAX, DWORD_PTR, RAX);
 		//printf("    movzx %s, %s\n", RAX, EAX);
@@ -551,80 +657,27 @@ static void	load(t_type *type)
 // raxに入っている型fromをtoに変換する
 static void	cast(t_type *from, t_type *to)
 {
-	int		size1;
-	int		size2;
-	char	*name1;
-	char	*name2;
+	int	id1;
+	int	id2;
 
-	// 型が同じなら何もしない
-	if (type_equal(from, to))
+	id1 = get_type_id(from);
+	id2 = get_type_id(to);
+
+	//printf("# cast %d(%s) %d(%s)\n", id1, get_type_name(from), id2, get_type_name(to));
+
+	if (id1 == -1 || id2 == -1)
 		return ;
 
-	name1 = get_type_name(from);
-	name2 = get_type_name(to);
-	debug("cast %s -> %s", name1, name2);
-
-	// ポインタからポインタのキャストは何もしない
-	if (is_pointer_type(from)
-	&& is_pointer_type(to))
-		return ;
-	
-	size1 = get_type_size(from);
-	size2 = get_type_size(to);
-
-	// ポインタから整数へのキャストは情報を落とす
-	if (is_pointer_type(from)
-	&& is_integer_type(to))
+	if (g_cast_table[id1][id2] != NULL)
 	{
-		pushi(0);
-		mov(R10, RSP);
-		store_value(size2);
-		pop(RAX);
-		return ;
+		printf("    %s\n", g_cast_table[id1][id2]);
 	}
-
-	// 整数からポインタは0埋めで拡張
-	// (ポインタはunsinged long long intなので)
-	if (is_integer_type(from)
-	&& is_pointer_type(to))
-	{
-		pushi(0);
-		mov(R10, RSP);
-		store_value(size1);
-		pop(RAX);
-		return ;
-	}
-
-	// 整数から整数は符号を考えながらキャスト
-	if (is_integer_type(from)
-	&& is_integer_type(to))
-	{
-		// TODO unsigned
-		// 符号拡張する
-		if (size1 < size2)
-		{
-			debug("cast %d -> %d", size1, size2);
-			if (size1 == 1)
-				printf("    movsx %s, %s\n", RAX, AL);
-			else if (size1 == 4)
-				printf("    movsx %s, %s\n", RAX, EAX);
-			else
-				error("8byte -> 8byteのキャストは無い");
-		}
-		return ;
-	}
-
-	if (from != NULL)
-		fprintf(stderr, "from : %d\n", from->ty);
-	if (to != NULL)
-		fprintf(stderr, "to : %d\n", to->ty);
-		
-	error("%sから%sへのキャストが定義されていません\n (addr %p, %p)", name1, name2, from, to);
 }
 
 static void	print_global_constant(t_node *node, t_type *type)
 {
 	t_node	*notmp;
+	int		i;
 
 	if (type_equal(type, new_primitive_type(TY_INT)))
 	{
@@ -642,10 +695,25 @@ static void	print_global_constant(t_node *node, t_type *type)
 	}
 	else if (is_pointer_type(type))
 	{
+		if (node->kind == ND_NUM)
+		{
+			// 数字は無視....
+			for (i = get_type_size(type); i > 0; i -= 8)
+			{
+				if (i >= 8)
+				{
+					printf("    .quad 0\n");
+					continue ;
+				}
+				for (; i > 0; i--)
+					printf("    .byte 0\n");
+			}
+			return ;
+		}
 		// TODO 数のチェックはしてない
 		// array array
-		for (notmp = node; notmp; notmp = notmp->global_assign_next)
-			print_global_constant(notmp, type->ptr_to);
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_global_constant(notmp->lhs, type->ptr_to);
 	}
 	else
 		error("print_global_constant : 未対応の型 %s", get_type_name(type));
@@ -670,6 +738,50 @@ static void gen_defglobal(t_defvar *node)
 		printf("_%s:\n", name);
 		print_global_constant(node->assign, node->type);
 	}
+}
+
+// R10にアドレスを入れておく
+static void	print_local_array(t_node *node, t_type *type)
+{
+	t_node	*notmp;
+
+	if (type_equal(type, new_primitive_type(TY_INT)))
+	{
+		printf("    mov dword ptr [%s], %d\n", R10, node->val);
+		printf("    add %s, %d\n", R10, 4);
+	}
+	else if (type_equal(type, new_primitive_type(TY_CHAR)))
+	{
+		printf("    mov byte ptr [%s], %d\n", R10, node->val);
+		printf("    add %s, %d\n", R10, 1);
+	}
+ 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR))) && node->def_str != NULL)
+	{
+		printf("    %s %s, [rip + L_STR_%d]\n", ASM_LEA, RAX, node->def_str->index);
+		printf("    mov [%s], %s\n", R10, RAX);
+		printf("    add r10, 8\n");
+	}
+	else if (is_pointer_type(type))
+	{
+		if (node->kind == ND_NUM)
+		{
+			printf("    mov qword ptr [%s], %d\n", R10, node->val);
+			printf("    add %s, %d\n", R10, get_type_size(type));
+			return ;
+		}
+		for (notmp = node; notmp; notmp = notmp->global_array_next)
+			print_local_array(notmp->lhs, type->ptr_to);
+	}
+	else
+		error("print_local_array : 未対応の型 %s", get_type_name(type));
+}
+
+static void	gen_lvar_array(t_il *code)
+{
+	pop(RAX);
+	push();
+	mov(R10, RAX);
+	print_local_array(code->lvar_array, code->type);
 }
 
 static void	gen_call_start(t_il *code)
@@ -756,6 +868,14 @@ static void	gen_call_exec(t_il *code)
 		if (defarg->is_dummy)
 			continue ;
 
+		if (defarg->type->ty == TY_FLOAT)
+		{
+			printf("	mov eax, dword ptr [rsp + %d]\n", pop_count * 8);
+			printf("    movd xmm0, eax\n");
+			pop_count += 1;
+			continue ;
+		}
+
 		// レジスタに入れる
 		if (tmp_regindex != -1)
 		{
@@ -823,7 +943,7 @@ static void	gen_call_exec(t_il *code)
 	printf("    add %s, %d\n", RSP, pop_count * 8);
 	stack_count -= pop_count * 8;
 
-	printf("# return_type : %s (%d)\n", get_type_name(deffunc->type_return), get_type_size(deffunc->type_return));
+	//printf("# return_type : %s (%d)\n", get_type_name(deffunc->type_return), get_type_size(deffunc->type_return));
 
 	// 返り値がMEMORYなら、raxにアドレスを入れる
 	if (is_memory_type(deffunc->type_return))
@@ -842,6 +962,12 @@ static void	gen_call_exec(t_il *code)
 			printf("    mov [%s + 8], %s\n", RDI, RDX);
 		mov(RAX, RDI);
 		push();
+	}
+	else if (is_flonum(deffunc->type_return))
+	{
+		printf("movss [rsp - 8], xmm0\n");
+		printf("sub rsp, 8\n");
+		stack_count += 8;
 	}
 	// それ以外(int, char, ptrとか)ならraxをpushする
 	else
@@ -994,14 +1120,6 @@ static void	gen_func_epilogue(t_il *code)
 	pop(RBP);
 	printf("    ret\n");
 
-	g_locals_count = 0;
-
-	if (stack_count != 0)
-	{
-		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
-		error("Error");
-	}
-
 	stack_count = 0;
 }
 
@@ -1046,6 +1164,15 @@ static void	gen_var_local_addr(t_il *code)
 
 static void	gen_il(t_il *code)
 {
+	//printf("# ilid: %d, kind: %d\n", code->ilid_unique, code->kind);
+
+	if (code->gen_is_generated)
+	{
+		fprintf(stderr, "error : code is re-generated.\n");
+		return ;
+	}
+	code->gen_is_generated = true;
+
 	//printf("# kind %d\n", code->kind);
 	switch (code->kind)
 	{
@@ -1105,52 +1232,83 @@ static void	gen_il(t_il *code)
 		case IL_PUSH_NUM:
 			pushi(code->number_int);
 			return ;
-		case IL_STACK_SWAP:
-		{
-			// とりあえず型を何も考えずに交換する
-			pop(RAX);
-			mov(R10, RAX);
-
-			pop(RDI);
-			mov(RAX, R10);
-			push();
-
-			mov(RAX, RDI);
-			push();
+		case IL_PUSH_FLOAT:
+			printf("movss   xmm0, DWORD PTR .LC%.2f[rip]\n", code->number_float);
+			printf("movss [rsp - 8], xmm0\n");
+			printf("sub rsp, 8\n");
+			stack_count += 8;
 			return ;
-		}
 		case IL_POP:
 			// TODO 型
 			pop(RAX);
 			return ;
 
-		// TODO 型を考慮
 		case IL_ADD:
-			pop(RDI);
-			pop(RAX);
-			printf("    add %s, %s\n", RAX, RDI);
-			push();
+			if (!is_flonum(code->type))
+			{
+				pop(RDI);
+				pop(RAX);
+				printf("    add %s, %s\n", RAX, RDI);
+				push();
+			}
+			else
+			{
+				printf("movss   xmm0, DWORD PTR [rsp]\n");
+				printf("addss   xmm0, DWORD PTR [rsp + 8]\n");
+				pop(RAX);
+				printf("movss DWORD PTR [rsp], xmm0\n");
+			}
 			return ;
 		case IL_SUB:
-			pop(RDI);
-			pop(RAX);
-			printf("    sub %s, %s\n", RAX, RDI);
-			push();
+			if (!is_flonum(code->type))
+			{
+				pop(RDI);
+				pop(RAX);
+				printf("    sub %s, %s\n", RAX, RDI);
+				push();
+			}
+			else
+			{
+				printf("movss   xmm0, DWORD PTR [rsp]\n");
+				printf("subss   xmm0, DWORD PTR [rsp + 8]\n");
+				pop(RAX);
+				printf("movss DWORD PTR [rsp], xmm0\n");
+			}
 			return ;
 		case IL_MUL:
-			pop(RDI);
-			pop(RAX);
-			printf("    movsxd %s, %s\n", RAX, EAX);
-			printf("    movsxd %s, %s\n", RDI, EDI);
-			printf("    imul %s, %s\n", RAX, RDI);	
-			push();
+			if (!is_flonum(code->type))
+			{
+				pop(RDI);
+				pop(RAX);
+				printf("    movsxd %s, %s\n", RAX, EAX);
+				printf("    movsxd %s, %s\n", RDI, EDI);
+				printf("    imul %s, %s\n", RAX, RDI);	
+				push();
+			}
+			else
+			{
+				printf("movss   xmm0, DWORD PTR [rsp]\n");
+				printf("mulss   xmm0, DWORD PTR [rsp + 8]\n");
+				pop(RAX);
+				printf("movss DWORD PTR [rsp], xmm0\n");
+			}
 			return ;
 		case IL_DIV:
-			pop(RDI);
-			pop(RAX);
-			printf("    cdq\n");
-			printf("    idiv edi\n");
-			push();
+			if (!is_flonum(code->type))
+			{
+				pop(RDI);
+				pop(RAX);
+				printf("    cdq\n");
+				printf("    idiv edi\n");
+				push();
+			}
+			else
+			{
+				printf("movss   xmm0, DWORD PTR [rsp + 8]\n");
+				printf("divss   xmm0, DWORD PTR [rsp]\n");
+				pop(RAX);
+				printf("movss DWORD PTR [rsp], xmm0\n");
+			}
 			return ;
 		case IL_MOD:
 			pop(RDI);
@@ -1178,13 +1336,27 @@ static void	gen_il(t_il *code)
 			push();
 			return ;
 		case IL_LESS:
-			pop(RDI);
-			pop(RAX);
-			cmp(code->type);
-			printf("    setl al\n");
-			printf("    movzx rax, al\n");
-			push();
+		{
+			if (is_flonum(code->type))
+			{
+				printf("movss xmm0, dword ptr [rsp + 8]\n");
+				printf("comiss xmm0, dword ptr [rsp + 0]\n");
+				printf("    seta al\n");
+				printf("    movzx rax, al\n");
+				pop(R10);
+				printf("mov [rsp], rax\n");
+			}
+			else
+			{
+				pop(RDI);
+				pop(RAX);
+				cmp(code->type);
+				printf("    setl al\n");
+				printf("    movzx rax, al\n");
+				push();
+			}
 			return ;
+		}
 		case IL_LESSEQ:
 			pop(RDI);
 			pop(RAX);
@@ -1253,9 +1425,7 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_VAR_LOCAL:
-			code->kind = IL_VAR_LOCAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_LOCAL;
+			gen_var_local_addr(code);
 			pop(RAX);
 			load(code->var_local->type);
 			push();
@@ -1264,16 +1434,16 @@ static void	gen_il(t_il *code)
 			gen_var_local_addr(code);
 			return ;
 		case IL_VAR_GLOBAL:
-			code->kind = IL_VAR_GLOBAL_ADDR;
-			gen_il(code);
-			code->kind = IL_VAR_GLOBAL;
-			pop(RAX);
+			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
+					my_strndup(code->var_global->name, 
+							code->var_global->name_len));
 			load(code->var_global->type);
 			push();
 			return ;
 		case IL_VAR_GLOBAL_ADDR:
 			printf("    mov rax, [rip + _%s@GOTPCREL]\n",
-					my_strndup(code->var_global->name, code->var_global->name_len));
+					my_strndup(code->var_global->name, 
+							code->var_global->name_len));
 			push();
 			return ;
 		// TODO genでoffsetの解決 , analyzeで宣言のチェック
@@ -1309,19 +1479,21 @@ static void	gen_il(t_il *code)
 			return ;
 
 		case IL_CAST:
-			// TODO とりあえずpop / pushしてます
-			printf("#CAST\n");
+			//printf("#CAST\n");
 			pop(RAX);
 			cast(code->cast_from, code->cast_to);
 			push();
-			printf("#CAST END\n");
+			//printf("#CAST END\n");
 			return ;
 
 		case IL_LOAD:
-			// TODO とりあえずpop / pushしてます
 			pop(RAX);
 			load(code->type);
 			push();
+			return ;
+
+		case IL_DEF_VAR_LOCAL_ARRAY:
+			gen_lvar_array(code);
 			return ;
 
 		default:
@@ -1335,11 +1507,17 @@ static void	gen_il(t_il *code)
 
 void	codegen_x8664(void)
 {
-	int		i;
-	t_il	*code;
+	int				i;
+	t_il			*code;
+	t_funcil_pair	*pair;
 
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");
+
+	printf(".LC6.28:\n.long   1086911939\n");
+	printf(".LC0.07:\n.long   1032805417\n");
+	printf(".LC0.04:\n.long   1025758986\n");
+	printf(".LC0.02:\n.long   1017370378\n");
 
 	// 文字列リテラル生成
 	for (i = 0; g_str_literals[i] != NULL; i++)
@@ -1357,6 +1535,11 @@ void	codegen_x8664(void)
 
 	// コードを生成
 	printf(".section	__TEXT,__text,regular,pure_instructions\n");
-	for (code = g_il; code != NULL; code = code->next)
-		gen_il(code);
+
+	for (pair = g_func_ils; pair != NULL; pair = pair->next)
+	{
+		for (code = pair->code; code != NULL; code = code->next)
+			gen_il(code);
+		g_locals_count = 0;
+	}
 }

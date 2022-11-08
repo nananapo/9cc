@@ -6,7 +6,11 @@ int		printf(char *fmt, ...);
 int		fprintf(void *fp, char *fmt, ...);
 void	*fopen(char *path, char *mode);
 int		sprintf(char *str, char *fmt, ...);
+int		snprintf(char *str, int size, char *fmt, ...);
 int		scanf(char *fmt, ...);
+
+int		putchar(char c);
+char	getchar(void);
 
 #include <stdarg.h>
 void	vfprintf(void *stream, char *format, va_list ap);

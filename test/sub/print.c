@@ -341,3 +341,20 @@ s_struct6 retstruct6_a(int a)
 	p->f = a + 600;
 	return (*p);
 }
+
+
+#include <math.h>
+float mysin(float a)
+{
+	return (float)sin(a);
+}
+
+float mycos(float b)
+{
+	return (float)cos(b);
+}
+
+void putf(float a)
+{
+	printf("%f\n", a);
+}

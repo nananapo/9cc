@@ -1,6 +1,8 @@
 #ifndef NINECC_H
 # define NINECC_H
 
+#define DEBUG
+
 #include <stdbool.h>
 #include "list.h"
 
@@ -30,11 +32,15 @@ typedef enum e_tokenkind
 
 	TK_INT,
 	TK_CHAR,
- 	TK__BOOL,
+ 	TK_BOOL,
 	TK_VOID,
 	TK_STRUCT,
 	TK_ENUM,
 	TK_UNION,
+	TK_FLOAT,
+	TK_DOUBLE,
+	TK_SIGNED,
+	TK_UNSIGNED,
 
 	TK_STATIC,
 	TK_TYPEDEF,
@@ -48,6 +54,7 @@ typedef struct s_token
 	struct s_token	*next;
 
 	int				val;			// number
+	float			val_float;			// number
 	char			*str;			// token str
 	int				len;			// length
 	int				strlen_actual;	// charlit
@@ -60,6 +67,7 @@ typedef enum e_nodekind
 	ND_CALL,
 	ND_BLOCK,
 	ND_NUM,
+	ND_FLOAT,
 
 	ND_ADD,
 	ND_SUB,
@@ -84,6 +92,7 @@ typedef enum e_nodekind
 
 
 	ND_VAR_DEF,
+	ND_VAR_DEF_ARRAY,
 	ND_VAR_LOCAL,
  	ND_VAR_GLOBAL,
 	ND_SHIFT_LEFT,
@@ -146,8 +155,11 @@ typedef enum e_typekind
 	TY_ENUM,
 	TY_UNION,
 	TY_BOOL,
-	TY_VOID
-} t_typekind;
+	TY_VOID,
+	TY_FLOAT,
+	TY_DOUBLE,
+	TY_FUNCTION
+}	t_typekind;
 
 typedef struct s_defenum
 {
@@ -162,6 +174,8 @@ typedef struct s_type
 {
 	t_typekind		ty;
 	struct s_type	*ptr_to;
+
+	bool			is_unsigned;
 
 	int 			array_size;
 
@@ -190,6 +204,7 @@ typedef struct s_type
 	}	*strct;
 	t_defenum			*enm;
 	struct s_defunion *unon;
+	void			*funcdef;
 } t_type;
 
 typedef struct s_defstruct	t_defstruct;
@@ -243,6 +258,7 @@ typedef struct s_node
 
 	t_lvar			*lvar; // local var
 	struct s_node	*lvar_assign; // type ident = expr;
+	struct s_node	*lvar_const; // type ident = {...};
 
 	t_str_elem		*def_str;
 struct s_defvar
@@ -258,10 +274,11 @@ struct s_defvar
 	struct s_node	*assign;
 }	*var_global;
 
-	struct s_node	*global_assign_next;
+	struct s_node	*global_array_next;
 
 	// num
 	int				val;
+	float			val_float;
 
 	// else of if
 	struct s_node	*elsif;
@@ -272,23 +289,23 @@ struct s_defvar
 	// call
 struct s_deffunc
 {
-	char		*name;
-	int			name_len;
+	char			*name;
+	int				name_len;
 
-	t_type		*type_return;
+	t_type			*type_return;
 
-	int			argcount;
+	int				argcount;
 
-	char		*argument_names[20];
-	int			argument_name_lens[20];
-	t_type		*argument_types[20];
+	char			*argument_names[20];
+	int				argument_name_lens[20];
+	t_type			*argument_types[20];
+	
+	bool			is_static;
+	bool			is_prototype;
+	bool			is_zero_argument;		// func(void)
+	bool			is_variable_argument;	// func(, ...)
 
-	bool		is_static;
-	bool		is_prototype;
-	bool		is_zero_argument;		// func(void)
-	bool		is_variable_argument;	// func(, ...)
-
-	t_lvar		*locals;
+	t_lvar			*locals;
 	struct s_node	*stmt;
 }	*funcdef;
 	int				funccall_argcount;
@@ -315,11 +332,11 @@ struct s_deffunc
 	char		*analyze_var_name;
 	int			analyze_var_name_len;
 
-	char		*analyze_funccall_name;
-	int			analyze_funccall_name_len;
-
 	char		*analyze_member_name;
 	int			analyze_member_name_len;
+
+	char		*analyze_funccall_name;
+	int			analyze_funccall_name_len;
 }	t_node;
 
 typedef struct s_deffunc t_deffunc;
@@ -366,10 +383,11 @@ bool	is_declarable_type(t_type *type);
 bool	type_equal(t_type *t1, t_type *t2);
 
 bool	can_compared(t_type *l, t_type *r, t_type **lt, t_type **rt);
-bool	type_can_cast(t_type *from, t_type *to, bool is_explicit);
+bool	type_can_cast(t_type *from, t_type *to);
 bool	can_use_arrow(t_type *type);
 bool	can_use_dot(t_type *type);
 t_member	*get_member_by_name(t_type *type, char *name, int len);
+t_type	*get_common_type(t_type *ty1, t_type *ty2);
 
 char	*get_type_name(t_type *type);
 
@@ -378,10 +396,12 @@ t_lvar		*find_lvar(t_deffunc *func, char *str, int len);
 t_defvar	*find_global(char *str, int len);
 
 void	parse(void);
-void	analyze();
+void	analyze(void);
+void	optimize(void);
 
 void	codegen(void);
 int		get_type_size(t_type *type);
 int		get_array_align_size(t_type *type);
+bool	is_unsigned_abi(t_typekind type);
 
 #endif

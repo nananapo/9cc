@@ -4,8 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-//#define DEBUG
-
 extern char	*g_user_input;
 
 void	error(char *fmt, ...)

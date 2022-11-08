@@ -143,13 +143,14 @@ static bool	tokenize_str_literal(TokenizeEnv *env, bool is_inc)
 	tok->is_dq = is_dq;
 	env->str++;
 
-	//debug("%p ", env->str);
 	while (*env->str != '\0'
 		&& *env->str != '\n'
 		&& ((is_dq && *env->str != '\"')
 		|| (!is_dq && *env->str != '>')))
 	{
-		//debug("%c", *env->str);
+
+		//fprintf(stderr, "%c\n", *env->str);
+
 		if (*env->str == '\\')
 		{
 			env->str += 1;
@@ -164,9 +165,12 @@ static bool	tokenize_str_literal(TokenizeEnv *env, bool is_inc)
 			tok->len += 1;
 		}
 	}
-	//debug("\n");
-	if (!(is_dq && *env->str == '\"') && !(!is_dq && *env->str == '>'))
+	if (!(is_dq && *env->str == '\"')
+	&& !(!is_dq && *env->str == '>'))
+	{
+		//fprintf(stderr, "err: %s\n", env->str - 1);
 		error_at(tok->str - 1, "文字列リテラルが終了しませんでした(end)");
+	}
 	env->str += 1;
 	return (true);
 }

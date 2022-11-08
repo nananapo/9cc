@@ -7,7 +7,7 @@ char	*my_strndup(char *source, int len)
 {
 	char	*dst;
 
-	dst = calloc(len + 1, sizeof(char));
+	dst = calloc(len + 2, sizeof(char));
 	strncat(dst, source, len);
 	return (dst);
 }

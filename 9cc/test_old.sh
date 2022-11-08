@@ -78,12 +78,21 @@ tmpcfile="$testdir/tmp.c"
 assert_gcc(){
 	input="$prefix`cat $testdir/$1`"
 	
-    echo "$input" | $prpr - | $ncc > tmp.s
+    cat <<EOF | $prpr - > $tmpcfile
+	$input
+EOF
+
+	if [ "$?" != "0" ]; then
+		echo "$1 => prpr KO"
+		exit 1
+	fi
+	
+	$ncc $tmpcfile > tmp.s
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc KO"
 		exit 1
 	fi
-	
+
 	cc -o tmp1 tmp.s $module
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc gcc compile KO"
@@ -93,7 +102,9 @@ assert_gcc(){
 	./tmp1 > $actualfile
 	actual=`cat -e $actualfile`
 
-	echo "$input" > $tmpcfile
+    cat <<EOF > $tmpcfile
+	$input
+EOF
 	cc -o tmp2 $tmpcfile $module
 	if [ "$?" != "0" ]; then
 		rm -rf $tmpcfile
@@ -496,7 +507,7 @@ assert_out "Hello" "int printf(char *a);
 int main()
 {
 	char	*s;
-	s = \"Hello\\n\";
+	s = \"Hello\\\n\";
 	printf(s);
 }"
 

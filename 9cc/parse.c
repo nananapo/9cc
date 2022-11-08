@@ -14,13 +14,11 @@
 t_deffunc	*get_function_by_name(char *name, int len);
 bool		consume_enum_key(t_type **type, int *value);
 t_str_elem	*get_str_literal(char *str, int len);
+bool consume_float(float *result);
 
-static t_node	*call(t_token *tok);
-static t_node	*read_suffix_increment(t_node *node);
-static t_node	*read_deref_index(t_node *node);
+static t_node	*call(t_node *funcnode, t_token *ident);
+static t_node	*read_postfix_expression(t_node *node);
 static t_node	*primary(void);
-static t_node	*arrow_loop(t_node *node);
-static t_node	*arrow(void);
 static t_node	*unary(void);
 static t_node	*mul(void);
 static t_node	*add(void);
@@ -34,7 +32,7 @@ static t_node	*conditional_and(void);
 static t_node	*conditional_or(void);
 static t_node	*conditional_op(void);
 static t_node	*assign(void);
-static t_node	*expr(void);
+static t_node	*expr(bool comma);
 static t_node	*read_ifblock(void);
 static t_node	*stmt(void);
 static t_node	*expect_constant(t_type *type);
@@ -42,7 +40,6 @@ static void	global_var(t_type *type, t_token *ident, bool is_extern, bool is_sta
 t_type		*read_struct_block(t_token *ident);
 t_type		*read_enum_block(t_token *ident);
 t_type		*read_union_block(t_token *ident);
-static void	funcdef(t_type *type, t_token *ident, bool is_static);
 static void	read_typedef(void);
 static void	filescope(void);
 void		parse(void);
@@ -105,6 +102,16 @@ t_node	*new_node_num(int val, char *source)
 	return (node);
 }
 
+t_node	*new_node_float(float val, char *source)
+{
+	t_node	*node;
+
+	node		= new_node(ND_FLOAT, NULL, NULL, source);
+	node->val_float	= val;
+	node->type	= new_primitive_type(TY_FLOAT);
+	return (node);
+}
+
 // 文字列リテラルを保存してオブジェクトを取得する
 // 既に同じ文字列があるならそのオブジェクトを取得する
 t_str_elem	*get_str_literal(char *str, int len)
@@ -130,17 +137,19 @@ t_str_elem	*get_str_literal(char *str, int len)
 	return (elem);
 }
 
-static t_node	*call(t_token *tok)
+static t_node	*call(t_node *funcnode, t_token *ident)
 {
 	t_node		*node;
 
-	debug("CALL %s", my_strndup(tok->str, tok->len));
-
-	node							= new_node(ND_CALL, NULL, NULL, tok->str);
-	node->analyze_funccall_name		= tok->str;
-	node->analyze_funccall_name_len	= tok->len;
-	node->funccall_argcount			= 0;
-	node->funcdef					= get_function_by_name(tok->str, tok->len);
+	node						= new_node(ND_CALL, NULL, NULL, g_token->str);
+	if (ident != NULL)
+	{
+		node->analyze_funccall_name		= ident->str;
+		node->analyze_funccall_name_len	= ident->len;
+		node->funcdef					= get_function_by_name(ident->str, ident->len);
+	}
+	node->lhs					= funcnode;
+	node->funccall_argcount		= 0;
 
 	// read arguments
 	for (;;)
@@ -151,18 +160,51 @@ static t_node	*call(t_token *tok)
 		if (node->funccall_argcount != 0 && !consume(","))
 			error_at(g_token->str, "トークンが,ではありません");
 
-		node->funccall_args[node->funccall_argcount++] = expr();
+		node->funccall_args[node->funccall_argcount++] = expr(false);
 	}
 	return (node);
 }
 
-// 後置インクリメント, デクリメント
-static t_node	*read_suffix_increment(t_node *node)
+// 添字, 関数呼び出し
+static t_node	*read_postfix_expression(t_node *node)
 {
-	char	*source;
+	char		*source;
+	t_token		*ident;
 
 	source = g_token->str;
-	if (consume("++"))
+	// call func
+	if (consume("["))
+	{
+		node = new_node(ND_ADD, node, expr(true), source);
+		node = new_node(ND_DEREF, node, NULL, source);
+		if (!consume("]"))
+			error_at(g_token->str, "%s");
+	}
+	else if (consume("("))
+	{
+		node = call(node, NULL);
+	}
+	else if (consume("."))
+	{
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(g_token->str, "識別子が必要です\n (read_postfix_expr)");
+		node							= new_node(ND_MEMBER_VALUE, node, NULL, ident->str);
+		node->analyze_member_name		= ident->str;
+		node->analyze_member_name_len	= ident->len;
+		node							= read_postfix_expression(node);
+	}
+	else if (consume("->"))
+	{
+		ident = consume_ident();
+		if (ident == NULL)
+			error_at(g_token->str, "識別子が必要です\n (read_postfix_expr)");
+		node							= new_node(ND_MEMBER_PTR_VALUE, node, NULL, ident->str);
+		node->analyze_member_name		= ident->str;
+		node->analyze_member_name_len	= ident->len;
+		node							= read_postfix_expression(node);
+	}
+	else if (consume("++"))
 	{
 		node = new_node(ND_COMP_ADD, node, new_node_num(1, source), source);
 		node = new_node(ND_SUB, node, new_node_num(1, source), source);
@@ -172,33 +214,18 @@ static t_node	*read_suffix_increment(t_node *node)
 		node = new_node(ND_COMP_SUB, node, new_node_num(1, source), source);
 		node = new_node(ND_ADD, node, new_node_num(1, source), source);
 	}
-	return (node);
-}
+	else
+		return (node);
 
-// 添字によるDEREF
-// TODO エラーメッセージが足し算用になってしまう
-static t_node	*read_deref_index(t_node *node)
-{
-	char	*source;
-
-	source = g_token->str;
-	while (consume("["))
-	{
-		node = new_node(ND_ADD, node, expr(), source);
-		node = new_node(ND_DEREF, node, NULL, source);
-		if (!consume("]"))
-			error_at(g_token->str, "%s");
-		source = g_token->str;
-	}
-	return (read_suffix_increment(node));
+	return (read_postfix_expression(node));
 }
 
 static t_node *primary(void)
 {
 	t_token	*tok;
 	t_node	*node;
-	t_type	*type_cast;
 	int 	number;
+	float 	number_float;
 	t_type	*enum_type;
 	char	*source;
 
@@ -207,26 +234,10 @@ static t_node *primary(void)
 	// 括弧
 	if (consume("("))
 	{
-		// 型を読む
-		type_cast = consume_type_before(false);
-		
-		// 括弧の中身が型ではないなら優先順位を上げる括弧
-		if (type_cast == NULL)
-		{
-			node = expr();
-			node = new_node(ND_PARENTHESES, node, NULL, node->analyze_source);
-			expect(")");
-			return (read_deref_index(node));
-		}
-
-		// 明示的なキャスト
-		// TODO キャストの優先順位が違う
+		node = expr(true);
+		node = new_node(ND_PARENTHESES, node, NULL, node->analyze_source);
 		expect(")");
-
-		node = unary();
-		node = new_node(ND_CAST, node, NULL, node->analyze_source);
-		node->type = type_cast;
-		return (read_deref_index(node));
+		return (read_postfix_expression(node));
 	}
 
 	// enumの値
@@ -234,26 +245,19 @@ static t_node *primary(void)
 	{
 		node = new_node_num(number, source);
 		node->type = enum_type;
-		return (read_deref_index(node));
+		return (read_postfix_expression(node));
 	}
 
-	// 変数かcall
-	// TODO 関数を変数として、関数呼び出しをパースする
+	// 変数か関数呼び出し
 	tok = consume_ident();
 	if (tok)
 	{
-		// call func
 		if (consume("("))
-		{
-			node = call(tok);
-			return (read_deref_index(node));
-		}
-
-		// 変数
-		node						= new_node(ND_ANALYZE_VAR, NULL, NULL, tok->str);
+			return (read_postfix_expression(call(NULL, tok)));
+		node			= new_node(ND_ANALYZE_VAR, NULL, NULL, tok->str);
 		node->analyze_var_name		= tok->str;
 		node->analyze_var_name_len	= tok->len;
-		return (read_deref_index(node));
+		return (read_postfix_expression(node));
 	}
 
 	// string
@@ -262,7 +266,7 @@ static t_node *primary(void)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL, tok->str);
 		node->def_str = get_str_literal(tok->str, tok->len);
-		return (read_deref_index(node));
+		return (read_postfix_expression(node));
 	}
 
 	// char
@@ -274,7 +278,13 @@ static t_node *primary(void)
 			error_at(tok->str, "不明なエスケープシーケンスです (primary)");
 		node = new_node_num(number, tok->str);
 		node->type = new_primitive_type(TY_CHAR);
-		return (read_deref_index(node));
+		return (read_postfix_expression(node));
+	}
+
+	if (consume_float(&number_float))
+	{
+		node = new_node_float(number_float, source);
+		return (node);
 	}
 
 	// 数
@@ -282,59 +292,24 @@ static t_node *primary(void)
 		error_at(g_token->str, "数字が必要です");
 	node = new_node_num(number, source);
 
-	return (read_deref_index(node));
-}
-
-
-static t_node	*arrow_loop(t_node *node)
-{
-	t_token		*ident;
-
-	if (consume("->"))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です\n (arrow_loop)");
-		node							= new_node(ND_MEMBER_PTR_VALUE, node, NULL, ident->str);
-		node->analyze_member_name		= ident->str;
-		node->analyze_member_name_len	= ident->len;
-		node							= read_deref_index(node);
-		return (arrow_loop(node));
-	}
-	else if (consume("."))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です\n (arrow_loop)");
-		node							= new_node(ND_MEMBER_VALUE, node, NULL, ident->str);
-		node->analyze_member_name		= ident->str;
-		node->analyze_member_name_len	= ident->len;
-		node							= read_deref_index(node);
-		return (arrow_loop(node));
-	}
-	else
-		return (node);
-}
-
-static t_node	*arrow(void)
-{
-	return (arrow_loop(primary()));
+	return (read_postfix_expression(node));
 }
 
 static t_node	*parse_sizeof(void)
 {
 	t_node	*node;
 	t_type	*type;
+	t_token	*token;
 	char	*source;
 
 	if (consume("("))
 	{
 		source	= g_token->str;
-		type	= consume_type_before(true);
-		if (type == NULL)
+		if (!consume_type(&type, &token, NULL, NULL))
 			node = new_node(ND_SIZEOF, unary(), NULL, source);
 		else
 			node = new_node_num(get_type_size(type), source);
+
 		if (!consume(")"))
 			error_at(g_token->str, ")が必要です");
 	}
@@ -369,24 +344,48 @@ static t_node	*unary(void)
 		return (new_node(ND_BITWISE_NOT, unary(), NULL, source));
 	else if (consume_kind(TK_SIZEOF))
 		return (parse_sizeof());
-	return (arrow());
+	return (primary());
 }
 
-static t_node *mul(void)
+static t_node	*cast_expression(void)
+{
+	t_token	*tmp;
+	t_token	*ident;
+	t_type	*type;
+	t_node	*node;
+
+	tmp = g_token;
+	if (consume("("))
+	{
+		if (!consume_type(&type, &ident, NULL, NULL))
+		{
+			g_token = tmp;
+			return (unary());
+		}
+		expect(")");
+		node = cast_expression();
+		node = new_node(ND_CAST, node, NULL, node->analyze_source);
+		node->type = type;
+		return (node);
+	}
+	return (unary());
+}
+
+static t_node	*mul(void)
 {
 	t_node	*node;
 	char	*source;
 
-	node = unary();
+	node = cast_expression();
 	for (;;)
 	{
 		source = g_token->str;
 		if (consume("*"))
-			node = new_node(ND_MUL, node, unary(), source);
+			node = new_node(ND_MUL, node, cast_expression(), source);
 		else if (consume("/"))
-			node = new_node(ND_DIV, node, unary(), source);
+			node = new_node(ND_DIV, node, cast_expression(), source);
 		else if (consume("%"))
-			node = new_node(ND_MOD, node, unary(), source);
+			node = new_node(ND_MOD, node, cast_expression(), source);
 		else
 			break ;
 	}
@@ -538,10 +537,10 @@ static t_node	*conditional_op(void)
 	source	= g_token->str;
 	if (consume("?"))
 	{
-		node = new_node(ND_COND_OP, node, conditional_op(), source);
+		node = new_node(ND_COND_OP, node, expr(true), source);
 		if (!consume(":"))
 			error_at(g_token->str, ":が必要です");
-		node->els = conditional_op();
+		node->els = expr(true);
 	}
 	return (node);
 }
@@ -568,9 +567,19 @@ static t_node	*assign(void)
 	return (node);
 }
 
-static t_node	*expr(void)
+static t_node	*expr(bool comma)
 {
-	return (assign());
+	t_node	*node;
+
+	node = assign();
+	if (comma && consume(","))
+	{	
+		node		= new_node(ND_BLOCK, node, NULL, node->analyze_source);
+		node->rhs	= new_node(ND_BLOCK, expr(true), NULL, NULL);
+		node->rhs->analyze_source = node->rhs->lhs->analyze_source;
+		return (node);
+	}
+	return (node);
 }
 
 // ifの後ろの括弧から読む
@@ -582,7 +591,7 @@ static t_node	*read_ifblock(void)
 	source = g_token->str;
 	if (!consume("("))
 		error_at(g_token->str, "(ではないトークンです");
-	node = new_node(ND_IF, expr(), NULL, source);
+	node = new_node(ND_IF, expr(true), NULL, source);
 
 	if (!consume(")"))
 		error_at(g_token->str, ")ではないトークンです");
@@ -596,6 +605,33 @@ static t_node	*read_ifblock(void)
 			node->els = stmt();
 	}
 	return (node);
+}
+
+static t_node	*consume_const_local(t_type *type)
+{
+	t_node	*first;
+	t_node	*tmp;
+	t_node	*last;
+
+	first = NULL;
+	last = NULL;
+	if (is_pointer_type(type) && consume("{"))
+	{
+		for (;;)
+		{
+			tmp = new_node(ND_NONE, expect_constant(type->ptr_to), NULL, NULL);
+			if (last == NULL)
+				first = tmp;
+			else
+				last->global_array_next = tmp;
+			last = tmp;
+			if (consume("}"))
+				break ;
+			if (!consume(","))
+				error_at(g_token->str, ",が必要です");
+		}
+	}
+	return (first);
 }
 
 // TODO 条件の中身がintegerか確認する
@@ -617,7 +653,7 @@ static t_node	*stmt(void)
 			node = new_node(ND_RETURN, NULL, NULL, source);
 		else
 		{
-			node = new_node(ND_RETURN, expr(), NULL, source);
+			node = new_node(ND_RETURN, expr(true), NULL, source);
 			expect_semicolon();
 		}
 		return (node);
@@ -628,7 +664,7 @@ static t_node	*stmt(void)
 	{
 		if (!consume("("))
 			error_at(g_token->str, "(ではないトークンです");
-		node = new_node(ND_WHILE, expr(), NULL, source);
+		node = new_node(ND_WHILE, expr(true), NULL, source);
 		if (!consume(")"))
 			error_at(g_token->str, ")ではないトークンです");
 		if (!consume(";"))
@@ -644,7 +680,7 @@ static t_node	*stmt(void)
 		if (!consume("("))
 			error_at(g_token->str, "(ではないトークンです");
 		if (!consume(";"))
-			node->rhs = expr();
+			node->rhs = expr(true);
 		if (!consume(")"))
 			error_at(g_token->str, ")ではないトークンです");
 	}
@@ -656,17 +692,17 @@ static t_node	*stmt(void)
 		node = new_node(ND_FOR, NULL, NULL, source);
 		if (!consume(";")) 
 		{
-			node->for_expr[0] = expr();
+			node->for_expr[0] = expr(true);
 			expect_semicolon();
 		}
 		if (!consume(";"))
 		{
-			node->for_expr[1] = expr();
+			node->for_expr[1] = expr(true);
 			expect_semicolon();
 		}
 		if (!consume(")"))
 		{
-			node->for_expr[2] = expr();
+			node->for_expr[2] = expr(true);
 			if(!consume(")"))
 				error_at(g_token->str, ")ではないトークンです");
 		}
@@ -678,7 +714,7 @@ static t_node	*stmt(void)
 	{
 		if (!consume("("))
 			error_at(g_token->str, "(ではないトークンです");
-		node = new_node(ND_SWITCH, expr(), NULL, source);
+		node = new_node(ND_SWITCH, expr(true), NULL, source);
 		if (!consume(")"))
 			error_at(g_token->str, ")ではないトークンです");
 		node->rhs = stmt();
@@ -730,75 +766,14 @@ static t_node	*stmt(void)
 		}
 		return (start);
 	}
-	else
+	else if (consume_type(&type, &ident, NULL, NULL))
 	{
-		// 構造体なら宣言の可能性がある
-		// TODO ここはfilescopeのコピペ
-		if (consume_kind(TK_STRUCT))
+		if (ident == NULL)
 		{
-			ident = consume_ident();
-			if (ident == NULL)
-				error_at(g_token->str, "構造体の識別子が必要です");
-
-			if (consume("{"))
-			{
-				type = read_struct_block(ident);
-				// ;なら構造体の宣言
-				if (consume(";"))
-					return new_node(ND_NONE, NULL, NULL, ident->str);
-			}
-			else
-				type = new_struct_type(ident->str, ident->len);
-			consume_type_ptr(&type);
-		}
-		// enumの可能性
-		else if (consume_kind(TK_ENUM))
-		{
-			ident = consume_ident();
-			if (ident == NULL)
-				error_at(g_token->str, "enumの識別子が必要です");
-
-			if (consume("{"))
-			{
-				type = read_enum_block(ident);
-				// ;ならenumの宣言
-				if (consume(";"))
-					return new_node(ND_NONE, NULL, NULL, ident->str);
-			}
-			else
-				type = new_enum_type(ident->str, ident->len);
-			consume_type_ptr(&type);
-		}
-		// unionの可能性
-		else if (consume_kind(TK_UNION))
-		{
-			ident = consume_ident();
-			if (ident == NULL)
-				error_at(g_token->str, "unionの識別子が必要です");
-
-			if (consume("{"))
-			{
-				type = read_union_block(ident);
-				// ;ならunionの宣言
-				if (consume(";"))
-					return (new_node(ND_NONE, NULL, NULL, ident->str));
-			}
-			else
-				type = new_union_type(ident->str, ident->len);
-			consume_type_ptr(&type);
+			node = new_node(ND_NONE, NULL, NULL, source);
 		}
 		else
-			type = consume_type_before(false);
-
-		if (type != NULL)
 		{
-			ident = consume_ident();
-
-			if (ident == NULL)
-				error_at(g_token->str, "識別子が必要です");
-
-			expect_type_after(&type);
-
 			node = new_node(ND_VAR_DEF, NULL, NULL, ident->str);
 			node->type = type;
 			node->analyze_var_name = ident->str;
@@ -806,38 +781,66 @@ static t_node	*stmt(void)
 
 			// 宣言と同時に代入
 			if (consume("="))
-				node->lvar_assign = expr();
-		}
-		else
-		{
-			node = expr();
+			{
+				node->lvar_const = consume_const_local(node->type);
+				if (node->lvar_const == NULL)
+					node->lvar_assign = expr(true);
+			}
 		}
 	}
+	else
+	{
+		node = expr(true);
+	}
+	
 	if(!consume(";"))
 		error_at(g_token->str, ";ではないトークン(Kind : %d , %s)です", g_token->kind, my_strndup(g_token->str, g_token->len));
 
-	return node;
+	return (node);
 }
 
 static t_node	*expect_constant(t_type *type)
 {
 	t_node	*node;
-	t_node	**next;
 	int		number;
 	t_token	*tok;
 	char	*source;
+
+	t_node	*first;
+	t_node	*last;
+	t_node	*tmp;
 
 	source = g_token->str;
 	if (is_integer_type(type) && consume_number(&number))
 	{
 		node = new_node_num(number, source);
 	}
+	// とりあえずマイナスも読めるように....
+	else if (is_integer_type(type) && consume("-"))
+	{
+		if (is_integer_type(type) && consume_number(&number))
+		{
+			node = new_node_num(number, source);
+		}
+		else
+		{
+			error("Error");
+			node = NULL;
+		}
+	}
+	// char *でstrlit
 	else if (type_equal(type, new_type_ptr_to(new_primitive_type(TY_CHAR)))
 			&& (tok = consume_str_literal()) != NULL)
 	{
 		node = new_node(ND_STR_LITERAL, NULL, NULL, source);
 		node->def_str = get_str_literal(tok->str, tok->len);
 	}
+	// pointerで数字
+	else if (is_pointer_type(type) && consume_number(&number))
+	{
+		node = new_node_num(number, source);
+	}
+	// char でcharlit
 	else if (type_equal(type, new_primitive_type(TY_CHAR)) 
 			&& (tok = consume_char_literal()) != NULL)
 	{
@@ -848,22 +851,27 @@ static t_node	*expect_constant(t_type *type)
 	}
 	else if (is_pointer_type(type) && consume("{"))
 	{
-		node = NULL;
-		next = &node;
+		first = NULL;
+		last = NULL;
 		for (;;)
 		{
-			*next = expect_constant(type->ptr_to);
-			next = &(*next)->global_assign_next;
+			tmp = new_node(ND_NONE, expect_constant(type->ptr_to), NULL, NULL);
+			if (last == NULL)
+				first = tmp;
+			else
+				last->global_array_next = tmp;
+			last = tmp;
 			if (consume("}"))
 				break ;
 			if (!consume(","))
 				error_at(g_token->str, ",が必要です");
 		}
+		node = first;
 	}
 	else
 	{
 		node = NULL;
-		error_at(g_token->str, "定数が必要です");
+		error_at(g_token->str, "定数が必要です(c)");
 	}
 	return (node);
 }
@@ -873,9 +881,12 @@ static void	global_var(t_type *type, t_token *ident, bool is_extern, bool is_sta
 	int			i;
 	t_defvar	*defvar;
 
-	// 後ろの型を読む
-	// TODO a[]とかでも許容したい
-	expect_type_after(&type);
+	// 型だけ
+	if (ident == NULL)
+	{
+		expect_semicolon();
+		return ;
+	}
 
 	defvar				= calloc(1, sizeof(t_defvar));
 	defvar->name		= ident->str;
@@ -923,15 +934,10 @@ t_type	*read_struct_block(t_token *ident)
 		if (consume("}"))
 			break ;
 
-		type = consume_type_before(true);
-		if (type == NULL)
-			error_at(g_token->str, "型宣言が必要です\n (read_struct_block)");
-
-		ident = consume_ident();
+		if (!consume_type(&type, &ident, NULL, NULL))
+			error_at(g_token->str, "型宣言が必要です\n (read_union_block)");
 		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です\n (read_struct_block)");
-		expect_type_after(&type);
-
+			error_at(g_token->str, "識別子が必要です\n (read_union_block)");
 		expect_semicolon();
 
 		elem			= calloc(1, sizeof(t_member));
@@ -1015,15 +1021,10 @@ t_type	*read_union_block(t_token *ident)
 		if (consume("}"))
 			break;
 
-		type = consume_type_before(true);
-		if (type == NULL)
+		if (!consume_type(&type, &ident, NULL, NULL))
 			error_at(g_token->str, "型宣言が必要です\n (read_union_block)");
-
-		ident = consume_ident();
 		if (ident == NULL)
 			error_at(g_token->str, "識別子が必要です\n (read_union_block)");
-
-		expect_type_after(&type);
 		expect_semicolon();
 
 		elem			= calloc(1, sizeof(t_member));
@@ -1045,74 +1046,9 @@ t_type	*read_union_block(t_token *ident)
 	return (type);
 }
 
-// (まで読んだところから読む
-static void	funcdef(t_type *type, t_token *ident, bool is_static)
+static void	funcdef(t_deffunc *def)
 {
-	t_deffunc	*def;
-	t_token		*arg;
 	int			i;
-
-	def							= calloc(1, sizeof(t_deffunc));
-	def->name					= ident->str;
-	def->name_len				= ident->len;
-	def->type_return			= type;
-	def->argcount				= 0;
-	def->is_static				= is_static;
-
-	// args
-	if (!consume(")"))
-	{
-		for (;;)
-		{
-			// variable argument
-			if (consume("..."))
-			{
-				if (def->argument_types[0] == NULL)
-					error_at(g_token->str, "可変長引数の宣言をするには、少なくとも一つの引数が必要です");
-				if (!consume(")"))
-					error_at(g_token->str, ")が必要です");
-				def->is_variable_argument = true;
-				break ;
-			}
-
-			// 型宣言の確認
-			type = consume_type_before(false);
-			if (type == NULL)
-				error_at(g_token->str,"型が必要です\n (funcdef)");
-
-			// 仮引数名
-			arg = consume_ident();
-			if (arg == NULL)
-			{
-				// voidなら引数0個
-				if (type->ty == TY_VOID)
-				{
-					if (def->argument_types[0] != NULL)
-						error_at(g_token->str, "既に引数が宣言されています");
-					if (!consume(")"))
-						error_at(g_token->str, ")が見つかりませんでした。");
-					def->is_zero_argument = true;
-					break ;
-				}
-				error_at(g_token->str, "仮引数が必要です");
-			}
-
-			// arrayを読む
-			expect_type_after(&type);
-
-			// save
-			def->argument_names[def->argcount]		= arg->str;
-			def->argument_name_lens[def->argcount]	= arg->len;
-			def->argument_types[def->argcount]		= type;
-			def->argcount += 1;
-
-			// )か,
-			if (consume(")"))
-				break;
-			if (!consume(","))
-				error_at(g_token->str, ",が必要です");
-		}
-	}
 
 	// func_defsに代入
 	if (consume(";"))
@@ -1138,25 +1074,18 @@ static void	read_typedef(void)
 	t_token			*token;
 	t_typedefpair	*pair;
 
-	// 型を読む
-	type = consume_type_before(true);
-	if (type == NULL)
+	if (!consume_type(&type, &token, NULL, NULL))
 		error_at(g_token->str, "型宣言が必要です\n (read_typedef)");
-	expect_type_after(&type);
 
-	// 識別子を読む
-	token = consume_ident();
 	if (token == NULL)
 		error_at(g_token->str, "識別子が必要です");
 
-	// ペアを追加
 	pair			= malloc(sizeof(t_typedefpair));
 	pair->name		= token->str;
 	pair->name_len	= token->len;
 	pair->type		= type;
 
 	linked_list_insert(g_type_alias, pair);
-
 	expect_semicolon();
 }
 
@@ -1165,7 +1094,7 @@ static void	filescope(void)
 	t_token	*ident;
 	t_type	*type;
 	bool	is_static;
-	bool	is_inline;
+	bool	is_extern;
 
 	// typedef
 	if (consume_kind(TK_TYPEDEF))
@@ -1174,112 +1103,124 @@ static void	filescope(void)
 		return ;
 	}
 
-	// extern
-	if (consume_kind(TK_EXTERN))
-	{
-		type = consume_type_before(true);
-		if (type == NULL)
-			error_at(g_token->str, "型が必要です");
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です");
-		global_var(type, ident, true, false);
-		return ;
-	}
-
-	is_static = false;
-	if (consume_kind(TK_STATIC))
-	{
-		is_static = true;
-	}
-
-	// TODO とりあえず無視
-	is_inline = false;
 	if (consume_kind(TK_INLINE))
 	{
-		is_inline = true;
+		// 無視
 	}
 
-	// structの宣言か返り値がstructか
-	if (consume_kind(TK_STRUCT))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です");
-			
-		if (consume("{"))
-		{
-			read_struct_block(ident);
-			// ;なら構造体の宣言
-			// そうでないなら返り値かグローバル変数
-			if (consume(";"))
-				return ;
-		}
-		type = new_struct_type(ident->str, ident->len);
-		consume_type_ptr(&type);
-	}
-	// enumの宣言か返り値がenumか
-	else if (consume_kind(TK_ENUM))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です");
-			
-		if (consume("{"))
-		{
-			read_enum_block(ident);
-			// ;ならenumの宣言
-			// そうでないなら返り値かグローバル変数
-			if (consume(";"))
-				return ;
-		}
-		type = new_enum_type(ident->str, ident->len);
-		consume_type_ptr(&type);
-	}
-	// unionの宣言か返り値がunionか
-	else if (consume_kind(TK_UNION))
-	{
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "識別子が必要です");
-			
-		if (consume("{"))
-		{
-			read_union_block(ident);
-			// ;ならunionの宣言
-			// そうでないなら返り値かグローバル変数
-			if (consume(";"))
-				return ;
-		}
-		type = new_union_type(ident->str, ident->len);
-		consume_type_ptr(&type);
-	}
+	if (!consume_type(&type, &ident, &is_static, &is_extern))
+		error_at(g_token->str, "error : filescope");
+
+	if (type->ty == TY_FUNCTION)
+		funcdef(type->funcdef);
 	else
-		type = consume_type_before(true);
-
-	// TODO 一旦staticは無視
-	// グローバル変数か関数宣言か
-	if (type != NULL)
-	{
-		// ident
-		ident = consume_ident();
-		if (ident == NULL)
-			error_at(g_token->str, "不明なトークンです");
-
-		// function definition
-		if (consume("("))
-			funcdef(type, ident, is_static);
-		else
-		{
-			if (is_inline)
-				error_at(ident->str, "グローバル変数にinlineは使えません");
-			global_var(type, ident, false, is_static);
-		}
-		return ;
-	}
-
-	error_at(g_token->str, "構文解析に失敗しました[filescope kind:%d]", g_token->kind);
+		global_var(type, ident, is_extern, is_static);
 }
+
+/*
+static t_storage_class	consume_storage_class_specifier(void)
+{
+	t_storage_class	r;
+
+	r = SC_NONE;
+	switch (g_token->kind)
+	{
+		case TK_AUTO:
+			r = SC_AUTO;
+			break ;
+		case TK_REGISTER:
+			r = SC_REGISTER;
+			break ;
+		case TK_STATIC:
+			r = SC_STATIC;
+			break ;
+		case TK_EXTERN:
+			r = SC_EXTERN;
+			break ;
+		case TK_TYPEDEF:
+			r = SC_TYPEDEF;
+			break ;
+		default:
+	}
+	if (r != SC_NONE)
+		consume_any();
+	return (r);
+}
+
+static t_declaration_specifiers	*consume_declaration_specifiers(void)
+{
+	t_token						*tmp;
+	t_declaration_specifiers	*dec;
+	t_storage_class				storage_class;
+	t_declaration_specifiers	*spec1;
+	t_type_specifier			*type_specifier;
+	t_declaration_specifiers	*spec2;
+	ttype_qualifier				*type_qualifier;
+	t_declaration_specifiers	*spec3;
+
+	tmp = g_token;
+	storage_class = consume_storage_class_specifier();
+	if (storage_class = SC_NONE)
+		return (NULL);
+	spec1			= consume_declatation_specifiers();
+	type_specifier	= expect_type_specifier();
+	if (type_specifier == NULL)
+	{
+		g_token = tmp;
+		return (NULL);
+	}
+	spec2			= consume_declatation_specifiers();
+	type_qualifier	= consume_type_qualifier();
+	if (type_qualifier == NULL)
+	{
+		g_token = tmp;
+		return (NULL);
+	}
+	spec3			= consume_declatation_specifiers();
+
+	dec = calloc(1, sizeof(t_declaration_specifiers));
+	dec->storage = storage_class;
+	dec->spec1 = spec1;
+	dec->spec2 = spec2;
+	dec->spec3 = spec3;
+}
+
+static bool consume_function_definition(void)
+{
+	t_token						*tmp;
+	t_function_definition		*function_definition;
+	t_declaration_specifiers	*declaration_specifiers;
+	t_declarator				*declarator;
+	t_declaration_list			*declaration_list;
+	t_compound_statement		*compound_statement;
+
+	tmp	= g_token;
+	declaration_specifiers	= consume_declaration_specifiers();
+	declarator				= consume_declarator();
+	if (declarator == NULL)
+	{
+		g_token = tmp;
+		return (false);
+	}
+	declaration_list		= consume_declaration_list();
+
+	function_definition	 = calloc(1, sizeof(t_function_definition));
+	function_definition->declaration_specifiers	= declaration_specifiers;
+	function_definition->declarator				= declarator;
+	function_definition->declaration_lists		= declaration_list;
+	function_definition->compound_statement 	= compound_statement;
+
+	// TODO 保存する
+}
+
+static void	external_declaration(void)
+{
+	if (consume_function_definition())
+		return ;
+	else if (consume_declaration())
+		return ;
+}
+*/
 
 void	parse(void)
 {

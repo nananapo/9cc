@@ -19,12 +19,14 @@ static void	translate_node(t_node *node);
 static void	translate_func(t_deffunc *func);
 void		translate_il(void);
 
+static t_il	*g_il;
 static t_il	*g_il_last;
 static int	jumpLabelCount;
+static int	ILID_UNIQUE;
 
 // main
 extern t_deffunc		*g_func_defs[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
 static char	*get_function_epi_label(char *name, int len)
 {
@@ -33,22 +35,191 @@ static char	*get_function_epi_label(char *name, int len)
 
 static char	*get_label_str(int i)
 {
-	char	buf[100];
-	sprintf(buf, "%d", i);
+	char	buf[1000];
+	snprintf(buf, sizeof(buf), "%d", i);
 	return (my_strcat("L", buf));
+}
+
+char* get_il_name(t_ilkind kind)
+{
+	switch (kind)
+	{
+		case IL_LABEL:
+			return "LABEL";
+		case IL_JUMP:
+			return "JUMP";
+		case IL_JUMP_TRUE:
+			return "JUMP_TRUE";
+		case IL_JUMP_FALSE:
+			return "JUMP_FALSE";
+		case IL_FUNC_PROLOGUE:
+			return "FUNC_PROLOGUE";
+		case IL_FUNC_EPILOGUE:
+			return "EPILOGUE";
+		case IL_DEF_VAR_LOCAL:
+			return "DEF_VAR_LOCAL";
+		case IL_DEF_VAR_LOCAL_ARRAY:
+			return "DEF_VAR_LOCAL_ARRAY";
+		case IL_DEF_VAR_END:
+			return "DEF_VAR_END";
+		case IL_PUSH_AGAIN:
+			return "PUSH_AGAIN";
+		case IL_PUSH_NUM:
+			return "PUSH_NUM";
+		case IL_PUSH_FLOAT:
+			return "PUSH_FLOAT";
+		case IL_POP:
+			return "POP";
+		case IL_ADD:
+			return "ADD";
+		case IL_SUB:
+			return "SUB";
+		case IL_MUL:
+			return "MUL";
+		case IL_DIV:
+			return "DIV";
+		case IL_MOD:
+			return "MOD";
+		case IL_EQUAL:
+			return "EQUAL";
+		case IL_NEQUAL:
+			return "NEQUAL";
+		case IL_LESS:
+			return "LESS";
+		case IL_LESSEQ:
+			return "LESSQ";
+		case IL_BITWISE_AND:
+			return "BITWISE_AND";
+		case IL_BITWISE_OR:
+			return "BITWISE_OR";
+		case IL_BITWISE_XOR:
+			return "BITWISE_XOR";
+		case IL_BITWISE_NOT:
+			return "BITWISE_NOT";
+		case IL_SHIFT_LEFT:
+			return "SHIFT_LEFT";
+		case IL_SHIFT_RIGHT:
+			return "SHIFT_RIGHT";
+		case IL_ASSIGN:
+			return "ASSIGN";
+		case IL_VAR_LOCAL:
+			return "VAR_LOCAL";
+		case IL_VAR_LOCAL_ADDR:
+			return "VAR_LOCAL_ADDR";
+		case IL_VAR_GLOBAL:
+			return "VAR_GLOBAL";
+		case IL_VAR_GLOBAL_ADDR:
+			return "VAR_GLOBAL_ADDR";
+		case IL_MEMBER:
+			return "MEMBER";
+		case IL_MEMBER_ADDR:
+			return "MEMBER_ADDER";
+		case IL_MEMBER_PTR:
+			return "MEMBER_PTR";
+		case IL_MEMBER_PTR_ADDR:
+			return "MEMBER_PTR_ADDR";
+		case IL_STR_LIT:
+			return "STR_LIT";
+		case IL_CALL_START:
+			return "CALL_START";
+		case IL_CALL_ADD_ARG:
+			return "CALL_ADD_ARG";
+		case IL_CALL_EXEC:
+			return "CALL_EXEC";
+		case IL_MACRO_VASTART:
+			return "MACRO_VA_START";
+		case IL_CAST:
+			return "CAST";
+		case IL_LOAD:
+			return "LOAD";
+	}
+}
+
+void	print_il(t_il *code)
+{
+	debug("#%d %s", code->ilid_unique, get_il_name(code->kind));
+
+	switch (code->kind)
+	{
+		case IL_LABEL:
+		case IL_JUMP:
+		case IL_JUMP_TRUE:
+		case IL_JUMP_FALSE:
+			debug("#    label : %s", code->label_str);
+			break ;
+		case IL_DEF_VAR_LOCAL:
+		case IL_DEF_VAR_LOCAL_ARRAY:
+		case IL_VAR_LOCAL:
+		case IL_VAR_LOCAL_ADDR:
+			debug("#    name : %s",
+			 my_strndup(code->var_local->name, code->var_local->name_len));
+			break ;
+		case IL_VAR_GLOBAL:
+		case IL_VAR_GLOBAL_ADDR:
+			debug("#    name : %s",
+			 my_strndup(code->var_global->name, code->var_global->name_len));
+			break ;
+		case IL_ADD:
+		case IL_SUB:
+		case IL_MUL:
+		case IL_DIV:
+		case IL_MOD:
+		case IL_EQUAL:
+		case IL_NEQUAL:
+		case IL_LESS:
+		case IL_LESSEQ:
+		case IL_BITWISE_AND:
+		case IL_BITWISE_OR:
+		case IL_BITWISE_XOR:
+		case IL_BITWISE_NOT:
+		case IL_SHIFT_LEFT:
+		case IL_SHIFT_RIGHT:
+			debug("#    type : %s", get_type_name(code->type));
+			break ;
+		case IL_CAST:
+			debug("#    op : %s -> %s", get_type_name(code->cast_from), get_type_name(code->cast_to));
+			break ;
+		case IL_PUSH_NUM:
+			debug("#    num : %d", code->number_int);
+			break ;
+		case IL_FUNC_PROLOGUE:
+		case IL_FUNC_EPILOGUE:
+		case IL_DEF_VAR_END:
+		case IL_PUSH_AGAIN:
+		case IL_PUSH_FLOAT:
+		case IL_POP:
+		case IL_STR_LIT:
+		case IL_CALL_START:
+		case IL_CALL_ADD_ARG:
+		case IL_CALL_EXEC:
+		case IL_MACRO_VASTART:
+		case IL_LOAD:
+		case IL_MEMBER:
+		case IL_MEMBER_ADDR:
+		case IL_MEMBER_PTR:
+		case IL_MEMBER_PTR_ADDR:
+		case IL_ASSIGN:
+			break ;
+	}
 }
 
 static t_il	*append_il(t_ilkind kind)
 {
 	t_il	*tmp;
 
-	tmp			= calloc(1, sizeof(t_il));
-	tmp->kind	= kind;
+	tmp				= calloc(1, sizeof(t_il));
+	tmp->kind		= kind;
+	tmp->next		= NULL;
+	tmp->ilid_unique= ILID_UNIQUE++;
+	tmp->label_str	= NULL;
 
 	if (g_il == NULL)
 		g_il = tmp;
 	else
+	{
+		tmp->before = g_il_last;
 		g_il_last->next = tmp;
+	}
 	g_il_last = tmp;
 	return (tmp);
 }
@@ -58,6 +229,14 @@ static t_il	*append_il_pushnum(int i)
 	t_il	*code;
 	code			= append_il(IL_PUSH_NUM);
 	code->number_int= i;
+	return (code);
+}
+
+static t_il	*append_il_pushflonum(float i)
+{
+	t_il	*code;
+	code				= append_il(IL_PUSH_FLOAT);
+	code->number_float	= i;
 	return (code);
 }
 
@@ -164,7 +343,7 @@ static void	translate_call(t_node *node)
 	{
 		code					= append_il(IL_CALL_ADD_ARG);
 		code->funccall_callee	= node->funcdef;
-		code->type				= node->funccall_args[i]->type;
+		code->type				= type_array_to_ptr(node->funccall_args[i]->type);
 	}
 
 	code					= append_il(IL_CALL_EXEC);
@@ -543,6 +722,9 @@ static void	translate_node(t_node *node)
 		case ND_NUM:
 			append_il_pushnum(node->val);
 			return ;
+		case ND_FLOAT:
+			append_il_pushflonum(node->val_float);
+			return ;
 
 		// TODO analyzeで両方の型が一致している状態にする
 		case ND_ADD:
@@ -787,6 +969,16 @@ static void	translate_node(t_node *node)
 		case ND_SWITCH:
 			translate_switch(node);
 			return ;
+		case ND_VAR_DEF_ARRAY:
+		{
+			code			= append_il(IL_VAR_LOCAL_ADDR);
+			code->var_local	= node->lvar;
+
+			code = append_il(IL_DEF_VAR_LOCAL_ARRAY);
+			code->type = node->lvar->type;
+			code->lvar_array = node->lvar_const;
+			return ;
+		}
 		case ND_NONE:
 			append_il_pushnum(0);
 			return ;
@@ -833,15 +1025,25 @@ static void	translate_func(t_deffunc *func)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_function_epi_label(func->name, func->name_len);
 
-	code		= append_il(IL_FUNC_EPILOGUE);
-	code->type	= func->type_return;
+	code				= append_il(IL_FUNC_EPILOGUE);
+	code->type			= func->type_return;
 	code->deffunc_def	= func;
 }
 
 void	translate_il(void)
 {
-	int	i;
+	int				i;
+	t_funcil_pair	*pair;
 
 	for (i = 0; g_func_defs[i] != NULL; i++)
+	{
+		g_il = NULL;
 		translate_func(g_func_defs[i]);
+
+		pair = calloc(1, sizeof(t_funcil_pair));
+		pair->func = g_func_defs[i];
+		pair->code = g_il;
+		pair->next = g_func_ils;
+		g_func_ils = pair;
+	}
 }

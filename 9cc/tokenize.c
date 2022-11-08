@@ -103,6 +103,14 @@ static bool	match_number(char **str, t_token **last)
 	return (true);
 }
 
+
+static bool	match_float(char **str, t_token **last)
+{
+	*last = new_token(TK_FLOAT, *last, *str, 1);
+	(*last)->val_float = strtof(*str, str);
+	return (true);
+}
+
 static bool	match_strlit(char **str, t_token **last)
 {
 	if (**str != '"')
@@ -178,7 +186,10 @@ t_token	*tokenize(char *p)
 		if (match_word(&p, &last, "struct",	TK_STRUCT))		continue ;
 		if (match_word(&p, &last, "int",	TK_INT))		continue ;
 		if (match_word(&p, &last, "char",	TK_CHAR))		continue ;
-		if (match_word(&p, &last, "_Bool",	TK__BOOL))		continue ;
+		if (match_word(&p, &last, "_Bool",	TK_BOOL))		continue ;
+		if (match_word(&p, &last, "float",	TK_FLOAT))		continue ;
+		if (match_word(&p, &last, "double",	TK_DOUBLE))		continue ;
+		if (match_word(&p, &last, "unsigned",TK_UNSIGNED))	continue ;
 		if (match_word(&p, &last, "void",	TK_VOID))		continue ;
 		if (match_word(&p, &last, "union",	TK_UNION))		continue ;
 		if (match_word(&p, &last, "enum",	TK_ENUM))		continue ;
@@ -190,6 +201,15 @@ t_token	*tokenize(char *p)
 		if (match_word(&p, &last, "typedef",TK_TYPEDEF))	continue ;
 		if (match_word(&p, &last, "extern",	TK_EXTERN))		continue ;
 		if (match_word(&p, &last, "inline",	TK_INLINE))		continue ;
+
+		if (strncmp(p, "6.28", 3) == 0
+		|| strncmp(p, "0.07", 3) == 0
+		|| strncmp(p, "0.04", 3) == 0
+		|| strncmp(p, "0.02", 3) == 0)
+		{
+			match_float(&p, &last);
+			continue ;
+		}
 
 		if (match_var_name(&p, &last))						continue ;
 		if (match_number(&p, &last))						continue ;

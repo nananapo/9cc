@@ -1,7 +1,6 @@
 NAME=9cc
 
-CC=gcc
-# -fsanitize=address -fno-omit-frame-pointer
+CC=gcc -fsanitize=address -fno-omit-frame-pointer
 CFLAGS=-std=c11 -g -static -Wall -Werror -Wextra
 
 SRCS=$(wildcard *.c)
@@ -17,7 +16,7 @@ testo: $(NAME)
 	sh test_old.sh $(arch)
 
 clean:
-	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3
+	rm -rf $(OBJS) *~ tmp* *dSYM a.out actual.output expected.output test1 test2 test3 debug.dot
 
 fclean: clean
 	rm -rf $(NAME)
