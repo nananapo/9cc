@@ -94,7 +94,7 @@ static void	connect_basicblock_recursively(t_pair_ilblock *pairs, t_basicblock *
 		block->next = target_block;
 
 		if (target_block != NULL)
-			printf("# block(%d)->next = %d\n", block->uniqueid, target_block->uniqueid);
+			debug("# block(%d)->next = %d", block->uniqueid, target_block->uniqueid);
 
 		connect_basicblock_recursively(pairs, target_block);
 	}
@@ -106,9 +106,9 @@ static void	connect_basicblock_recursively(t_pair_ilblock *pairs, t_basicblock *
 		target_block = search_ilblock_with_label(pairs, block->end->label_str);
 
 		if (target_block != NULL)
-			printf("# block(%d)->next_if = %d\n", block->uniqueid, target_block->uniqueid);
+			debug("# block(%d)->next_if = %d", block->uniqueid, target_block->uniqueid);
 		else
-			printf("# failed to find Label:\"%s\" , block(%d,kind:%d)\n",
+			debug("# failed to find Label:\"%s\" , block(%d,kind:%d)",
 						block->end->label_str, block->uniqueid, block->end->kind);
 
 		block->next_if = target_block;
@@ -131,7 +131,7 @@ static t_basicblock	*construct_basicblock(void)
 	il_leader_pairs	= NULL;
 	headblock		= NULL;
 
-	printf("# start construct\n");
+	debug("# start construct");
 
 	// 筆頭と中間表現のペアを作る
 	// ラベルをとりあえず筆頭にする
@@ -147,7 +147,7 @@ static t_basicblock	*construct_basicblock(void)
 				block_now = block;
 				append_ilblock_pair(&il_leader_pairs, block);
 
-				printf("# Create Block(%d,kind:%d) start:%d\n", block->uniqueid, code->kind, code->ilid_unique);
+				debug("# Create Block(%d,kind:%d) start:%d", block->uniqueid, code->kind, code->ilid_unique);
 			}
 			else
 				block_now->end = code;
@@ -159,13 +159,13 @@ static t_basicblock	*construct_basicblock(void)
 			block_now = block;
 			append_ilblock_pair(&il_leader_pairs, block);
 
-			printf("# Create Block(%d, kind:%d) start:%d\n", block->uniqueid, code->kind, code->ilid_unique);
+			debug("# Create Block(%d, kind:%d) start:%d", block->uniqueid, code->kind, code->ilid_unique);
 		}
 		if (block_now != NULL)
 			block_now->end = code;
 	}
 
-	printf("# start connect\n");
+	debug("# start connect");
 	// 基本ブロックをつなぐ
 	headblock = search_ilblock_pair(il_leader_pairs, g_il);
 	connect_basicblock_recursively(il_leader_pairs, headblock);
@@ -298,12 +298,12 @@ static void	debug_il(void)
 {
 	t_il	*tmpil;
 
-	printf("# printil start\n");
+	debug("# printil start");
 	for (tmpil = g_il; tmpil != NULL; tmpil = tmpil->next)
 	{
 		print_il(tmpil);
 	}
-	printf("# printil end\n");
+	debug("# printil end");
 }
 
 static void debug_basicblock(FILE *fp, t_basicblock *block)

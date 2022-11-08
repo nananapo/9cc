@@ -136,7 +136,7 @@ char* get_il_name(t_ilkind kind)
 
 void	print_il(t_il *code)
 {
-	printf("#%d %s (%p)\n", code->ilid_unique, get_il_name(code->kind), code);
+	debug("#%d %s", code->ilid_unique, get_il_name(code->kind));
 
 	switch (code->kind)
 	{
@@ -144,18 +144,18 @@ void	print_il(t_il *code)
 		case IL_JUMP:
 		case IL_JUMP_TRUE:
 		case IL_JUMP_FALSE:
-			printf("#    label : %s\n", code->label_str);
+			debug("#    label : %s", code->label_str);
 			break ;
 		case IL_DEF_VAR_LOCAL:
 		case IL_DEF_VAR_LOCAL_ARRAY:
 		case IL_VAR_LOCAL:
 		case IL_VAR_LOCAL_ADDR:
-			printf("#    name : %s\n",
+			debug("#    name : %s",
 			 my_strndup(code->var_local->name, code->var_local->name_len));
 			break ;
 		case IL_VAR_GLOBAL:
 		case IL_VAR_GLOBAL_ADDR:
-			printf("#    name : %s\n",
+			debug("#    name : %s",
 			 my_strndup(code->var_global->name, code->var_global->name_len));
 			break ;
 		case IL_ADD:
@@ -173,13 +173,13 @@ void	print_il(t_il *code)
 		case IL_BITWISE_NOT:
 		case IL_SHIFT_LEFT:
 		case IL_SHIFT_RIGHT:
-			printf("#    type : %s\n", get_type_name(code->type));
+			debug("#    type : %s", get_type_name(code->type));
 			break ;
 		case IL_CAST:
-			printf("#    op : %s -> %s\n", get_type_name(code->cast_from), get_type_name(code->cast_to));
+			debug("#    op : %s -> %s", get_type_name(code->cast_from), get_type_name(code->cast_to));
 			break ;
 		case IL_PUSH_NUM:
-			printf("#    num : %d\n", code->number_int);
+			debug("#    num : %d", code->number_int);
 			break ;
 		case IL_FUNC_PROLOGUE:
 		case IL_FUNC_EPILOGUE:
