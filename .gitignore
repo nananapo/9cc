@@ -12,3 +12,4 @@ a
 9cc/test/gcc/*
 atcoder/*
 .DS_Store
+*.vcd

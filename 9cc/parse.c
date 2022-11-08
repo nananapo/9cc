@@ -53,7 +53,6 @@ extern t_str_elem		*g_str_literals[1000];
 extern t_defstruct		*g_struct_defs[1000];
 extern t_defenum		*g_enum_defs[1000];
 extern t_defunion		*g_union_defs[1000];
-extern t_lvar			*g_locals;
 extern t_linked_list	*g_type_alias;
 
 t_deffunc	*get_function_by_name(char *name, int len)

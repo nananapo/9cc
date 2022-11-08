@@ -147,6 +147,8 @@ static t_switchcase	*add_switchcase(t_labelstack *sbdata, int number)
 // parse.cからのコピー
 static t_node	*cast(t_node *node, t_type *to)
 {
+	if (type_equal(node->type, to))
+		return (node);
 	node = new_node(ND_CAST, node, NULL, node->analyze_source);
 	node->type = to;
 	return (node);
@@ -693,6 +695,7 @@ static t_node	*analyze_conditional_op(t_node *node)
 	return (node);
 }
 
+// lhs = rhs
 static t_node	*analyze_assign(t_node *node)
 {
 	node->lhs = analyze_node(node->lhs);
@@ -984,6 +987,8 @@ static t_node	*analyze_node(t_node *node)
 			if (!type_can_cast(node->lhs->type, node->type))
 				error_at(node->analyze_source, "%sを%sにキャストできません",
 						get_type_name(node->lhs->type), get_type_name(node->type));
+			if (type_equal(node->type, node->lhs->type))
+				return (node->lhs);
 			return (node);
 		}
 		case ND_RETURN:

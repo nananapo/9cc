@@ -237,6 +237,7 @@ typedef struct s_lvar
 	int				name_len;
 	bool			is_dummy;
 	bool			is_argument;
+	int				offset;
 
 	struct s_lvar	*next;
 } t_lvar;
@@ -352,7 +353,8 @@ typedef struct s_typedefpair
 typedef enum s_arch
 {
 	ARCH_X8664,
-	ARCH_RISCV
+	ARCH_RISCV,
+	ARCH_VERILOG
 }	t_arch;
 
 char	*my_strndup(char *s, int len);

@@ -44,7 +44,7 @@ int main(int argc, char **argv)
 		{
 			if (argc < 3)
 			{
-				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
+				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv / verilog] [filename]");
 				return (1);
 			}
 
@@ -52,9 +52,11 @@ int main(int argc, char **argv)
 				g_arch = ARCH_X8664;
 			else if (strcmp("riscv", argv[2]) == 0)
 				g_arch = ARCH_RISCV;
+			else if (strcmp("verilog", argv[2]) == 0)
+				g_arch = ARCH_VERILOG;
 			else
 			{
-				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv] [filename]");
+				fprintf(stderr, "Usage 9cc --arch [x8664 / riscv / verilog] [filename]");
 				return (1);
 			}
 
@@ -84,6 +86,13 @@ int main(int argc, char **argv)
 	debug("parse end");
 
 	analyze();
+
+	// verilogは特別扱い！
+	if (g_arch == ARCH_VERILOG)
+	{
+		codegen();
+		return 0;
+	}
 
 	translate_il();
 
