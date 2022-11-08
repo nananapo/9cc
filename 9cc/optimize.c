@@ -6,9 +6,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-extern t_il	*g_il;
+extern t_funcil_pair	*g_func_ils;
 
 static t_basicblock		*g_basicblock;
+static t_il				*g_il;
 static t_il				*g_il_last;
 static int				BASICBLOCK_ID;
 static t_pair_ilblock	*g_all_blocks;
@@ -42,21 +43,6 @@ static void	append_ilblock_pair(t_pair_ilblock **pairs, t_basicblock *block)
 	p->next = *pairs;
 	*pairs = p;
 	return ;
-}
-
-static t_basicblock	*pop_ilblock_pair(t_pair_ilblock **pairs)
-{
-	t_basicblock	*block;
-	t_pair_ilblock	*ptr;
-
-	if (*pairs == NULL)
-		return (NULL);
-
-	ptr = *(pairs);
-	block = ptr->block;
-	*pairs = ptr->next;
-	free(ptr);
-	return (block);
 }
 
 static t_basicblock *search_ilblock_pair(t_pair_ilblock *pairs, t_il *il)
@@ -122,7 +108,6 @@ static t_basicblock	*construct_basicblock(void)
 	t_basicblock	*block_now;
 	t_il			*code;
 	t_pair_ilblock	*il_leader_pairs;
-	t_pair_ilblock	*pair;
 	t_basicblock	*headblock;
 
 	block			= NULL;
@@ -179,21 +164,15 @@ static void	mark_next_blocks(t_basicblock *parent, t_basicblock *target)
 	|| target->il_generated
 	|| target->mark_block != NULL)
 		return ;
-	for (;	target != NULL
-		&&	target->mark_block == NULL
-		&&	!target->mark_prohibited;
-			target = target->next)
+
+	for (; target != NULL; target = target->next)
 	{
 		target->mark_block = parent;
 	}
-}
 
-static void	unmark_next_blocks(t_basicblock *parent, t_basicblock *target)
-{
-	for (;	target != NULL && target->mark_block == parent;
-			target = target->next)
+	for (; target != NULL; target = target->next)
 	{
-		target->mark_block = NULL;
+		mark_next_blocks(target, target->next_if);
 	}
 }
 
@@ -201,49 +180,58 @@ static void	generate_basicblock_il(t_basicblock *block)
 {
 	t_basicblock	*tmp;
 
-	// skip
-	if (block == NULL
-	|| block->il_generated
-	|| block->mark_block != NULL)
+	if (block == NULL || block->il_generated)
 		return ;
-	block->il_generated = true;
 
-	// ok
-	printf("# generate bblock(%d)\n", block->uniqueid);
-	if (g_il == NULL)
+	debug("# call(%d)", block->uniqueid);
+
+	// generate block
+	for (tmp = block; tmp != NULL; tmp = tmp->next)
 	{
-		g_il = block->start;
-		g_il_last = block->end;
+		debug("# generate(%d)", tmp->uniqueid);
+		if (g_il == NULL)
+		{
+			g_il = tmp->start;
+			g_il_last = tmp->end;
+		}
+		else
+		{
+			g_il_last->next = tmp->start;
+			g_il_last = tmp->end;
+		}
+		tmp->il_generated = true;
+		g_il_last->next = NULL;
 	}
-	else
+
+	for (tmp = block; tmp != NULL; tmp = tmp->next)
 	{
-		g_il_last->next = block->start;
-		g_il_last = block->end;
+		if (tmp->next_if == NULL)
+			continue ;
+		mark_next_blocks(tmp, tmp->next_if);
 	}
-	g_il_last->next = NULL;
 
-	for (	tmp = block;
-			tmp != NULL && !tmp->mark_prohibited;
-			tmp = tmp->next)
-		tmp->mark_prohibited = true;
-
-	mark_next_blocks(block, block->next_if);
-	generate_basicblock_il(block->next);
-	unmark_next_blocks(block, block->next_if);
-
-	generate_basicblock_il(block->next_if);
+	for (tmp = block; tmp != NULL; tmp = tmp->next)
+	{
+		if (tmp->next_if == NULL
+		|| tmp->next_if->mark_block != tmp)
+			continue ;
+		generate_basicblock_il(tmp->next_if);
+	}	
 }
 
-static void	delete_cast_nonsense(void)
+static bool	delete_cast_nonsense(void)
 {
 	t_il	*code;
+	bool	updated;
 
+	updated = false;
 	for (code = g_il; code != NULL; code = code->next)
 	{
 		if (code->kind != IL_CAST)
 			continue ;
 		if (type_equal(code->cast_from, code->cast_to))
 		{
+			updated = true;
 			if (code->before != NULL)
 				code->before->next = code->next;
 			if (code->next != NULL)
@@ -252,12 +240,15 @@ static void	delete_cast_nonsense(void)
 				g_il = code->next;
 		}
 	}
+	return (updated);
 }
 
-static void	delete_push_pop(void)
+static bool	delete_push_pop(void)
 {
 	t_il	*code;
+	bool	updated;
 
+	updated = false;
 	for (code = g_il; code != NULL; code = code->next)
 	{
 		if (code->before == NULL
@@ -285,6 +276,7 @@ static void	delete_push_pop(void)
 				continue ;
 		}
 
+		updated = true;
 		if (code->before->before != NULL)
 			code->before->before->next = code->next;
 		if (code->next != NULL)
@@ -292,6 +284,60 @@ static void	delete_push_pop(void)
 		if (code->before == g_il)
 			g_il = code->next;
 	}
+	return (updated);
+}
+
+static bool	delete_label_array(void)
+{
+	t_il		*code;
+	t_il		*head;
+	t_label_pair*pairs;
+	t_label_pair*tmp;
+	bool		updated;
+
+	head = NULL;
+	pairs = NULL;
+	tmp = NULL;
+	updated = false;
+
+	// ラベルをまとめる
+	for (code = g_il; code != NULL; code = code->next)
+	{
+		if (code->before == NULL
+		|| code->kind != IL_LABEL)
+			continue ;
+
+		head = code;
+		for (code = code->next;
+			code != NULL && code->kind == IL_LABEL;
+			code = code->next)
+		{
+			tmp = calloc(1, sizeof(t_label_pair));
+			tmp->from = code->label_str;
+			tmp->to = head->label_str;
+			tmp->next = pairs;
+			pairs = tmp;
+			updated = true;
+		}
+		head->next = code;
+	}
+
+	// ラベルを置き換える
+	for (code = g_il; code != NULL; code = code->next)
+	{
+		if (code->label_str == NULL)
+			continue ;
+		for (tmp = pairs; tmp != NULL; tmp = tmp->next)
+		{
+			if (strcmp(code->label_str, tmp->from) == 0)
+			{
+				code->label_str = tmp->to;
+				break ;
+			}
+		}
+	}
+
+	return (updated);
 }
 
 static void	debug_il(void)
@@ -318,12 +364,18 @@ static void debug_basicblock(FILE *fp, t_basicblock *block)
 	fprintf(fp, "#%d %s\\l", code->ilid_unique, get_il_name(code->kind));
 }
 
-static void debug_basicblock_dot()
+static void debug_basicblock_dot(char *funcname)
 {
 	FILE			*fp;
 	t_pair_ilblock	*pair;
+	char			filename[1000];
 
-	fp = fopen("debug.dot", "w");
+	filename[0] = '\0';
+	strcat(filename, "dot/");
+	strcat(filename, funcname);
+	strcat(filename, ".dot");
+
+	fp = fopen(filename, "w");
 	if (fp == NULL)
 		return ;
 
@@ -338,7 +390,6 @@ static void debug_basicblock_dot()
  	fprintf(fp," node [\n");
  	fprintf(fp,"   shape = rect,\n");
  	fprintf(fp,"   fontsize = 14,\n");
- 	fprintf(fp,"   fontname = \"明朝体\",\n");
  	fprintf(fp," ];\n");
  	fprintf(fp," edge [\n");
  	fprintf(fp,"   color = black\n");
@@ -346,6 +397,9 @@ static void debug_basicblock_dot()
 
 	for (pair = g_all_blocks; pair != NULL; pair = pair->next)
 	{
+		if (!pair->block->il_generated)
+			continue ;
+
 		if (pair->block->next != NULL)
 		{
 			fprintf(fp, "\"");
@@ -361,7 +415,12 @@ static void debug_basicblock_dot()
 				debug_basicblock(fp, pair->block);
 			fprintf(fp, "\" -> \n\"");
 				debug_basicblock(fp, pair->block->next_if);
-			fprintf(fp, "\"[label = \"next_j\"];");
+			fprintf(fp, "\"[label = \"");
+			if (pair->block->end->kind == IL_JUMP)
+				fprintf(fp, "jmp");
+			else
+				fprintf(fp, "if");
+			fprintf(fp, "\", color = red];");
 		}
 
 		if (pair->block->next == NULL && pair->block->next_if == NULL)
@@ -377,21 +436,46 @@ static void debug_basicblock_dot()
 
 void	optimize(void)
 {
-	// int -> intのような意味のないキャストを削除する
-	delete_cast_nonsense();
+	t_funcil_pair	*pair;
+	bool			updated;
 
-	// pushする以外に副作用がないt_ilの直後にpopがあったら消す
-	delete_push_pop();
+	for (pair = g_func_ils; pair != NULL; pair = pair->next)
+	{
+		BASICBLOCK_ID = 0;
+		g_all_blocks = NULL;
 
-	debug_il();
+		// init
+		g_il = pair->code;
+		g_il_last = NULL;
 
-	// 基本ブロックを構成
-	g_basicblock = construct_basicblock();
+		// int -> intのような意味のないキャストを削除する
+		delete_cast_nonsense();
 
-	g_il = NULL;
-	g_il_last = NULL;
-	//基本ブロックから中間表現の列を生成する
-	generate_basicblock_il(g_basicblock);
+		updated = true;
+		while (updated)
+		{
+			updated = false;
+			// pushする以外に副作用がないt_ilの直後にpopがあったら消す
+			updated = delete_push_pop();
+			// 連続するラベルを1つにまとめる
+			updated = delete_label_array() || updated;
+		}
 
-	debug_basicblock_dot();
+		debug_il();
+
+		// 基本ブロックを構成
+		g_basicblock = construct_basicblock();
+
+		//基本ブロックから中間表現の列を生成する
+		g_il = NULL;
+		g_il_last = NULL;
+		generate_basicblock_il(g_basicblock);
+
+		// save
+		pair->code = g_il;
+
+# ifdef DEBUG
+		debug_basicblock_dot(my_strndup(pair->func->name, pair->func->name_len));
+# endif
+	}
 }

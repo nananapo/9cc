@@ -72,7 +72,7 @@ extern char				*g_filename;
 extern t_deffunc		*g_func_defs[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
 static void	put_str_literal(char *str, int len)
 {
@@ -1032,15 +1032,6 @@ static void	gen_func_epilogue(t_il *code)
 	addi(SP, SP, g_va_start_offset);
 	printf("    jr %s\n", RA);
 	
-	g_locals_count = 0;
-
-	/* 必要ない?
-	if (stack_count != 0)
-	{
-		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
-		error("Error");
-	}*/
-
 	stack_count = 0;
 }
 
@@ -1052,8 +1043,6 @@ static void	gen_def_var_local(t_il *code)
 static void	gen_def_var_end(void)
 {
 	int	old;
-
-	
 
 	old			= stack_count;
 	stack_count	= align_to(stack_count, 16);
@@ -1385,7 +1374,7 @@ void	codegen_riscv(void)
 {
 	int		i;
 	t_il	*code;
-
+	t_funcil_pair	*pair;
 
 	printf("    .file \"%s\"\n", g_filename);
 
@@ -1402,8 +1391,12 @@ void	codegen_riscv(void)
 	}
 
 	printf("    .align 1\n");
-	for (code = g_il; code != NULL; code = code->next)
-		gen_il(code);
+	for (pair = g_func_ils; pair != NULL; pair = pair->next)
+	{
+		for (code = pair->code; code != NULL; code = code->next)
+			gen_il(code);
+		g_locals_count = 0;
+	}
 
 	// グローバル変数を生成
 	printf(".section  .sdata, \"aw\", @progbits\n");

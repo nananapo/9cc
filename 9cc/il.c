@@ -19,13 +19,14 @@ static void	translate_node(t_node *node);
 static void	translate_func(t_deffunc *func);
 void		translate_il(void);
 
+static t_il	*g_il;
 static t_il	*g_il_last;
 static int	jumpLabelCount;
 static int	ILID_UNIQUE;
 
 // main
 extern t_deffunc		*g_func_defs[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
 static char	*get_function_epi_label(char *name, int len)
 {
@@ -210,6 +211,7 @@ static t_il	*append_il(t_ilkind kind)
 	tmp->kind		= kind;
 	tmp->next		= NULL;
 	tmp->ilid_unique= ILID_UNIQUE++;
+	tmp->label_str	= NULL;
 
 	if (g_il == NULL)
 		g_il = tmp;
@@ -1023,15 +1025,25 @@ static void	translate_func(t_deffunc *func)
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_function_epi_label(func->name, func->name_len);
 
-	code		= append_il(IL_FUNC_EPILOGUE);
-	code->type	= func->type_return;
+	code				= append_il(IL_FUNC_EPILOGUE);
+	code->type			= func->type_return;
 	code->deffunc_def	= func;
 }
 
 void	translate_il(void)
 {
-	int	i;
+	int				i;
+	t_funcil_pair	*pair;
 
 	for (i = 0; g_func_defs[i] != NULL; i++)
+	{
+		g_il = NULL;
 		translate_func(g_func_defs[i]);
+
+		pair = calloc(1, sizeof(t_funcil_pair));
+		pair->func = g_func_defs[i];
+		pair->code = g_il;
+		pair->next = g_func_ils;
+		g_func_ils = pair;
+	}
 }

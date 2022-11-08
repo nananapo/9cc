@@ -80,7 +80,7 @@ static t_lvar	*g_call_memory_lvars[1000];
 extern t_deffunc		*g_func_defs[1000];
 extern t_defvar			*g_global_vars[1000];
 extern t_str_elem		*g_str_literals[1000];
-extern t_il				*g_il;
+extern t_funcil_pair	*g_func_ils;
 
 typedef enum e_numkind
 {
@@ -1120,16 +1120,6 @@ static void	gen_func_epilogue(t_il *code)
 	pop(RBP);
 	printf("    ret\n");
 
-	g_locals_count = 0;
-
-	/* TODO 必要ない?
-	if (stack_count != 0)
-	{
-		fprintf(stderr, "STACKCOUNT err %d\n", stack_count);
-		error("Error");
-	}
-	*/
-
 	stack_count = 0;
 }
 
@@ -1517,8 +1507,9 @@ static void	gen_il(t_il *code)
 
 void	codegen_x8664(void)
 {
-	int		i;
-	t_il	*code;
+	int				i;
+	t_il			*code;
+	t_funcil_pair	*pair;
 
 	printf(".intel_syntax noprefix\n");
 	printf(".p2align	4, 0x90\n");
@@ -1544,6 +1535,11 @@ void	codegen_x8664(void)
 
 	// コードを生成
 	printf(".section	__TEXT,__text,regular,pure_instructions\n");
-	for (code = g_il; code != NULL; code = code->next)
-		gen_il(code);
+
+	for (pair = g_func_ils; pair != NULL; pair = pair->next)
+	{
+		for (code = pair->code; code != NULL; code = code->next)
+			gen_il(code);
+		g_locals_count = 0;
+	}
 }

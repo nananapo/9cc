@@ -101,6 +101,13 @@ typedef struct s_il
 	bool		gen_is_generated;
 }	t_il;
 
+typedef struct s_funcil_pair
+{
+	struct	s_funcil_pair	*next;
+	t_deffunc				*func;
+	t_il					*code;
+}	t_funcil_pair;
+
 void	translate_il(void);
 void	print_il(t_il *code);
 char	*get_il_name(t_ilkind kind);

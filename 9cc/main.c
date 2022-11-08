@@ -18,7 +18,7 @@ t_defenum		*g_enum_defs[1000];
 t_defunion		*g_union_defs[1000];
 t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
-t_il			*g_il;
+t_funcil_pair	*g_func_ils;
 t_arch			g_arch;
 
 char	*my_strndup(char *source, int len)

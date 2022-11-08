@@ -15,7 +15,6 @@ typedef struct	s_basicblock
 	bool				il_generated;
 
 	struct s_basicblock	*mark_block;
-	bool				mark_prohibited;
 }	t_basicblock;
 
 typedef struct	s_pair_ilblock
@@ -24,5 +23,12 @@ typedef struct	s_pair_ilblock
 	t_basicblock			*block;
 	struct s_pair_ilblock	*next;
 }	t_pair_ilblock;
+
+typedef struct s_label_pair
+{
+	char				*from;
+	char				*to;
+	struct s_label_pair	*next;
+}	t_label_pair;
 
 #endif
