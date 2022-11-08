@@ -1,6 +1,8 @@
 #ifndef NINECC_H
 # define NINECC_H
 
+#define DEBUG
+
 #include <stdbool.h>
 #include "list.h"
 
@@ -287,23 +289,23 @@ struct s_defvar
 	// call
 struct s_deffunc
 {
-	char		*name;
-	int			name_len;
+	char			*name;
+	int				name_len;
 
-	t_type		*type_return;
+	t_type			*type_return;
 
-	int			argcount;
+	int				argcount;
 
-	char		*argument_names[20];
-	int			argument_name_lens[20];
-	t_type		*argument_types[20];
+	char			*argument_names[20];
+	int				argument_name_lens[20];
+	t_type			*argument_types[20];
+	
+	bool			is_static;
+	bool			is_prototype;
+	bool			is_zero_argument;		// func(void)
+	bool			is_variable_argument;	// func(, ...)
 
-	bool		is_static;
-	bool		is_prototype;
-	bool		is_zero_argument;		// func(void)
-	bool		is_variable_argument;	// func(, ...)
-
-	t_lvar		*locals;
+	t_lvar			*locals;
 	struct s_node	*stmt;
 }	*funcdef;
 	int				funccall_argcount;
