@@ -1,6 +1,7 @@
 #include "9cc.h"
 #include "list.h"
 #include "il.h"
+#include "ir.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@ t_deffunc		*g_func_now;
 t_linked_list	*g_type_alias;
 t_funcil_pair	*g_func_ils;
 t_arch			g_arch;
+t_ir_func		*g_ir_funcs[1000];
 
 char	*my_strndup(char *source, int len)
 {
@@ -85,8 +87,8 @@ int main(int argc, char **argv)
 
 	analyze();
 
+	translate_ir();
 	translate_il();
-
 
 	optimize();
 	codegen();
