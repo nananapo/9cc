@@ -125,8 +125,6 @@ EOF
   	fi
 }
 
-assert_gcc "structsize5.c"
-
 assert 0 "int main(){return 0;}"
 assert 42 "int main(){return 42;}"
 
