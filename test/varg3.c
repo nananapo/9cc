@@ -9,7 +9,9 @@ int	test(char *fmt, char *fmt2, ...)
 	va_start(ap, fmt2);
 
 	vfprintf(stdout, fmt, ap);
-	vfprintf(stdout, fmt2, ap);
+	// これ未定義動作
+	// vfprintf(stdout, fmt2, ap);
+	return 0;
 }
 
 int	main(void)
