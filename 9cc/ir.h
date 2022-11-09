@@ -3,6 +3,7 @@
 
 # include <stdbool.h>
 # include "9cc.h"
+# include "list.h"
 
 typedef enum e_irkind
 {
@@ -17,36 +18,51 @@ typedef enum e_ir_numtype
 	IRNUM_FLOAT
 }	t_ir_numtype;
 
+typedef struct s_ir_variable
+{
+	int		id;
+	bool	is_temporary_var;
+	t_lvar	*var_base;
+
+	bool	is_phi_function;
+	//t_list	*phi_ids;
+}	t_ir_variable;
+
+typedef struct s_ir_base
+{
+	t_irkind	kind;
+}	t_ir_base;
+
+typedef struct s_ir_stmt_base
+{
+	t_irkind				kind;
+	t_ir_variable			*result;
+	struct s_ir_stmt_base	*next_stmt;
+}	t_ir_stmt_base;
+
 typedef union u_ir
 {
-	struct s_ir_base
-	{
-		t_irkind	kind;
-	}	base;
-	struct s_ir_stmt_base
-	{
-		t_irkind				kind;
-		struct s_ir_stmt_base	*next_stmt;
-	}	stmtbase;
 	struct s_ir_func
 	{
-		t_irkind				kind;
+		t_irkind		kind;
 
-		char					*name;
-		struct s_ir_stmt_base	*stmt;
-		t_deffunc				*def;
+		char			*name;
+		t_ir_stmt_base	*stmt;
+		t_deffunc		*def;
 	}	func;
 	struct s_ir_return
 	{
-		t_irkind	kind;
-		struct s_ir	*next_stmt;
+		t_irkind		kind;
+		t_ir_variable	*result;
+		t_ir_stmt_base	*next_stmt;
 
-		bool		has_value;
-		union u_ir	*value;
+		bool			has_value;
 	}	ret;
 	struct s_ir_number
 	{
 		t_irkind		kind;
+		t_ir_variable	*result;
+		t_ir_stmt_base	*next_stmt;
 
 		t_ir_numtype	numtype;
 		int				value_int;
@@ -54,8 +70,8 @@ typedef union u_ir
 	}	number;
 } t_ir;
 
-typedef struct s_ir_base		t_ir_base;
-typedef struct s_ir_stmt_base	t_ir_stmt_base;
+//typedef struct s_ir_base		t_ir_base;
+//typedef struct s_ir_stmt_base	t_ir_stmt_base;
 typedef struct s_ir_func		t_ir_func;
 typedef struct s_ir_return		t_ir_return;
 typedef struct s_ir_number		t_ir_number;

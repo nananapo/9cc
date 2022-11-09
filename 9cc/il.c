@@ -5,6 +5,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+extern t_ir_func		*g_ir_funcs[1000];
+extern t_funcil_pair	*g_func_ils;
+
+static t_il	*g_il;
+static t_il	*g_il_last;
+static int	jumpLabelCount;
+static int	ILID_UNIQUE;
+
+/*
 static void	translate_condtional_and(t_node *node);
 static void	translate_condtional_or(t_node *node);
 static void	translate_call(t_node *node);
@@ -18,15 +27,6 @@ static void	translate_switch(t_node *node);
 static void	translate_node(t_node *node);
 static void	translate_func(t_deffunc *func);
 void		translate_il(void);
-
-static t_il	*g_il;
-static t_il	*g_il_last;
-static int	jumpLabelCount;
-static int	ILID_UNIQUE;
-
-// main
-extern t_deffunc		*g_func_defs[1000];
-extern t_funcil_pair	*g_func_ils;
 
 static char	*get_function_epi_label(char *name, int len)
 {
@@ -1029,19 +1029,22 @@ static void	translate_func(t_deffunc *func)
 	code->type			= func->type_return;
 	code->deffunc_def	= func;
 }
+*/
+
+
 
 void	translate_il(void)
 {
 	int				i;
 	t_funcil_pair	*pair;
 
-	for (i = 0; g_func_defs[i] != NULL; i++)
+	for (i = 0; g_ir_funcs[i] != NULL; i++)
 	{
 		g_il = NULL;
-		translate_func(g_func_defs[i]);
+		translate_func(g_ir_funcs[i]);
 
 		pair = calloc(1, sizeof(t_funcil_pair));
-		pair->func = g_func_defs[i];
+		pair->func = g_ir_funcs[i];
 		pair->code = g_il;
 		pair->next = g_func_ils;
 		g_func_ils = pair;
