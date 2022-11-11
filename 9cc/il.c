@@ -34,7 +34,7 @@ static char	*get_function_epi_label(char *name, int len)
 static char	*get_label_str(int i)
 {
 	char	buf[100];
-	sprintf(buf, "%d", i);
+	snprintf(buf, 100, "%d", i);
 	return (my_strcat("L", buf));
 }
 
