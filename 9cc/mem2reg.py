@@ -72,8 +72,10 @@ def WelshPowell(colNum, values, graph):
 			return None
 	return result
 
+"""
 N = 7
-R = 3
+R = 2
+
 c_use = [set() for i in range(N)]
 c_def = [set() for i in range(N)]
 c_succ = [set() for i in range(N)]
@@ -94,21 +96,42 @@ c_def[0] = {"a"}
 for i in range(N-1):
 	c_succ[i].add(i+1)
 c_succ[5].add(1)
+#"""
+
+# variablecount, ircount, registercount
+N,M,R = map(int,input().split())
+
+c_values = []
+c_use = [set() for i in range(N)]
+c_def = [set() for i in range(N)]
+c_succ = [set() for i in range(N)]
+
+for i in range(M):
+	c_values.append(input())
+
+for i in range(N):
+	c_use.append()
 
 graph = create_intereference_graph(c_values, N, c_use, c_def, c_succ);
 degs = get_degrees(graph)
 degs = list(sorted(degs.items(),reverse=True,key=lambda x:x[1]))
 
-print(*graph.items(), sep="\n")
-print(degs)
+#print(*graph.items(), sep="\n")
+#print(degs)
 
 new_values = copy.copy(c_values)
 for i in range(len(c_values)):
 	graph = create_intereference_graph(new_values, N, c_use, c_def, c_succ);
 	result = WelshPowell(R, new_values, graph)
 	if result is not None:
-		print("レジスタ数: ", R)
-		print("割り当て  : ", result)
-		print("spill     : ", *(set(c_values) - set(new_values)))
+		#print("レジスタ数: ", R)
+		#print("割り当て  : ", result)
+		#print("spill     : ", *(set(c_values) - set(new_values)))
+		spills = set(c_values) - set(new_values)
+		for k in c_values:
+			if k in spills:
+				print("-1")
+			else:
+				print(result[k])
 		exit()
 	new_values.remove(degs[i][0])

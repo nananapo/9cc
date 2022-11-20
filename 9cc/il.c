@@ -13,7 +13,6 @@ static t_il	*g_il_last;
 static int	jumpLabelCount;
 static int	ILID_UNIQUE;
 
-/*
 static void	translate_condtional_and(t_node *node);
 static void	translate_condtional_or(t_node *node);
 static void	translate_call(t_node *node);
@@ -223,6 +222,7 @@ static t_il	*append_il(t_ilkind kind)
 	g_il_last = tmp;
 	return (tmp);
 }
+/*
 
 static t_il	*append_il_pushnum(int i)
 {
@@ -994,8 +994,9 @@ static void	translate_node(t_node *node)
 		}
 	}
 }
+*/
 
-static void	translate_func(t_deffunc *func)
+static void	translate_func(t_it_func *func)
 {
 	t_il	*code;
 	t_lvar	*lvar;
@@ -1017,11 +1018,6 @@ static void	translate_func(t_deffunc *func)
 
 	translate_node(func->stmt);
 
-	if (func->type_return->ty == TY_VOID)
-	{
-		append_il_pop(func->stmt->type);
-	}
-
 	code			= append_il(IL_LABEL);
 	code->label_str	= get_function_epi_label(func->name, func->name_len);
 
@@ -1029,9 +1025,6 @@ static void	translate_func(t_deffunc *func)
 	code->type			= func->type_return;
 	code->deffunc_def	= func;
 }
-*/
-
-
 
 void	translate_il(void)
 {

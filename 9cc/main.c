@@ -88,6 +88,7 @@ int main(int argc, char **argv)
 	analyze();
 
 	translate_ir();
+	allocate_register();
 	translate_il();
 
 	optimize();

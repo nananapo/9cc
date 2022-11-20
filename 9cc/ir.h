@@ -21,10 +21,8 @@ typedef enum e_ir_numtype
 typedef struct s_ir_variable
 {
 	int		id;
-	bool	is_temporary_var;
-	t_lvar	*var_base;
-
-	bool	is_phi_function;
+	int		regid;
+	//bool	is_phi_function;
 	//t_list	*phi_ids;
 }	t_ir_variable;
 

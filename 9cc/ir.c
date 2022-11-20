@@ -19,7 +19,7 @@ static t_ir_variable	*translate_stmt(t_node *node);
 static t_ir_variable	*translate_return(t_node *node);
 static t_ir_variable	*translate_num(t_node *node);
 static void	translate_block(t_node *node);
-static t_ir_variable	*malloc_var(bool is_temporary_var);
+static t_ir_variable	*malloc_var(void);
 
 static bool	is_stmt_node(t_nodekind kind)
 {
@@ -61,13 +61,12 @@ static t_ir	*malloc_ir(t_irkind kind)
 	return ((t_ir *)ir);
 }
 
-static t_ir_variable	*malloc_var(bool is_temporary_var)
+static t_ir_variable	*malloc_var(void)
 {
 	t_ir_variable	*var;
 
 	var	= calloc(1, sizeof(t_ir_variable));
 	var->id = g_var_id++;
-	var->is_temporary_var = is_temporary_var;
 	return (var);
 }
 
@@ -103,7 +102,7 @@ static t_ir_variable	*translate_num(t_node *node)
 	var = NULL;
 	if (node->kind == ND_NUM)
 	{
-		var = malloc_var(true);
+		var = malloc_var();
 
 		ir = &malloc_ir(IR_NUMBER)->number;
 		ir->numtype = IRNUM_INT;
@@ -125,7 +124,7 @@ static t_ir_variable	*translate_return(t_node *node)
 	t_ir_return		*ir;
 	t_ir_variable	*var;
 
-	var = malloc_var(true);
+	var = malloc_var();
 
 	ir = &malloc_ir(IR_RETURN)->ret;
 	ir->has_value = node->lhs != NULL;
