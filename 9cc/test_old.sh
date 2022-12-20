@@ -33,6 +33,12 @@ assert() {
 	exit 1
   fi
 
+  # Verilogはコンパイルするだけ
+  if [ "$TARGET" = "verilog" ]; then
+    echo "$input => compile ok"
+    return
+  fi
+
   cc -o tmp tmp.s
   if [ "$?" != "0" ]; then
 	echo "$input => GCC FAIL"
@@ -60,6 +66,13 @@ assert_out(){
 	
     HEY="`echo "$input" | $prpr -`"
 	echo "$HEY"| $ncc > tmp.s
+
+  # Verilogはコンパイルするだけ
+  if [ "$TARGET" = "verilog" ]; then
+	echo "$input => compile ok"
+    return
+  fi
+
 	cc -o tmp tmp.s $module
 	actual=`./tmp`
 
@@ -84,6 +97,12 @@ assert_gcc(){
 		exit 1
 	fi
 	
+  # Verilogはコンパイルするだけ
+  if [ "$TARGET" = "verilog" ]; then
+	echo "$input => compile ok"
+    return
+  fi
+
 	cc -o tmp1 tmp.s $module
 	if [ "$?" != "0" ]; then
 		echo "$1 => 9cc gcc compile KO"
