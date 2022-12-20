@@ -214,6 +214,19 @@ static void	translate_process(t_node *node, t_veriproc **head, t_veriproc **tail
 			*tail = proc;
 			return ;
 		}
+		case ND_MUL:
+		{
+			translate_process(node->lhs, head, &tmp_head);
+			translate_process(node->rhs, &tmp_tail, tail);
+			tmp_head->next = tmp_tail;
+
+			proc = create_proc(VERI_SUB);
+			proc->type = node->type;
+
+			(*tail)->next = proc;
+			*tail = proc;
+			return ;
+		}
 		case ND_CAST:
 		{
 			translate_process(node->lhs, head, tail);
