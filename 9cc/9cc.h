@@ -398,6 +398,7 @@ t_defvar	*find_global(char *str, int len);
 void	parse(void);
 void	analyze(void);
 void	optimize(void);
+void	allocate_register(void);
 
 void	codegen(void);
 int		get_type_size(t_type *type);

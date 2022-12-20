@@ -1,6 +1,7 @@
 #ifndef IL_H
 # define IL_H
 # include "9cc.h"
+# include "ir.h"
 
 // va_startでは何もpushしない
 typedef enum e_ilkind
@@ -104,7 +105,7 @@ typedef struct s_il
 typedef struct s_funcil_pair
 {
 	struct	s_funcil_pair	*next;
-	t_deffunc				*func;
+	t_ir_func				*func;
 	t_il					*code;
 }	t_funcil_pair;
 
