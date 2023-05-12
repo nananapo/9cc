@@ -13,6 +13,7 @@ static t_il	*g_il_last;
 static int	jumpLabelCount;
 static int	ILID_UNIQUE;
 
+/*
 static void	translate_condtional_and(t_node *node);
 static void	translate_condtional_or(t_node *node);
 static void	translate_call(t_node *node);
@@ -24,7 +25,8 @@ static void	translate_dowhile(t_node *node);
 static void	translate_for(t_node *node);
 static void	translate_switch(t_node *node);
 static void	translate_node(t_node *node);
-static void	translate_func(t_deffunc *func);
+*/
+static void	translate_func(t_ir_func *func);
 void		translate_il(void);
 
 static char	*get_function_epi_label(char *name, int len)
@@ -222,7 +224,6 @@ static t_il	*append_il(t_ilkind kind)
 	g_il_last = tmp;
 	return (tmp);
 }
-/*
 
 static t_il	*append_il_pushnum(int i)
 {
@@ -232,6 +233,7 @@ static t_il	*append_il_pushnum(int i)
 	return (code);
 }
 
+/*
 static t_il	*append_il_pushflonum(float i)
 {
 	t_il	*code;
@@ -705,311 +707,42 @@ static void	translate_switch(t_node *node)
 
 	append_il_pushnum(50);
 }
+*/
 
-static void	translate_node(t_node *node)
+static void translate_node(t_ir_stmt_base* node)
 {
-	t_il	*code;
-
-	//fprintf(stderr, "# kind: %d\n", node->kind);
-	if (!node->is_analyzed)
-		error("t_node is not analyzed");
-
 	switch(node->kind)
 	{
-		case ND_BLOCK:
-			translate_block(node);
-			return ;
-		case ND_NUM:
+		case IR_NUMBER:
+		{
 			append_il_pushnum(node->val);
 			return ;
-		case ND_FLOAT:
-			append_il_pushflonum(node->val_float);
-			return ;
-
-		// TODO analyzeで両方の型が一致している状態にする
-		case ND_ADD:
-		case ND_SUB:
-		case ND_MUL:
-		case ND_DIV:
-		case ND_MOD:
-		case ND_EQUAL:
-		case ND_NEQUAL:
-		case ND_LESS:
-		case ND_LESSEQ:
-		case ND_BITWISE_AND:
-		case ND_BITWISE_OR:
-		case ND_BITWISE_XOR:
-		case ND_SHIFT_LEFT:
-		case ND_SHIFT_RIGHT:
-		{
-			translate_node(node->lhs);
-			translate_node(node->rhs);
-			
-			if (node->kind == ND_ADD)
-				code = append_il(IL_ADD);
-			else if (node->kind == ND_SUB)
-				code = append_il(IL_SUB);
-			else if (node->kind == ND_MUL)
-				code = append_il(IL_MUL);
-			else if (node->kind == ND_DIV)
-				code = append_il(IL_DIV);
-			else if (node->kind == ND_MOD)
-				code = append_il(IL_MOD);
-			else if (node->kind == ND_EQUAL)
-				code = append_il(IL_EQUAL);
-			else if (node->kind == ND_NEQUAL)
-				code = append_il(IL_NEQUAL);
-			else if (node->kind == ND_LESS)
-				code = append_il(IL_LESS);
-			else if (node->kind == ND_LESSEQ)
-				code = append_il(IL_LESSEQ);
-			else if (node->kind == ND_BITWISE_AND)
-				code = append_il(IL_BITWISE_AND);
-			else if (node->kind == ND_BITWISE_OR)
-				code = append_il(IL_BITWISE_OR);
-			else if (node->kind == ND_BITWISE_XOR)
-				code = append_il(IL_BITWISE_XOR);
-			else if (node->kind == ND_SHIFT_LEFT)
-				code = append_il(IL_SHIFT_LEFT);
-			else //if (node->kind == ND_SHIFT_RIHGT)
-				code = append_il(IL_SHIFT_RIGHT);
-
-			code->type = node->type;
-			return ;
 		}
-		case ND_BITWISE_NOT:
+		case IR_RETURN:
 		{
-			translate_node(node->lhs);
-			code		= append_il(IL_BITWISE_NOT);
-			code->type	= node->lhs->type;
-			return ;
-		}
-		case ND_COMP_ADD:
-		case ND_COMP_SUB:
-		case ND_COMP_MUL:
-		case ND_COMP_DIV:
-		case ND_COMP_MOD:
-		{
-			// 左辺を二回push -> load -> 右辺をpush -> op -> assign
-			translate_node(node->lhs);
-			code		= append_il(IL_PUSH_AGAIN);
-			code->type	= node->lhs->type;
-
-			code		= append_il(IL_LOAD);
-			code->type	= node->lhs->type->ptr_to;
-
-			translate_node(node->rhs);
-
-			// op
-			if (node->kind == ND_COMP_ADD)
-				code	= append_il(IL_ADD);
-			else if (node->kind == ND_COMP_SUB)
-				code	= append_il(IL_SUB);
-			else if (node->kind == ND_COMP_MUL)
-				code	= append_il(IL_MUL);
-			else if (node->kind == ND_COMP_DIV)
-				code	= append_il(IL_DIV);
-			else// if (node->kind == ND_COMP_MOD)
-				code	= append_il(IL_MOD);
-			code->type	= node->type;
-
-			code		= append_il(IL_ASSIGN);
-			code->type	= node->type;
-			return ;
-		}
-		case ND_ASSIGN:
-		{
-			translate_node(node->lhs);
-			translate_node(node->rhs);
-			code		= append_il(IL_ASSIGN);
-			code->type	= node->type;
-			return ;
-		}
-		case ND_VAR_LOCAL:
-		{
-			code			= append_il(IL_VAR_LOCAL);
-			code->var_local	= node->lvar;
-			return ;
-		}
-		case ND_VAR_LOCAL_ADDR:
-		{
-			code			= append_il(IL_VAR_LOCAL_ADDR);
-			code->var_local	= node->lvar;
-			return ;
-		}
-		case ND_VAR_GLOBAL:
-		{
-			code			= append_il(IL_VAR_GLOBAL);
-			code->var_global= node->var_global;
-			return ;
-		}
-		case ND_VAR_GLOBAL_ADDR:
-		{
-			code			= append_il(IL_VAR_GLOBAL_ADDR);
-			code->var_global= node->var_global;
-			return ;
-		}
-		case ND_COND_AND:
-			translate_condtional_and(node);
-			return ;
-		case ND_COND_OR:
-			translate_condtional_or(node);
-			return ;
-		case ND_CAST:
-		{
-			translate_node(node->lhs);
-			code			= append_il(IL_CAST);
-			code->cast_from	= node->lhs->type;
-			code->cast_to	= node->type;
-			return ;
-		}
-		case ND_DEREF:
-		{
-			translate_node(node->lhs);
-			code		= append_il(IL_LOAD);
-			code->type	= node->type;
-			return ;
-		}
-		case ND_DEREF_ADDR:
-		{
-			translate_node(node->lhs);
-			return ;
-		}
-		case ND_MEMBER_VALUE:
-		{
-			translate_node(node->lhs);
-			code		= append_il(IL_MEMBER);
-			code->member= node->elem;
-			return ;
-		}
-		case ND_MEMBER_VALUE_ADDR:
-		{
-			translate_node(node->lhs);
-			code		= append_il(IL_MEMBER_ADDR);
-			code->member= node->elem;
-			return ;
-		}
-		case ND_MEMBER_PTR_VALUE:
-		{
-			translate_node(node->lhs);
-			code		= append_il(IL_MEMBER_PTR);
-			code->member= node->elem;
-			return ;
-		}
-		case ND_MEMBER_PTR_VALUE_ADDR:
-		{
-			translate_node(node->lhs);
-			code		= append_il(IL_MEMBER_PTR_ADDR);
-			code->member= node->elem;
-			return ;
-		}
-		case ND_CALL_MACRO_VA_START:
-		{
-			translate_node(node->funccall_args[0]);
-			code					= append_il(IL_MACRO_VASTART);
-			//code->funccall_caller	= node->funccall_caller;
-			append_il_pushnum(0);
-			return ;
-		}
-		case ND_STR_LITERAL: // 文字列リテラルのアドレスは?
-		{
-			code			= append_il(IL_STR_LIT);
-			code->def_str	= node->def_str;
-			return ;
-		}
-		case ND_CALL:
-			translate_call(node);
-			return ;
-		case ND_RETURN:
 			translate_return(node);
-			return ;
-		case ND_CONTINUE:
-		{
-			code			= append_il(IL_JUMP);
-			code->label_str	= get_label_str(node->block_sbdata->startLabel);
-			append_il_pushnum(0);
-			return;
-		}
-		case ND_BREAK:
-		{
-			code			= append_il(IL_JUMP);
-			code->label_str	= get_label_str(node->block_sbdata->endLabel);
-			append_il_pushnum(0);
-			return;
-		}
-		case ND_CASE:
-		{
-			code			= append_il(IL_LABEL);
-			code->label_str	= get_label_str(node->case_label->label);
-			append_il_pushnum(0);
-			return;
-		}
-		case ND_DEFAULT:
-		{
-			code			= append_il(IL_LABEL);
-			code->label_str	= get_label_str(node->block_sbdata->defaultLabel);
-			append_il_pushnum(0);
-			return;
-		}
-		case ND_COND_OP:
-			translate_conditional_op(node);
-			return ;
-		case ND_IF:
-			translate_if(node);
-			return ;
-		case ND_WHILE:
-			translate_while(node);
-			return ;
-		case ND_DOWHILE:
-			translate_dowhile(node);
-			return ;
-		case ND_FOR:
-			translate_for(node);
-			return ;
-		case ND_SWITCH:
-			translate_switch(node);
-			return ;
-		case ND_VAR_DEF_ARRAY:
-		{
-			code			= append_il(IL_VAR_LOCAL_ADDR);
-			code->var_local	= node->lvar;
-
-			code = append_il(IL_DEF_VAR_LOCAL_ARRAY);
-			code->type = node->lvar->type;
-			code->lvar_array = node->lvar_const;
-			return ;
-		}
-		case ND_NONE:
-			append_il_pushnum(0);
-			return ;
-		case ND_SIZEOF:
-			fprintf(stderr, "sizeof not allowed\n"); // TODO genまで持っていく
-			error("Error");
-			return ;
-		default:
-		{
-			fprintf(stderr, "il not implemented\nkind : %d\n", node->kind);
-			error("Error");
 			return ;
 		}
 	}
 }
-*/
 
-static void	translate_func(t_it_func *func)
+static void	translate_func(t_ir_func *func)
 {
 	t_il	*code;
 	t_lvar	*lvar;
+	char	*label_name;
+
+	label_name = my_strndup(func->def->name, func->def->name_len);
 
 	code						= append_il(IL_LABEL);
-	code->label_str				= my_strndup(func->name, func->name_len);
+	code->label_str				= label_name;
 	code->label_is_deffunc		= true;
-	code->label_is_static_func	= func->is_static;
+	code->label_is_static_func	= func->def->is_static;
 
 	code				= append_il(IL_FUNC_PROLOGUE);
-	code->deffunc_def	= func;
+	code->deffunc_def	= func->def;
 
-	for (lvar = func->locals; lvar != NULL; lvar = lvar->next)
+	for (lvar = func->def->locals; lvar != NULL; lvar = lvar->next)
 	{
 		code = append_il(IL_DEF_VAR_LOCAL);
 		code->var_local = lvar;
@@ -1019,7 +752,7 @@ static void	translate_func(t_it_func *func)
 	translate_node(func->stmt);
 
 	code			= append_il(IL_LABEL);
-	code->label_str	= get_function_epi_label(func->name, func->name_len);
+	code->label_str	= get_function_epi_label(func->def->name, func->def->name_len);
 
 	code				= append_il(IL_FUNC_EPILOGUE);
 	code->type			= func->type_return;
